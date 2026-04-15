@@ -1,0 +1,102 @@
+import { MIDI_MIN, MIDI_MAX, isBlackKey } from '../core/midi/types'
+
+// Fixed pixel distance below the now-line that's always visible as "trail".
+// This value doesn't change with zoom — the time represented by the trail
+// decreases as you zoom in (fewer seconds fit in the same pixels).
+const TRAIL_PX = 80
+
+export interface ViewportConfig {
+  canvasWidth: number
+  canvasHeight: number
+  keyboardHeight: number
+  pixelsPerSecond: number
+}
+
+export class Viewport {
+  private cfg: ViewportConfig
+  private keyPositions: Map<number, { x: number; width: number }> = new Map()
+
+  constructor(cfg: ViewportConfig) {
+    this.cfg = cfg
+    this.buildKeyLayout()
+  }
+
+  update(partial: Partial<ViewportConfig>): void {
+    this.cfg = { ...this.cfg, ...partial }
+    this.buildKeyLayout()
+  }
+
+  get config(): Readonly<ViewportConfig> {
+    return this.cfg
+  }
+
+  get rollHeight(): number {
+    return this.cfg.canvasHeight - this.cfg.keyboardHeight
+  }
+
+  // Fixed position — does NOT shift when zoom changes
+  get nowLineY(): number {
+    return this.rollHeight - TRAIL_PX
+  }
+
+  // How many seconds of "past" are visible below the now-line (decreases as zoom increases)
+  get trailSeconds(): number {
+    return TRAIL_PX / this.cfg.pixelsPerSecond
+  }
+
+  // How many seconds of "future" are visible above the now-line (decreases as zoom increases)
+  get lookaheadSeconds(): number {
+    return Math.max(1, this.rollHeight - TRAIL_PX) / this.cfg.pixelsPerSecond
+  }
+
+  // Convert a time offset relative to currentTime → Y pixel.
+  // Positive delta = future (above now-line, smaller Y), negative = past (below, larger Y).
+  timeOffsetToY(deltaSeconds: number): number {
+    return this.nowLineY - deltaSeconds * this.cfg.pixelsPerSecond
+  }
+
+  pitchToX(pitch: number): number {
+    return this.keyPositions.get(pitch)?.x ?? 0
+  }
+
+  pitchWidth(pitch: number): number {
+    return this.keyPositions.get(pitch)?.width ?? 0
+  }
+
+  isTimeVisible(time: number, duration: number, currentTime: number): boolean {
+    const start = time - currentTime
+    const end = start + duration
+    return end > -(this.trailSeconds + 0.5) && start < (this.lookaheadSeconds + 0.5)
+  }
+
+  getAllKeyPositions(): Map<number, { x: number; width: number }> {
+    return this.keyPositions
+  }
+
+  private buildKeyLayout(): void {
+    this.keyPositions.clear()
+
+    let wCount = 0
+    for (let p = MIDI_MIN; p <= MIDI_MAX; p++) {
+      if (!isBlackKey(p)) wCount++
+    }
+
+    const whiteW = this.cfg.canvasWidth / wCount
+    const blackW = whiteW * 0.58
+    const blackOffset = whiteW - blackW / 2
+
+    let wIndex = 0
+    for (let p = MIDI_MIN; p <= MIDI_MAX; p++) {
+      if (isBlackKey(p)) continue
+      this.keyPositions.set(p, { x: wIndex * whiteW, width: whiteW })
+      wIndex++
+    }
+
+    for (let p = MIDI_MIN; p <= MIDI_MAX; p++) {
+      if (!isBlackKey(p)) continue
+      const left = this.keyPositions.get(p - 1)
+      if (!left) continue
+      this.keyPositions.set(p, { x: left.x + blackOffset, width: blackW })
+    }
+  }
+}
