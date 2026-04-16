@@ -7,7 +7,7 @@ export interface MidiNoteEvent {
   clockTime: number   // MasterClock.currentTime at the moment of the event
 }
 
-export type MidiDeviceStatus = 'unavailable' | 'disconnected' | 'connected'
+export type MidiDeviceStatus = 'unavailable' | 'disconnected' | 'connected' | 'blocked'
 
 // Manages Web MIDI access, device hot-plug, and raw message parsing.
 // Emits noteOn / noteOff signals synchronously on each incoming message.
@@ -29,18 +29,21 @@ export class MidiInputManager {
 
   constructor(private readonly clock: MasterClock) {}
 
-  // Must be called from a user-gesture handler (button click) so the browser
-  // grants MIDI permission. Also a good place to resume the AudioContext.
-  async requestAccess(): Promise<void> {
-    if (this.status.value === 'unavailable') return
+  async requestAccess(opts?: { silent?: boolean }): Promise<boolean> {
+    if (this.status.value === 'unavailable') return false
 
     try {
       this.access = await navigator.requestMIDIAccess({ sysex: false })
       this.access.onstatechange = () => this.rebindInputs()
       this.rebindInputs()
+      return true
     } catch (err) {
-      console.warn('[MidiInputManager] Access denied:', err)
-      this.status.set('disconnected')
+      if (!opts?.silent) {
+        console.warn('[MidiInputManager] Access denied:', err)
+      }
+      this.status.set('blocked')
+      this.deviceName.set('')
+      return false
     }
   }
 
@@ -72,7 +75,15 @@ export class MidiInputManager {
     const pitch    = data[1]!
     const rawVel   = data[2] ?? 0
     const velocity = rawVel / 127
-    const clockTime = this.clock.currentTime
+    let clockTime = this.clock.currentTime
+    const receivedTime = (e as MIDIMessageEvent & { receivedTime?: number }).receivedTime
+
+    // Use the device event timestamp when available so the visual hit-point
+    // lands closer to the real key press instead of the callback delivery time.
+    if (typeof performance !== 'undefined' && Number.isFinite(receivedTime)) {
+      const deltaSeconds = ((receivedTime ?? 0) - performance.now()) / 1000
+      clockTime = Math.max(0, clockTime + deltaSeconds * this.clock.speed)
+    }
 
     if (status === 0x90 && rawVel > 0) {
       // Note-on
@@ -92,5 +103,6 @@ export class MidiInputManager {
     this.access.onstatechange = null
     this.access = null
     this.status.set('disconnected')
+    this.deviceName.set('')
   }
 }

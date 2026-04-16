@@ -1,7 +1,6 @@
-import type { appState } from '../store/state'
+import type { appState, AppMode } from '../store/state'
 import type { MasterClock } from '../core/clock/MasterClock'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
-import { escHtml } from './utils'
 
 type State = typeof appState
 
@@ -21,6 +20,8 @@ export interface ControlsOptions {
   onMidiConnect?: () => void
   onOpenTracks?: () => void
   onRecord?: () => void
+  onOpenFile?: () => void
+  onModeRequest?: (mode: Exclude<AppMode, 'home'>) => void
 }
 
 export class Controls {
@@ -29,11 +30,35 @@ export class Controls {
   private playBtn!: HTMLButtonElement
   private scrubber!: HTMLInputElement
   private timeDisplay!: HTMLElement
+  private durationEl!: HTMLElement
   private midiBtn!: HTMLButtonElement
+  private midiLabelEl!: HTMLElement
+  private titleEl!: HTMLElement
+  private kickerEl!: HTMLElement
+  private openBtn!: HTMLButtonElement
+  private tracksBtn!: HTMLButtonElement
+  private recordBtn!: HTMLButtonElement
+  private fileModeBtn!: HTMLButtonElement
+  private liveModeBtn!: HTMLButtonElement
+  private hudDragHandle!: HTMLButtonElement
   private isScrubbing = false
   private idleTimer: ReturnType<typeof setTimeout> | null = null
-  private onMouseMoveDoc = (): void => { if (this.hud.classList.contains('hud--active')) this.wakeUp() }
-  private onKeyDownDoc  = (e: KeyboardEvent): void => this.handleKey(e)
+  private currentMidiStatus: MidiDeviceStatus = 'disconnected'
+  private currentMidiDeviceName = ''
+  private hudOffsetX = 0
+  private hudOffsetY = 0
+  private isDraggingHud = false
+  private hudDragStartX = 0
+  private hudDragStartY = 0
+  private hudDragOriginX = 0
+  private hudDragOriginY = 0
+  private onMouseMoveDoc = (): void => {
+    if (this.hud.classList.contains('hud--active')) this.wakeUp()
+  }
+  private onKeyDownDoc = (e: KeyboardEvent): void => this.handleKey(e)
+  private onPointerMoveDoc = (e: PointerEvent): void => this.handleHudDragMove(e)
+  private onPointerUpDoc = (): void => this.stopHudDrag()
+  private onWindowResize = (): void => this.clampHudOffset()
 
   constructor(private opts: ControlsOptions) {
     this.buildTopStrip()
@@ -42,33 +67,45 @@ export class Controls {
     this.bindState()
     document.addEventListener('mousemove', this.onMouseMoveDoc)
     document.addEventListener('keydown', this.onKeyDownDoc)
+    window.addEventListener('resize', this.onWindowResize)
   }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
 
   private buildTopStrip(): void {
     const el = document.createElement('div')
     el.id = 'top-strip'
     el.innerHTML = `
-      <button class="ts-btn" id="ts-tracks" title="Tracks" aria-label="Open track list">
-        ${ICON_TRACKS}
-      </button>
+      <div class="ts-left">
+        <div class="mode-switch" aria-label="Mode">
+          <button class="mode-btn" id="ts-mode-file" type="button">File</button>
+          <button class="mode-btn" id="ts-mode-live" type="button">Live</button>
+        </div>
+        <button class="ts-action-btn" id="ts-open" type="button">Open MIDI</button>
+        <button class="ts-btn" id="ts-tracks" title="Tracks" aria-label="Open track list">
+          ${ICON_TRACKS}
+        </button>
+      </div>
+
       <div class="ts-center">
-        <span class="ts-title" id="ts-title">
-          <span class="ts-placeholder">No file loaded</span>
-        </span>
-        <div class="ts-bars" aria-hidden="true">
-          <span></span><span></span><span></span><span></span>
+        <div class="ts-kicker" id="ts-kicker">Choose a mode</div>
+        <div class="ts-title-row">
+          <span class="ts-title" id="ts-title">
+            <span class="ts-placeholder">Open MIDI or play live</span>
+          </span>
+          <div class="ts-bars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
         </div>
       </div>
+
       <div class="ts-end">
-        <button class="ts-btn midi-btn" id="ts-midi" title="Connect MIDI keyboard" aria-label="Connect MIDI keyboard">
+        <button class="midi-chip" id="ts-midi" type="button" aria-label="Enable MIDI">
           ${ICON_MIDI}
+          <span id="ts-midi-label">Enable MIDI</span>
         </button>
         <button class="ts-btn ts-theme-btn" id="ts-theme" title="Cycle theme" aria-label="Cycle theme">
           <span class="theme-dot" id="ts-theme-dot"></span>
         </button>
-        <button class="ts-record-btn" id="ts-record" aria-label="Record MP4">
+        <button class="ts-record-btn" id="ts-record" type="button" aria-label="Record MP4">
           ${ICON_RECORD}
           <span>Record</span>
         </button>
@@ -83,6 +120,9 @@ export class Controls {
     el.id = 'hud'
     el.innerHTML = `
       <div class="hud-bar">
+        <button class="hud-drag-handle" id="hud-drag" type="button" aria-label="Move controls">
+          ${ICON_GRIP}
+        </button>
         <button class="btn-skip" id="hud-skip-back" title="Back 10s">${ICON_SKIP_BACK}</button>
         <button class="btn-play" id="hud-play" aria-label="Play">${ICON_PLAY}</button>
         <button class="btn-skip" id="hud-skip-fwd" title="Forward 10s">${ICON_SKIP_FWD}</button>
@@ -123,42 +163,56 @@ export class Controls {
     this.hud = el
   }
 
-  // ── Events ────────────────────────────────────────────────────────────────
-
   private bindEvents(): void {
     const { state, clock, onSeek, onZoom } = this.opts
 
-    this.playBtn     = this.hud.querySelector<HTMLButtonElement>('#hud-play')!
-    this.scrubber    = this.hud.querySelector<HTMLInputElement>('#hud-scrubber')!
+    this.playBtn = this.hud.querySelector<HTMLButtonElement>('#hud-play')!
+    this.scrubber = this.hud.querySelector<HTMLInputElement>('#hud-scrubber')!
     this.timeDisplay = this.hud.querySelector<HTMLElement>('#hud-time')!
-    this.midiBtn     = this.topStrip.querySelector<HTMLButtonElement>('#ts-midi')!
+    this.durationEl = this.hud.querySelector<HTMLElement>('#hud-duration')!
+    this.midiBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-midi')!
+    this.midiLabelEl = this.topStrip.querySelector<HTMLElement>('#ts-midi-label')!
+    this.titleEl = this.topStrip.querySelector<HTMLElement>('#ts-title')!
+    this.kickerEl = this.topStrip.querySelector<HTMLElement>('#ts-kicker')!
+    this.openBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-open')!
+    this.tracksBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-tracks')!
+    this.recordBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-record')!
+    this.fileModeBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-file')!
+    this.liveModeBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-live')!
+    this.hudDragHandle = this.hud.querySelector<HTMLButtonElement>('#hud-drag')!
 
-    // Play / pause
     this.playBtn.addEventListener('click', () => {
+      if (state.mode.value !== 'file') return
       const s = state.status.value
       if (s === 'playing') {
-        clock.pause(); state.status.set('paused')
+        clock.pause()
+        state.pausePlayback()
       } else if (s === 'paused' || s === 'ready') {
-        clock.play(); state.status.set('playing')
+        clock.play()
+        state.startPlaying()
       }
     })
 
-    // Skip
     this.hud.querySelector('#hud-skip-back')!.addEventListener('click', () => {
+      if (state.mode.value !== 'file') return
       const t = Math.max(0, clock.currentTime - SKIP_SECONDS)
-      clock.seek(t); onSeek?.(t)
+      clock.seek(t)
+      onSeek?.(t)
     })
     this.hud.querySelector('#hud-skip-fwd')!.addEventListener('click', () => {
+      if (state.mode.value !== 'file') return
       const t = Math.min(state.duration.value, clock.currentTime + SKIP_SECONDS)
-      clock.seek(t); onSeek?.(t)
+      clock.seek(t)
+      onSeek?.(t)
     })
 
-    // Scrubber
     this.scrubber.addEventListener('mousedown', () => {
       this.isScrubbing = true
-      this.wakeUp()  // ensure HUD visible while scrubbing even if it auto-hid
+      this.wakeUp()
     })
-    this.scrubber.addEventListener('touchstart', () => { this.isScrubbing = true }, { passive: true })
+    this.scrubber.addEventListener('touchstart', () => {
+      this.isScrubbing = true
+    }, { passive: true })
     this.scrubber.addEventListener('input', () => {
       const t = parseFloat(this.scrubber.value)
       this.timeDisplay.textContent = formatTime(t)
@@ -167,37 +221,40 @@ export class Controls {
     this.scrubber.addEventListener('change', () => {
       this.isScrubbing = false
       const t = parseFloat(this.scrubber.value)
-      clock.seek(t); onSeek?.(t)
+      clock.seek(t)
+      onSeek?.(t)
     })
 
-    // Volume
     this.hud.querySelector<HTMLInputElement>('#hud-volume')!.addEventListener('input', (e) => {
-      state.volume.set(parseFloat((e.target as HTMLInputElement).value))
+      state.setVolume(parseFloat((e.target as HTMLInputElement).value))
     })
 
-    // Speed
     const speedSlider = this.hud.querySelector<HTMLInputElement>('#hud-speed')!
-    const speedVal    = this.hud.querySelector<HTMLElement>('#hud-speed-val')!
+    const speedVal = this.hud.querySelector<HTMLElement>('#hud-speed-val')!
     speedSlider.addEventListener('input', () => {
       const s = parseFloat(speedSlider.value)
       speedVal.textContent = formatSpeed(s)
-      state.speed.set(s)
+      state.setSpeed(s)
     })
 
-    // Zoom
     this.hud.querySelector<HTMLInputElement>('#hud-zoom')!.addEventListener('input', (e) => {
       onZoom?.(parseFloat((e.target as HTMLInputElement).value))
     })
 
-    // Top strip
     this.topStrip.querySelector('#ts-theme')!.addEventListener('click', () => this.opts.onThemeCycle?.())
     this.midiBtn.addEventListener('click', () => this.opts.onMidiConnect?.())
-    this.topStrip.querySelector('#ts-tracks')!.addEventListener('click', () => this.opts.onOpenTracks?.())
-    this.topStrip.querySelector('#ts-record')!.addEventListener('click', () => this.opts.onRecord?.())
+    this.tracksBtn.addEventListener('click', () => this.opts.onOpenTracks?.())
+    this.recordBtn.addEventListener('click', () => this.opts.onRecord?.())
+    this.openBtn.addEventListener('click', () => this.opts.onOpenFile?.())
+    this.fileModeBtn.addEventListener('click', () => this.opts.onModeRequest?.('file'))
+    this.liveModeBtn.addEventListener('click', () => this.opts.onModeRequest?.('live'))
+    this.hudDragHandle.addEventListener('pointerdown', (e) => this.startHudDrag(e))
   }
 
   private handleKey(e: KeyboardEvent): void {
     if ((e.target as HTMLElement).tagName === 'INPUT') return
+    if (this.opts.state.mode.value !== 'file') return
+
     if (e.code === 'Space') {
       e.preventDefault()
       this.playBtn.click()
@@ -208,21 +265,19 @@ export class Controls {
       e.preventDefault()
       this.hud.querySelector<HTMLButtonElement>('#hud-skip-fwd')!.click()
     } else if (e.code === 'KeyT') {
-      if (this.hud.classList.contains('hud--active')) this.opts.onOpenTracks?.()
+      this.opts.onOpenTracks?.()
     } else if (e.code === 'KeyR') {
-      if (this.hud.classList.contains('hud--active') && !this.hud.classList.contains('hud--exporting')) {
+      if (!this.hud.classList.contains('hud--exporting')) {
         this.opts.onRecord?.()
       }
     }
   }
 
-  // ── State ─────────────────────────────────────────────────────────────────
-
   private bindState(): void {
     const { state, clock } = this.opts
 
     clock.subscribe((t) => {
-      if (this.isScrubbing) return
+      if (state.mode.value !== 'file' || this.isScrubbing) return
       const dur = state.duration.value
       this.scrubber.value = String(t)
       this.timeDisplay.textContent = formatTime(t)
@@ -231,35 +286,111 @@ export class Controls {
       if (dur > 0 && t >= dur) {
         clock.pause()
         clock.seek(0)
-        state.status.set('ready')
+        state.setReady()
       }
     })
 
     state.duration.subscribe((d) => {
       this.scrubber.max = String(d)
-      this.hud.querySelector<HTMLElement>('#hud-duration')!.textContent = formatTime(d)
+      this.durationEl.textContent = formatTime(d)
     })
 
-    state.status.subscribe((s) => {
-      // Visibility: show controls whenever something is loaded or live; hide on idle/loading
-      const active = s !== 'idle' && s !== 'loading'
-      this.topStrip.classList.toggle('strip--active', active)
-      this.hud.classList.toggle('hud--active', active)
+    state.mode.subscribe(() => this.refreshUi())
+    state.status.subscribe(() => this.refreshUi())
+    state.loadedMidi.subscribe(() => this.refreshUi())
 
-      this.playBtn.innerHTML = s === 'playing' ? ICON_PAUSE : ICON_PLAY
-      this.hud.classList.toggle('hud--playing',       s === 'playing')
-      this.hud.classList.toggle('hud--exporting',     s === 'exporting')
-      this.topStrip.classList.toggle('strip--playing',   s === 'playing')
-      this.topStrip.classList.toggle('strip--exporting', s === 'exporting')
-      if (s === 'playing') {
-        this.scheduleIdle()
-      } else {
-        this.clearIdle()
-      }
-    })
+    this.refreshUi()
   }
 
-  // ── Auto-hide ─────────────────────────────────────────────────────────────
+  updateThemeDot(color: string): void {
+    const dot = this.topStrip.querySelector<HTMLElement>('#ts-theme-dot')
+    if (dot) dot.style.background = color
+  }
+
+  updateMidiStatus(status: MidiDeviceStatus, deviceName: string): void {
+    this.currentMidiStatus = status
+    this.currentMidiDeviceName = deviceName
+    this.midiBtn.dataset['midiStatus'] = status
+    this.midiBtn.classList.toggle('midi-connected', status === 'connected')
+    this.midiBtn.classList.toggle('midi-blocked', status === 'blocked')
+    this.midiBtn.classList.toggle('midi-unavailable', status === 'unavailable')
+
+    const label = getMidiLabel(status, deviceName)
+    this.midiBtn.title = label
+    this.midiBtn.setAttribute('aria-label', label)
+    this.midiLabelEl.textContent = label
+    this.refreshUi()
+  }
+
+  dispose(): void {
+    document.removeEventListener('mousemove', this.onMouseMoveDoc)
+    document.removeEventListener('keydown', this.onKeyDownDoc)
+    document.removeEventListener('pointermove', this.onPointerMoveDoc)
+    document.removeEventListener('pointerup', this.onPointerUpDoc)
+    window.removeEventListener('resize', this.onWindowResize)
+    this.clearIdle()
+  }
+
+  private refreshUi(): void {
+    const { state } = this.opts
+    const mode = state.mode.value
+    const status = state.status.value
+    const midi = state.loadedMidi.value
+    const hasFile = midi !== null
+    const isFileMode = mode === 'file'
+    const isLoadingFile = isFileMode && status === 'loading'
+    const showHud = isFileMode && hasFile && !isLoadingFile
+
+    this.topStrip.classList.add('strip--active')
+    this.topStrip.classList.toggle('strip--playing', isFileMode && status === 'playing')
+    this.topStrip.classList.toggle('strip--exporting', status === 'exporting')
+    this.topStrip.dataset['mode'] = mode
+
+    this.fileModeBtn.classList.toggle('mode-btn--active', mode === 'file')
+    this.liveModeBtn.classList.toggle('mode-btn--active', mode === 'live')
+
+    this.tracksBtn.classList.toggle('hidden', !isFileMode || !hasFile || isLoadingFile)
+    this.recordBtn.classList.toggle('hidden', !isFileMode || !hasFile || isLoadingFile)
+
+    this.hud.classList.toggle('hud--active', showHud)
+    this.hud.classList.toggle('hud--playing', isFileMode && status === 'playing')
+    this.hud.classList.toggle('hud--exporting', status === 'exporting')
+    this.applyHudOffset()
+    this.playBtn.innerHTML = status === 'playing' ? ICON_PAUSE : ICON_PLAY
+
+    this.renderHeader(mode, midi?.name ?? null)
+
+    if (isFileMode && status === 'playing') {
+      this.scheduleIdle()
+    } else {
+      this.clearIdle()
+    }
+  }
+
+  private renderHeader(mode: AppMode, fileName: string | null): void {
+    if (mode === 'file' && this.opts.state.status.value === 'loading') {
+      this.kickerEl.textContent = 'Loading'
+      this.titleEl.textContent = 'Opening MIDI'
+      return
+    }
+
+    if (mode === 'live') {
+      this.kickerEl.textContent = 'Live'
+      this.titleEl.textContent = this.currentMidiStatus === 'connected'
+        ? (this.currentMidiDeviceName || 'MIDI ready')
+        : 'Play live'
+      return
+    }
+
+    if (mode === 'file') {
+      this.kickerEl.textContent = 'File'
+      this.titleEl.textContent = fileName ?? 'Open MIDI'
+      return
+    }
+
+    this.kickerEl.textContent = 'Ready'
+    this.titleEl.textContent = 'Open MIDI or play live'
+  }
 
   private wakeUp(): void {
     this.topStrip.classList.remove('strip--dim')
@@ -269,7 +400,7 @@ export class Controls {
 
   private scheduleIdle(): void {
     this.clearIdle()
-    if (this.opts.state.status.value !== 'playing') return
+    if (this.opts.state.mode.value !== 'file' || this.opts.state.status.value !== 'playing') return
     this.idleTimer = setTimeout(() => {
       if (!this.isScrubbing) {
         this.topStrip.classList.add('strip--dim')
@@ -279,45 +410,69 @@ export class Controls {
   }
 
   private clearIdle(): void {
-    if (this.idleTimer) { clearTimeout(this.idleTimer); this.idleTimer = null }
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer)
+      this.idleTimer = null
+    }
     this.topStrip.classList.remove('strip--dim')
     this.hud.classList.remove('hud--idle')
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
-
-  setFileName(name: string): void {
-    const titleEl = this.topStrip.querySelector<HTMLElement>('#ts-title')!
-    titleEl.innerHTML = `<strong>${escHtml(name)}</strong>`
+  private startHudDrag(e: PointerEvent): void {
+    e.preventDefault()
+    this.isDraggingHud = true
+    this.hudDragStartX = e.clientX
+    this.hudDragStartY = e.clientY
+    this.hudDragOriginX = this.hudOffsetX
+    this.hudDragOriginY = this.hudOffsetY
+    this.hud.classList.add('hud--dragging')
+    document.addEventListener('pointermove', this.onPointerMoveDoc)
+    document.addEventListener('pointerup', this.onPointerUpDoc)
   }
 
-  setLiveTitle(): void {
-    const titleEl = this.topStrip.querySelector<HTMLElement>('#ts-title')!
-    titleEl.innerHTML = `<span class="ts-live-badge">Live</span>`
+  private handleHudDragMove(e: PointerEvent): void {
+    if (!this.isDraggingHud) return
+    this.hudOffsetX = this.hudDragOriginX + (e.clientX - this.hudDragStartX)
+    this.hudOffsetY = this.hudDragOriginY + (e.clientY - this.hudDragStartY)
+    this.clampHudOffset()
   }
 
-  updateThemeDot(color: string): void {
-    const dot = this.topStrip.querySelector<HTMLElement>('#ts-theme-dot')
-    if (dot) dot.style.background = color
+  private stopHudDrag(): void {
+    if (!this.isDraggingHud) return
+    this.isDraggingHud = false
+    this.hud.classList.remove('hud--dragging')
+    document.removeEventListener('pointermove', this.onPointerMoveDoc)
+    document.removeEventListener('pointerup', this.onPointerUpDoc)
   }
 
-  updateMidiStatus(status: MidiDeviceStatus, deviceName: string): void {
-    this.midiBtn.dataset['midiStatus'] = status
-    const label = status === 'connected'
-      ? `MIDI: ${deviceName || 'Connected'}`
-      : status === 'unavailable'
-        ? 'Web MIDI not supported'
-        : 'Connect MIDI keyboard'
-    this.midiBtn.title = label
-    this.midiBtn.setAttribute('aria-label', label)
-    this.midiBtn.classList.toggle('midi-unavailable', status === 'unavailable')
-    this.midiBtn.classList.toggle('midi-connected',   status === 'connected')
+  private applyHudOffset(): void {
+    this.hud.style.setProperty('--hud-dx', `${this.hudOffsetX}px`)
+    this.hud.style.setProperty('--hud-dy', `${this.hudOffsetY}px`)
   }
 
-  dispose(): void {
-    document.removeEventListener('mousemove', this.onMouseMoveDoc)
-    document.removeEventListener('keydown', this.onKeyDownDoc)
-    this.clearIdle()
+  private clampHudOffset(): void {
+    const hudRect = this.hud.getBoundingClientRect()
+    if (hudRect.width === 0 || hudRect.height === 0) {
+      this.applyHudOffset()
+      return
+    }
+
+    const rootStyles = getComputedStyle(document.documentElement)
+    const keyboardHeight = parseFloat(rootStyles.getPropertyValue('--keyboard-h')) || 120
+    const hudGap = parseFloat(rootStyles.getPropertyValue('--hud-gap')) || 14
+    const defaultLeft = (window.innerWidth - hudRect.width) / 2
+    const defaultTop = window.innerHeight - keyboardHeight - hudGap - hudRect.height
+    const topStripBottom = this.topStrip.getBoundingClientRect().bottom
+    const minLeft = 12
+    const maxLeft = Math.max(minLeft, window.innerWidth - hudRect.width - 12)
+    const minTop = Math.max(topStripBottom + 12, 12)
+    const maxTop = Math.max(minTop, window.innerHeight - keyboardHeight - hudRect.height - 12)
+    const nextLeft = clamp(defaultLeft + this.hudOffsetX, minLeft, maxLeft)
+    const nextTop = clamp(defaultTop + this.hudOffsetY, minTop, maxTop)
+
+    this.hudOffsetX = nextLeft - defaultLeft
+    this.hudOffsetY = nextTop - defaultTop
+    this.applyHudOffset()
   }
 
   private updateFill(t: number): void {
@@ -327,7 +482,12 @@ export class Controls {
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+function getMidiLabel(status: MidiDeviceStatus, deviceName: string): string {
+  if (status === 'connected') return deviceName || 'MIDI connected'
+  if (status === 'blocked') return 'Enable MIDI'
+  if (status === 'unavailable') return 'MIDI unavailable'
+  return 'No MIDI device'
+}
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60)
@@ -340,7 +500,9 @@ function formatSpeed(s: number): string {
   return `${s % 1 === 0 ? s : s.toFixed(2).replace(/0+$/, '')}x`
 }
 
-// ── Icons ──────────────────────────────────────────────────────────────────
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
 
 const ICON_TRACKS = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
   <line x1="4" y1="6" x2="20" y2="6"/>
@@ -370,6 +532,11 @@ const ICON_PLAY = `<svg width="16" height="16" viewBox="0 0 24 24" fill="current
 
 const ICON_PAUSE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
   <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+</svg>`
+
+const ICON_GRIP = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+  <line x1="9" y1="6" x2="9" y2="18"/>
+  <line x1="15" y1="6" x2="15" y2="18"/>
 </svg>`
 
 const ICON_SKIP_BACK = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

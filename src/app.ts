@@ -8,7 +8,7 @@ import { Controls } from './ui/Controls'
 import { TrackPanel } from './ui/TrackPanel'
 import { ExportModal } from './ui/ExportModal'
 import { VideoExporter } from './export/VideoExporter'
-import { THEMES } from './renderer/theme'
+import { THEMES, type Theme } from './renderer/theme'
 import { MidiInputManager } from './midi/MidiInputManager'
 import { LiveNoteStore } from './midi/LiveNoteStore'
 
@@ -26,8 +26,11 @@ export class App {
   private currentExporter: VideoExporter | null = null
 
   private themeIndex = 0
+  private audioPrimed = false
   private onVisibilityChange = (): void => { if (document.hidden) this.releaseAllLiveNotes() }
   private onWindowBlur = (): void => this.releaseAllLiveNotes()
+  private onFirstPointerDown = (): void => this.primeInteractiveAudio()
+  private onFirstKeyDown = (): void => this.primeInteractiveAudio()
 
   async init(): Promise<void> {
     const canvas  = document.querySelector<HTMLCanvasElement>('#pianoroll')!
@@ -49,33 +52,37 @@ export class App {
       container:     overlay,
       state:         appState,
       clock:         this.clock,
-      onSeek:        (t) => { this.synth.seek(t); this.liveNotes.releaseAll() },
+      onSeek:        (t) => { this.synth.seek(t); this.liveNotes.reset() },
       onZoom:        (pps) => this.renderer.setZoom(pps),
       onThemeCycle:  () => this.cycleTheme(),
       onMidiConnect: () => void this.connectMidi(),
       onOpenTracks:  () => this.trackPanel.toggle(),
       onRecord:      () => this.exportModal.open(),
+      onOpenFile:    () => this.openFilePicker(),
+      onModeRequest: (mode) => this.requestMode(mode),
     })
 
-    this.trackPanel = new TrackPanel(overlay, this.renderer, () => this.showDropZone())
+    this.trackPanel = new TrackPanel(overlay, this.renderer, () => this.openFilePicker())
 
     this.exportModal = new ExportModal(overlay)
     this.exportModal.onStart  = (fps) => void this.startExport(fps)
     this.exportModal.onCancel = () => this.cancelExport()
 
-    // Initialize theme dot and MIDI button to reflect initial state
-    this.controls.updateThemeDot(THEMES[0]!.uiAccentCSS)
+    this.applyTheme(THEMES[this.themeIndex]!)
     this.controls.updateMidiStatus(this.midiInput.status.value, '')
+    this.dropzone.updateMidiStatus(this.midiInput.status.value, '')
 
-    this.clock.subscribe((t) => appState.currentTime.set(t))
+    this.clock.subscribe((t) => appState.setCurrentTime(t))
 
     appState.status.subscribe((status) => {
-      if (status === 'playing') {
+      if (appState.mode.value === 'file' && status === 'playing') {
         void this.synth.play(this.clock.currentTime)
       } else if (status === 'paused') {
         this.synth.pause()
-        this.liveNotes.releaseAll()
-        this.synth.liveReleaseAll()
+        if (appState.mode.value === 'live') {
+          this.liveNotes.releaseAll(this.clock.currentTime)
+          this.synth.liveReleaseAll()
+        }
       }
     })
 
@@ -90,6 +97,11 @@ export class App {
       if (!evt) return
       if (appState.status.value === 'exporting') return
 
+      if (appState.mode.value === 'file') return
+      if (appState.mode.value === 'home') {
+        this.enterLiveMode(false)
+      }
+
       this.synth.liveNoteOn(evt.pitch, evt.velocity)
       this.liveNotes.press(evt.pitch, evt.velocity, evt.clockTime)
       this.renderer.burstParticleAt(evt.pitch)
@@ -98,66 +110,79 @@ export class App {
       const s = appState.status.value
       if (s === 'idle' || s === 'ready' || s === 'paused') {
         this.clock.play()
-        appState.status.set('playing')
+        appState.startPlaying()
       }
     })
 
     this.midiInput.noteOff.subscribe((evt) => {
       if (!evt) return
+      if (appState.mode.value !== 'live') return
       this.synth.liveNoteOff(evt.pitch)
-      this.liveNotes.release(evt.pitch)
+      this.liveNotes.release(evt.pitch, evt.clockTime)
     })
 
     // Update MIDI button whenever either status or device name changes.
     // Reading the *other* signal's current value avoids a stale-name flash.
     this.midiInput.status.subscribe((status) => {
       this.controls.updateMidiStatus(status, this.midiInput.deviceName.value)
+      this.dropzone.updateMidiStatus(status, this.midiInput.deviceName.value)
     })
     this.midiInput.deviceName.subscribe((name) => {
       this.controls.updateMidiStatus(this.midiInput.status.value, name)
+      this.dropzone.updateMidiStatus(this.midiInput.status.value, name)
     })
 
     // Release all held notes when the page loses focus (prevents stuck notes)
     document.addEventListener('visibilitychange', this.onVisibilityChange)
     window.addEventListener('blur', this.onWindowBlur)
+    window.addEventListener('pointerdown', this.onFirstPointerDown, { passive: true })
+    window.addEventListener('keydown', this.onFirstKeyDown, { passive: true })
 
-    this.dropzone.show()
+    this.enterHomeMode()
+    void this.autoConnectMidi()
   }
 
   private releaseAllLiveNotes(): void {
-    this.liveNotes.releaseAll()
+    this.liveNotes.releaseAll(this.clock.currentTime)
     this.synth.liveReleaseAll()
   }
 
   private async connectMidi(): Promise<void> {
-    await this.synth.ensureInstrument()
+    this.primeInteractiveAudio()
     await this.midiInput.requestAccess()
   }
 
+  private async autoConnectMidi(): Promise<void> {
+    await this.midiInput.requestAccess({ silent: true })
+  }
+
   private async loadMidi(file: File): Promise<void> {
-    this.clock.pause()
-    this.clock.seek(0)
-    this.liveNotes.reset()
-    this.synth.liveReleaseAll()
-    appState.status.set('loading')
+    const previousMode = appState.mode.value
+    const previousMidi = appState.loadedMidi.value
+    this.resetInteractionState()
+    appState.beginFileLoad()
+    this.renderer.clearMidi()
     this.showLoading()
 
     try {
       const midi = await parseMidiFile(file)
-      appState.midi.set(midi)
-      appState.duration.set(midi.duration)
-
       this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
+      appState.completeFileLoad(midi)
       this.renderer.loadMidi(midi)
       this.trackPanel.render(midi)
-      this.controls.setFileName(midi.name)
       document.title = `${midi.name} · Piano Roll`
-
-      appState.status.set('ready')   // triggers Controls subscriber → shows HUD
       this.dropzone.hide()
     } catch (err) {
       console.error('Failed to load MIDI:', err)
-      appState.status.set('idle')
+      if (previousMode === 'file' && previousMidi) {
+        appState.enterFile()
+        this.renderer.loadMidi(previousMidi)
+        this.trackPanel.render(previousMidi)
+        this.dropzone.hide()
+      } else if (previousMode === 'live') {
+        this.enterLiveMode(false)
+      } else if (previousMode === 'home') this.enterHomeMode()
+      else appState.setReady()
       this.showError('Could not read that file — make sure it\'s a valid MIDI.')
     } finally {
       this.hideLoading()
@@ -166,22 +191,18 @@ export class App {
 
   private cycleTheme(): void {
     this.themeIndex = (this.themeIndex + 1) % THEMES.length
-    const theme = THEMES[this.themeIndex]!
-    this.renderer.setTheme(theme)
-    this.controls.updateThemeDot(theme.uiAccentCSS)
-    document.documentElement.style.setProperty('--accent', theme.uiAccentCSS)
-    document.documentElement.style.setProperty('--accent-soft', `${theme.uiAccentCSS}2e`)
-    document.documentElement.style.setProperty('--accent-glow', `${theme.uiAccentCSS}66`)
+    this.applyTheme(THEMES[this.themeIndex]!)
   }
 
   private async startExport(fps: number): Promise<void> {
-    const midi = appState.midi.value
-    if (!midi) return
+    const midi = appState.loadedMidi.value
+    if (!midi || appState.mode.value !== 'file') return
 
     const wasPlaying = appState.status.value === 'playing'
     this.clock.pause()
-    this.releaseAllLiveNotes()
-    appState.status.set('exporting')
+    this.liveNotes.reset()
+    this.synth.liveReleaseAll()
+    appState.beginExport()
     this.synth.pause()
     this.renderer.pauseAutoRender()
 
@@ -209,10 +230,10 @@ export class App {
       this.currentExporter = null
       this.renderer.resumeAutoRender()
       this.clock.seek(0)
-      appState.status.set('ready')
+      appState.setReady()
       if (wasPlaying) {
         this.clock.play()
-        appState.status.set('playing')
+        appState.startPlaying()
       }
     }
   }
@@ -221,18 +242,82 @@ export class App {
     this.currentExporter?.cancel()
   }
 
-  private showDropZone(): void {
-    this.clock.pause()
-    appState.status.set('idle')   // triggers Controls subscriber → hides HUD
+  private openFilePicker(): void {
+    this.dropzone.openFilePicker()
+  }
+
+  private requestMode(mode: 'file' | 'live'): void {
+    if (mode === 'live') {
+      this.enterLiveMode()
+      return
+    }
+
+    if (appState.loadedMidi.value) {
+      this.enterFileMode()
+      return
+    }
+
+    this.openFilePicker()
+  }
+
+  private enterHomeMode(): void {
+    this.resetInteractionState()
+    appState.enterHome()
+    this.renderer.clearMidi()
     this.trackPanel.close()
     this.dropzone.show()
     document.title = 'Piano Roll'
   }
 
-  private enterLiveMode(): void {
+  private enterLiveMode(primeAudio = true): void {
+    this.resetInteractionState()
+    appState.enterLive()
+    this.renderer.clearMidi()
+    this.trackPanel.close()
     this.dropzone.hide()
-    this.controls.setLiveTitle()
-    appState.status.set('ready')  // triggers Controls subscriber → shows HUD
+    document.title = 'Piano Roll · Live'
+    if (primeAudio) this.primeInteractiveAudio()
+  }
+
+  private enterFileMode(): void {
+    const midi = appState.loadedMidi.value
+    if (!midi) {
+      this.openFilePicker()
+      return
+    }
+    this.resetInteractionState()
+    appState.enterFile()
+    this.renderer.loadMidi(midi)
+    this.trackPanel.render(midi)
+    this.dropzone.hide()
+    document.title = `${midi.name} · Piano Roll`
+  }
+
+  private resetInteractionState(): void {
+    this.clock.pause()
+    this.clock.seek(0)
+    this.synth.pause()
+    this.synth.seek(0)
+    this.liveNotes.reset()
+    this.synth.liveReleaseAll()
+  }
+
+  private primeInteractiveAudio(): void {
+    if (this.audioPrimed) return
+    this.audioPrimed = true
+    this.clock.prime()
+    this.synth.primeLiveInput()
+    window.removeEventListener('pointerdown', this.onFirstPointerDown)
+    window.removeEventListener('keydown', this.onFirstKeyDown)
+  }
+
+  private applyTheme(theme: Theme): void {
+    this.renderer.setTheme(theme)
+    this.controls.updateThemeDot(theme.uiAccentCSS)
+    const accent = theme.uiAccentCSS
+    document.documentElement.style.setProperty('--accent', accent)
+    document.documentElement.style.setProperty('--accent-soft', `${accent}2e`)
+    document.documentElement.style.setProperty('--accent-glow', `${accent}66`)
   }
 
   private showLoading(): void {
@@ -272,6 +357,9 @@ export class App {
     this.releaseAllLiveNotes()
     document.removeEventListener('visibilitychange', this.onVisibilityChange)
     window.removeEventListener('blur', this.onWindowBlur)
+    window.removeEventListener('pointerdown', this.onFirstPointerDown)
+    window.removeEventListener('keydown', this.onFirstKeyDown)
+    this.dropzone.dispose()
     this.controls.dispose()
     this.midiInput.dispose()
     this.clock.dispose()

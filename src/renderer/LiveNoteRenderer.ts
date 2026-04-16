@@ -4,14 +4,16 @@ import type { LiveNote } from '../midi/LiveNoteStore'
 import type { Theme } from './theme'
 import type { Viewport } from './viewport'
 
-// Renders notes that are actively being played on a MIDI keyboard.
+// Renders live MIDI note trails. Held notes grow upward from the strike line;
+// once released, the captured trail keeps translating upward with time until it
+// leaves the roll.
 //
 // Y-axis math (y increases downward in canvas space):
-//   noteY  = viewport.nowLineY                           ← top edge pinned at the line
-//   height = heldDuration * pixelsPerSecond              ← grows downward into the past zone
+//   held:     y = nowLineY - height
+//   released: y = nowLineY - height - releasedAge * pixelsPerSecond
 //
-// The note body trails below the now-line, growing longer as the key is held.
-// From the player's perspective the tail scrolls upward — the Synthesia feel.
+// Live notes extend upward from the strike line so they visually agree with
+// imported notes arriving from above.
 
 export class LiveNoteRenderer {
   readonly container: Container
@@ -48,14 +50,14 @@ export class LiveNoteRenderer {
   }
 
   draw(
-    activeNotes: ReadonlyMap<number, LiveNote>,
+    notes: readonly LiveNote[],
     currentTime: number,
     viewport: Viewport,
   ): void {
     this.baseGraphics.clear()
     this.glowGraphics.clear()
 
-    if (activeNotes.size === 0) {
+    if (notes.length === 0) {
       this.glowContainer.visible = false
       return
     }
@@ -64,27 +66,34 @@ export class LiveNoteRenderer {
     const color = this.theme.nowLine
     const { pixelsPerSecond } = viewport.config
     const nowY = viewport.nowLineY
+    let hasHeldNotes = false
 
-    for (const [, note] of activeNotes) {
-      const x            = viewport.pitchToX(note.pitch)
-      const w            = Math.max(viewport.pitchWidth(note.pitch) - 1, 2)
-      const heldSec      = Math.max(currentTime - note.startTime, 0)
-      const height       = Math.max(heldSec * pixelsPerSecond, 3)
+    for (const note of notes) {
+      const x = viewport.pitchToX(note.pitch)
+      const w = Math.max(viewport.pitchWidth(note.pitch) - 1, 2)
+      const endTime = note.endTime ?? currentTime
+      const noteDuration = Math.max(endTime - note.startTime, 0)
+      const releasedSec = note.endTime === null ? 0 : Math.max(currentTime - note.endTime, 0)
+      const height = Math.max(noteDuration * pixelsPerSecond, 3)
+      const y = nowY - height - releasedSec * pixelsPerSecond
+      if (y + height <= 0) continue
       // Clamp corner radius so PixiJS never receives radius > half the height
-      const radius       = Math.min(this.theme.noteRadius, height / 2, w / 2)
-      const alpha        = 0.55 + note.velocity * 0.45
+      const radius = Math.min(this.theme.noteRadius, height / 2, w / 2)
+      const alpha = 0.55 + note.velocity * 0.45
 
       // Base layer — slightly transparent
-      this.baseGraphics.roundRect(x, nowY, w, height, radius)
+      this.baseGraphics.roundRect(x, y, w, height, radius)
       this.baseGraphics.fill({ color, alpha: alpha * 0.75 })
 
-      // Glow layer — all live notes are "active" by definition
-      this.glowGraphics.roundRect(x, nowY, w, height, radius)
-      this.glowGraphics.fill({ color, alpha })
+      if (note.endTime === null) {
+        hasHeldNotes = true
+        this.glowGraphics.roundRect(x, y, w, height, radius)
+        this.glowGraphics.fill({ color, alpha })
+      }
     }
 
     this.glowFilter.color = color
-    this.glowContainer.visible = true
+    this.glowContainer.visible = hasHeldNotes
   }
 
   updateTheme(theme: Theme): void {

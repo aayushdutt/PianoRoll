@@ -138,6 +138,17 @@ export class PianoRollRenderer {
     this.noteRenderer.setTracks(midi.tracks)
     this.particles.clear()
     this.prevActivePitches.clear()
+    this.renderStaticFrame(0)
+  }
+
+  clearMidi(): void {
+    this.midi = null
+    this.visibleTrackIds.clear()
+    this.noteRenderer.setTracks([])
+    this.particles.clear()
+    this.prevActivePitches.clear()
+    this.beatGrid.graphics.clear()
+    this.renderStaticFrame(0)
   }
 
   setTrackVisible(trackId: string, visible: boolean): void {
@@ -160,6 +171,7 @@ export class PianoRollRenderer {
     this.keyboardRenderer.updateTheme(theme)
     this.drawBackground()
     this.keyboardRenderer.build(this.viewport, this.viewport.rollHeight)
+    this.renderStaticFrame(0)
   }
 
   attachClock(clock: MasterClock): void {
@@ -169,7 +181,7 @@ export class PianoRollRenderer {
   private onTick(clock: MasterClock, _ticker: Ticker): void {
     if (this.exportMode) return
     // Render if we have a MIDI file OR live notes are being played
-    const hasLive = (this.liveNoteStore?.activeNotes.size ?? 0) > 0
+    const hasLive = this.liveNoteStore?.hasRenderableNotes ?? false
     if (!this.midi && !hasLive) return
     const dt = _ticker.deltaMS / 1000
     this.renderFrame(clock.currentTime, dt, clock.playing)
@@ -178,6 +190,11 @@ export class PianoRollRenderer {
   renderManualFrame(time: number, dt: number): void {
     if (!this.midi) return
     this.renderFrame(time, dt, false)
+    this.app.renderer.render(this.app.stage)
+  }
+
+  renderStaticFrame(currentTime: number): void {
+    this.renderFrame(currentTime, 0, false)
     this.app.renderer.render(this.app.stage)
   }
 
@@ -220,10 +237,13 @@ export class PianoRollRenderer {
 
     // ── Live MIDI keyboard notes ──────────────────────────────────────────
     if (this.liveNoteStore) {
-      for (const [pitch] of this.liveNoteStore.activeNotes) {
+      const maxReleasedAge = this.viewport.nowLineY / this.viewport.config.pixelsPerSecond
+      this.liveNoteStore.pruneInvisible(currentTime, maxReleasedAge)
+
+      for (const [pitch] of this.liveNoteStore.heldNotes) {
         activePitchNums.add(pitch)
       }
-      this.liveNoteRenderer.draw(this.liveNoteStore.activeNotes, currentTime, this.viewport)
+      this.liveNoteRenderer.draw(this.liveNoteStore.renderableNotes, currentTime, this.viewport)
     }
 
     this.keyboardRenderer.drawActiveKeys(activePitchNums, this.viewport)
@@ -246,7 +266,7 @@ export class PianoRollRenderer {
     this.app.ticker.stop()
     this.particles.clear()
     this.prevActivePitches.clear()
-    this.liveNoteRenderer.draw(new Map(), 0, this.viewport)  // clear live notes from screen
+    this.liveNoteRenderer.draw([], 0, this.viewport)  // clear live notes from screen
   }
 
   resumeAutoRender(): void {
@@ -265,6 +285,7 @@ export class PianoRollRenderer {
     this.viewport.update({ canvasWidth: w, canvasHeight: h })
     this.drawBackground()
     this.keyboardRenderer.build(this.viewport, this.viewport.rollHeight)
+    this.renderStaticFrame(0)
   }
 
   destroy(): void {

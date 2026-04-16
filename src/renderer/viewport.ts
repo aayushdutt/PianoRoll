@@ -1,9 +1,8 @@
 import { MIDI_MIN, MIDI_MAX, isBlackKey } from '../core/midi/types'
 
-// Fixed pixel distance below the now-line that's always visible as "trail".
-// This value doesn't change with zoom — the time represented by the trail
-// decreases as you zoom in (fewer seconds fit in the same pixels).
-const TRAIL_PX = 80
+// The strike line sits directly on the keyboard edge so notes "land" where the
+// keys begin instead of floating relative to the HUD.
+const TRAIL_PX = 0
 
 export interface ViewportConfig {
   canvasWidth: number
@@ -34,7 +33,7 @@ export class Viewport {
     return this.cfg.canvasHeight - this.cfg.keyboardHeight
   }
 
-  // Fixed position — does NOT shift when zoom changes
+  // Fixed position — aligned to the top edge of the keyboard.
   get nowLineY(): number {
     return this.rollHeight - TRAIL_PX
   }

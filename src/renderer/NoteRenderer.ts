@@ -87,8 +87,9 @@ export class NoteRenderer {
         const x = viewport.pitchToX(note.pitch)
         const w = Math.max(viewport.pitchWidth(note.pitch) - 1, 2)
         const timeDelta = note.time - currentTime
-        const noteBottom = viewport.timeOffsetToY(timeDelta)
+        const noteBottom = Math.min(viewport.timeOffsetToY(timeDelta), viewport.nowLineY)
         const noteTop = viewport.timeOffsetToY(timeDelta + note.duration)
+        if (noteTop >= viewport.nowLineY) continue
         const h = Math.max(noteBottom - noteTop, 3)
         const y = noteTop
 

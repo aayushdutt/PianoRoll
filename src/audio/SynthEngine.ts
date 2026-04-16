@@ -30,14 +30,18 @@ export class SynthEngine implements AudioEngine {
   // Kept as a field so play() can await it without checking a boolean flag.
   // Resolves once the instrument is ready to make sound.
   private readyPromise: Promise<void> = Promise.resolve()
+  private liveWarmupStarted = false
+
+  constructor() {
+    this.ensureFallbackSynth()
+  }
 
   load(source: MidiFile | AudioBuffer): Promise<void> {
     if (!(source instanceof AudioBuffer)) {
       this.midi = source as MidiFile
     }
 
-    // Only (re)initialize if no instrument is loaded yet
-    if (!this.pianoInstance && !this.fallbackSynth) {
+    if (!this.pianoInstance) {
       this.readyPromise = this.initInstrument()
     }
     return this.readyPromise
@@ -53,12 +57,7 @@ export class SynthEngine implements AudioEngine {
       }
     } catch (err) {
       console.warn('Piano samples unavailable, falling back to PolySynth', err)
-      if (!this.fallbackSynth) {
-        this.fallbackSynth = new Tone.PolySynth(Tone.Synth, {
-          oscillator: { type: 'triangle' },
-          envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.8 },
-        }).toDestination()
-      }
+      this.ensureFallbackSynth()
     }
   }
 
@@ -135,16 +134,28 @@ export class SynthEngine implements AudioEngine {
   // loading in the background. By the time they play their first note it's ready.
   async ensureInstrument(): Promise<void> {
     await Tone.start()
-    if (!this.pianoInstance && !this.fallbackSynth) {
+    this.liveWarmupStarted = true
+    if (!this.pianoInstance) {
       this.readyPromise = this.initInstrument()
     }
     await this.readyPromise
   }
 
+  primeLiveInput(): void {
+    if (this.liveWarmupStarted) return
+    this.liveWarmupStarted = true
+    this.ensureFallbackSynth()
+    void Tone.start().catch(() => undefined)
+    if (!this.pianoInstance) {
+      this.readyPromise = this.initInstrument()
+    }
+  }
+
   // Trigger a note immediately (no Transport scheduling) for live input.
   liveNoteOn(pitch: number, velocity: number): void {
+    this.primeLiveInput()
     const name = midiToNoteName(pitch)
-    const t    = Tone.now()
+    const t    = Tone.immediate()
     if (this.pianoInstance) {
       this.pianoInstance.keyDown({ note: name, velocity, time: t })
     } else {
@@ -153,8 +164,9 @@ export class SynthEngine implements AudioEngine {
   }
 
   liveNoteOff(pitch: number): void {
+    this.primeLiveInput()
     const name = midiToNoteName(pitch)
-    const t    = Tone.now()
+    const t    = Tone.immediate()
     if (this.pianoInstance) {
       this.pianoInstance.keyUp({ note: name, time: t })
     } else {
@@ -191,6 +203,14 @@ export class SynthEngine implements AudioEngine {
     const transport = Tone.getTransport()
     for (const id of this.scheduledIds) transport.clear(id)
     this.scheduledIds = []
+  }
+
+  private ensureFallbackSynth(): void {
+    if (this.fallbackSynth) return
+    this.fallbackSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.005, decay: 0.08, sustain: 0.55, release: 0.5 },
+    }).toDestination()
   }
 
   dispose(): void {

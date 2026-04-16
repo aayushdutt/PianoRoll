@@ -1,3 +1,5 @@
+import type { MidiDeviceStatus } from '../midi/MidiInputManager'
+
 type DropHandler = (file: File) => void
 
 function isMidiFile(name: string): boolean {
@@ -8,6 +10,8 @@ function isMidiFile(name: string): boolean {
 export class DropZone {
   private el: HTMLElement
   private dragDepth = 0
+  private input!: HTMLInputElement
+  private statusEl!: HTMLElement
   private docDragOver = (e: DragEvent): void => { e.preventDefault() }
   private docDrop = (e: DragEvent): void => {
     e.preventDefault()
@@ -29,49 +33,48 @@ export class DropZone {
     const el = document.createElement('div')
     el.id = 'dropzone'
     el.innerHTML = `
-      <div class="dropzone-card">
-        <div class="dropzone-icon">
-          <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-            <rect x="3"  y="16" width="10" height="32" rx="3.5" fill="currentColor"/>
-            <rect x="21" y="4"  width="10" height="44" rx="3.5" fill="currentColor"/>
-            <rect x="39" y="10" width="10" height="28" rx="3.5" fill="currentColor" opacity="0.55"/>
-            <rect x="0"  y="50" width="52" height="2"  rx="1"   fill="currentColor" opacity="0.30"/>
-          </svg>
+      <div class="home-card">
+        <h1 class="home-title">Piano Roll</h1>
+        <p class="home-sub">Open MIDI or play live.</p>
+
+        <div class="home-actions">
+          <button class="home-primary-btn" id="home-open" type="button">
+            ${ICON_UPLOAD}
+            <span>Open MIDI</span>
+          </button>
+          <button class="home-secondary-btn" id="home-live" type="button">
+            ${ICON_MIDI}
+            <span>Live</span>
+          </button>
         </div>
-        <p class="dropzone-title">Drop a MIDI file</p>
-        <p class="dropzone-sub">or <label class="dropzone-browse" for="midi-input">browse your files</label></p>
-        <div class="dropzone-hint">
-          <kbd>Space</kbd> play &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> skip 10s
-        </div>
-        <div class="dropzone-or"><span>or</span></div>
-        <button class="dropzone-live-btn" id="dropzone-live" type="button">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2" y="4" width="20" height="16" rx="2"/>
-            <line x1="2" y1="14" x2="22" y2="14"/>
-            <line x1="7" y1="4" x2="7" y2="14"/>
-            <line x1="12" y1="4" x2="12" y2="14"/>
-            <line x1="17" y1="4" x2="17" y2="14"/>
-            <rect x="5" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
-            <rect x="10" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
-            <rect x="15" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
-          </svg>
-          Play live with MIDI keyboard
-        </button>
+
+        <div class="home-midi-status" id="home-midi-status">Looking for MIDI…</div>
+        <div class="home-drop-hint">Drop <code>.mid</code> anywhere</div>
         <input type="file" id="midi-input" accept=".mid,.midi" style="display:none" />
       </div>
     `
+    this.input = el.querySelector<HTMLInputElement>('#midi-input')!
+    this.statusEl = el.querySelector<HTMLElement>('#home-midi-status')!
     return el
   }
 
   private bindEvents(): void {
-    const input = this.el.querySelector<HTMLInputElement>('#midi-input')!
-
-    input.addEventListener('change', () => {
-      const file = input.files?.[0]
+    this.input.addEventListener('change', () => {
+      const file = this.input.files?.[0]
       if (file && isMidiFile(file.name)) this.onDrop(file)
-      // Reset so the same file can be re-dropped
-      input.value = ''
+      this.input.value = ''
     })
+
+    this.el.querySelector<HTMLButtonElement>('#home-open')!.addEventListener('click', () => {
+      this.openFilePicker()
+    })
+
+    const liveBtn = this.el.querySelector<HTMLButtonElement>('#home-live')!
+    if (this.onLiveMode) {
+      liveBtn.addEventListener('click', () => this.onLiveMode?.())
+    } else {
+      liveBtn.classList.add('hidden')
+    }
 
     this.el.addEventListener('dragenter', (e) => {
       e.preventDefault()
@@ -88,45 +91,60 @@ export class DropZone {
 
     this.el.addEventListener('drop', (e) => {
       e.preventDefault()
-      e.stopPropagation()  // prevent document handler from double-firing
+      e.stopPropagation()
       this.dragDepth = 0
       this.el.classList.remove('drag-over')
       const file = e.dataTransfer?.files[0]
       if (file && isMidiFile(file.name)) this.onDrop(file)
     })
 
-    // Live mode button
-    const liveBtn = this.el.querySelector<HTMLButtonElement>('#dropzone-live')
-    if (liveBtn && this.onLiveMode) {
-      liveBtn.addEventListener('click', (e) => {
-        e.stopPropagation()
-        this.onLiveMode!()
-      })
-      liveBtn.style.display = ''
-    } else if (liveBtn) {
-      liveBtn.style.display = 'none'
-    }
-
-    // Click anywhere on the card triggers browse (except interactive children)
-    this.el.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement
-      if (target.closest('.dropzone-browse')) return
-      if (target.closest('#dropzone-live')) return
-      input.click()
-    })
-
-    // ── Document-level drag-drop ──────────────────────────────────────────
-    // Catches drops anywhere on the canvas when the dropzone is hidden
-    // (i.e., a file is already loaded and the user drags a new one in).
     document.addEventListener('dragover', this.docDragOver)
     document.addEventListener('drop', this.docDrop)
   }
 
-  show(): void { this.el.classList.remove('dz--hidden') }
-  hide(): void { this.el.classList.add('dz--hidden') }
+  updateMidiStatus(status: MidiDeviceStatus, deviceName: string): void {
+    this.statusEl.dataset['midiStatus'] = status
+    this.statusEl.textContent = getHomeMidiStatus(status, deviceName)
+  }
+
+  openFilePicker(): void {
+    this.input.click()
+  }
+
+  show(): void {
+    this.el.classList.remove('dz--hidden')
+  }
+
+  hide(): void {
+    this.el.classList.add('dz--hidden')
+  }
 
   dispose(): void {
     document.removeEventListener('dragover', this.docDragOver)
     document.removeEventListener('drop', this.docDrop)
   }
 }
+
+function getHomeMidiStatus(status: MidiDeviceStatus, deviceName: string): string {
+  if (status === 'connected') return deviceName || 'MIDI connected'
+  if (status === 'blocked') return 'Enable MIDI from the top bar'
+  if (status === 'unavailable') return 'Web MIDI unavailable'
+  return 'No MIDI keyboard'
+}
+
+const ICON_UPLOAD = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+  <polyline points="17 8 12 3 7 8"/>
+  <line x1="12" y1="3" x2="12" y2="15"/>
+</svg>`
+
+const ICON_MIDI = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="2" y="4" width="20" height="16" rx="2"/>
+  <line x1="2" y1="14" x2="22" y2="14"/>
+  <line x1="7" y1="4" x2="7" y2="14"/>
+  <line x1="12" y1="4" x2="12" y2="14"/>
+  <line x1="17" y1="4" x2="17" y2="14"/>
+  <rect x="5" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
+  <rect x="10" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
+  <rect x="15" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
+</svg>`

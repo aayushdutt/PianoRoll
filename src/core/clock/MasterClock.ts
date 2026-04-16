@@ -43,12 +43,16 @@ export class MasterClock {
     this._speed = s
   }
 
-  play(): void {
-    if (this._playing) return
-    // AudioContext may be suspended (browser autoplay policy)
+  prime(): void {
     if (this.context.state === 'suspended') {
       void this.context.resume()
     }
+  }
+
+  play(): void {
+    if (this._playing) return
+    // AudioContext may be suspended (browser autoplay policy)
+    this.prime()
     this._startContextTime = this.context.currentTime
     this._playing = true
     this.tick()
