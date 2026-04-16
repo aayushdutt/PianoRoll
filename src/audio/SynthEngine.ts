@@ -46,6 +46,7 @@ export class SynthEngine implements AudioEngine {
   private midi: MidiFile | null = null
   private scheduledIds: number[] = []
   private _volume = 0.8
+  private _speed = 1
   private scheduledFromTime = 0
   private readyPromise: Promise<void> = Promise.resolve()
   private liveWarmupStarted = false
@@ -119,6 +120,17 @@ export class SynthEngine implements AudioEngine {
     transport.position = 0
     this.scheduledFromTime = fromTime
 
+    // Tone converts seconds→ticks using the *current* bpm at schedule time.
+    // We schedule at the nominal tempo so every event's tick position encodes
+    // the note's original musical moment, then reapply the speed-scaled bpm
+    // right before start(). The transport then ticks `speed ×` faster and
+    // events fire at `t / speed` wall time — matching MasterClock.currentTime,
+    // which advances at `speed × wall`. If we schedule while bpm is already
+    // `midi.bpm × speed`, the two scalings cancel and audio plays at 1× while
+    // the visual clock is at `speed ×` → desync on fresh play / seek.
+    const nominalBpm = this.midi.bpm
+    transport.bpm.value = nominalBpm
+
     for (const track of this.midi.tracks) {
       for (const note of track.notes) {
         if (note.time < fromTime) continue
@@ -129,6 +141,8 @@ export class SynthEngine implements AudioEngine {
         )
       }
     }
+
+    transport.bpm.value = nominalBpm * this._speed
     transport.start()
   }
 
@@ -151,6 +165,7 @@ export class SynthEngine implements AudioEngine {
   }
 
   setSpeed(s: number): void {
+    this._speed = s
     Tone.getTransport().bpm.value = (this.midi?.bpm ?? 120) * s
   }
 
