@@ -7,9 +7,11 @@ import { DropZone } from './ui/DropZone'
 import { Controls } from './ui/Controls'
 import { TrackPanel } from './ui/TrackPanel'
 import { ExportModal } from './ui/ExportModal'
+import { KeyboardResizer } from './ui/KeyboardResizer'
 import { VideoExporter } from './export/VideoExporter'
 import { THEMES, type Theme } from './renderer/theme'
-import { MidiInputManager } from './midi/MidiInputManager'
+import { MidiInputManager, type MidiNoteEvent } from './midi/MidiInputManager'
+import { ComputerKeyboardInput } from './midi/ComputerKeyboardInput'
 import { LiveNoteStore } from './midi/LiveNoteStore'
 
 export class App {
@@ -17,11 +19,14 @@ export class App {
   private renderer      = new PianoRollRenderer()
   private synth         = new SynthEngine()
   private midiInput!:   MidiInputManager
+  private keyboardInput!: ComputerKeyboardInput
   private liveNotes     = new LiveNoteStore()
+  private activeMouseNote: number | null = null
   private dropzone!:    DropZone
   private controls!:    Controls
   private trackPanel!:  TrackPanel
   private exportModal!: ExportModal
+  private kbdResizer!:  KeyboardResizer
   private loadingEl:    HTMLElement | null = null
   private currentExporter: VideoExporter | null = null
 
@@ -41,6 +46,7 @@ export class App {
     this.renderer.setLiveNoteStore(this.liveNotes)
 
     this.midiInput = new MidiInputManager(this.clock)
+    this.keyboardInput = new ComputerKeyboardInput(this.clock)
 
     this.dropzone = new DropZone(
       overlay,
@@ -68,6 +74,13 @@ export class App {
     this.exportModal.onStart  = (fps) => void this.startExport(fps)
     this.exportModal.onCancel = () => this.cancelExport()
 
+    this.kbdResizer = new KeyboardResizer(
+      overlay,
+      () => this.renderer.currentKeyboardHeight,
+      (px) => this.renderer.setKeyboardHeight(px),
+    )
+    this.kbdResizer.restoreSaved()
+
     this.applyTheme(THEMES[this.themeIndex]!)
     this.controls.updateMidiStatus(this.midiInput.status.value, '')
     this.dropzone.updateMidiStatus(this.midiInput.status.value, '')
@@ -92,34 +105,18 @@ export class App {
       this.synth.setSpeed(s)
     })
 
-    // ── MIDI keyboard input wiring ────────────────────────────────────────
-    this.midiInput.noteOn.subscribe((evt) => {
-      if (!evt) return
-      if (appState.status.value === 'exporting') return
+    // ── Live input wiring (MIDI device + computer keyboard) ───────────────
+    this.midiInput.noteOn.subscribe((evt) => { if (evt) this.handleLiveNoteOn(evt) })
+    this.midiInput.noteOff.subscribe((evt) => { if (evt) this.handleLiveNoteOff(evt) })
+    this.keyboardInput.noteOn.subscribe((evt) => { if (evt) this.handleLiveNoteOn(evt) })
+    this.keyboardInput.noteOff.subscribe((evt) => { if (evt) this.handleLiveNoteOff(evt) })
+    this.keyboardInput.octave.subscribe((o) => this.controls.updateOctave(o))
 
-      if (appState.mode.value === 'file') return
-      if (appState.mode.value === 'home') {
-        this.enterLiveMode(false)
-      }
-
-      this.synth.liveNoteOn(evt.pitch, evt.velocity)
-      this.liveNotes.press(evt.pitch, evt.velocity, evt.clockTime)
-      this.renderer.burstParticleAt(evt.pitch)
-
-      // Auto-start clock on first note if idle/ready/paused
-      const s = appState.status.value
-      if (s === 'idle' || s === 'ready' || s === 'paused') {
-        this.clock.play()
-        appState.startPlaying()
-      }
-    })
-
-    this.midiInput.noteOff.subscribe((evt) => {
-      if (!evt) return
-      if (appState.mode.value !== 'live') return
-      this.synth.liveNoteOff(evt.pitch)
-      this.liveNotes.release(evt.pitch, evt.clockTime)
-    })
+    // Mouse/touch on the on-screen keyboard
+    canvas.addEventListener('pointerdown', this.onCanvasPointerDown)
+    canvas.addEventListener('pointerup', this.onCanvasPointerUp)
+    canvas.addEventListener('pointercancel', this.onCanvasPointerUp)
+    canvas.addEventListener('pointerleave', this.onCanvasPointerUp)
 
     // Update MIDI button whenever either status or device name changes.
     // Reading the *other* signal's current value avoids a stale-name flash.
@@ -145,6 +142,53 @@ export class App {
   private releaseAllLiveNotes(): void {
     this.liveNotes.releaseAll(this.clock.currentTime)
     this.synth.liveReleaseAll()
+  }
+
+  private handleLiveNoteOn(evt: MidiNoteEvent): void {
+    if (appState.status.value === 'exporting') return
+    if (appState.mode.value === 'file') return
+    if (appState.mode.value === 'home') this.enterLiveMode(false)
+
+    this.synth.liveNoteOn(evt.pitch, evt.velocity)
+    this.liveNotes.press(evt.pitch, evt.velocity, evt.clockTime)
+    this.renderer.burstParticleAt(evt.pitch)
+
+    const s = appState.status.value
+    if (s === 'idle' || s === 'ready' || s === 'paused') {
+      this.clock.play()
+      appState.startPlaying()
+    }
+  }
+
+  private handleLiveNoteOff(evt: MidiNoteEvent): void {
+    if (appState.mode.value !== 'live') return
+    this.synth.liveNoteOff(evt.pitch)
+    this.liveNotes.release(evt.pitch, evt.clockTime)
+  }
+
+  private onCanvasPointerDown = (e: PointerEvent): void => {
+    if (appState.mode.value === 'file') return
+    if (appState.status.value === 'exporting') return
+    const pitch = this.renderer.pitchAtClientPoint(e.clientX, e.clientY)
+    if (pitch === null) return
+
+    this.primeInteractiveAudio()
+    if (appState.mode.value === 'home') this.enterLiveMode(false)
+    ;(e.target as Element).setPointerCapture?.(e.pointerId)
+    e.preventDefault()
+
+    if (this.activeMouseNote !== null) {
+      this.handleLiveNoteOff({ pitch: this.activeMouseNote, velocity: 0, clockTime: this.clock.currentTime })
+    }
+    this.activeMouseNote = pitch
+    this.handleLiveNoteOn({ pitch, velocity: 0.8, clockTime: this.clock.currentTime })
+  }
+
+  private onCanvasPointerUp = (): void => {
+    if (this.activeMouseNote === null) return
+    const pitch = this.activeMouseNote
+    this.activeMouseNote = null
+    this.handleLiveNoteOff({ pitch, velocity: 0, clockTime: this.clock.currentTime })
   }
 
   private async connectMidi(): Promise<void> {
@@ -266,6 +310,9 @@ export class App {
     this.renderer.clearMidi()
     this.trackPanel.close()
     this.dropzone.show()
+    // Keep computer keyboard live — pressing a note from the home screen
+    // seamlessly dissolves into live mode.
+    this.keyboardInput.enable()
     document.title = 'Piano Roll'
   }
 
@@ -275,6 +322,7 @@ export class App {
     this.renderer.clearMidi()
     this.trackPanel.close()
     this.dropzone.hide()
+    this.keyboardInput.enable()
     document.title = 'Piano Roll · Live'
     if (primeAudio) this.primeInteractiveAudio()
   }
@@ -290,6 +338,7 @@ export class App {
     this.renderer.loadMidi(midi)
     this.trackPanel.render(midi)
     this.dropzone.hide()
+    this.keyboardInput.disable()
     document.title = `${midi.name} · Piano Roll`
   }
 
@@ -314,6 +363,7 @@ export class App {
   private applyTheme(theme: Theme): void {
     this.renderer.setTheme(theme)
     this.controls.updateThemeDot(theme.uiAccentCSS)
+    this.controls.updateThemeLabel(theme.name)
     const accent = theme.uiAccentCSS
     document.documentElement.style.setProperty('--accent', accent)
     document.documentElement.style.setProperty('--accent-soft', `${accent}2e`)
@@ -359,9 +409,15 @@ export class App {
     window.removeEventListener('blur', this.onWindowBlur)
     window.removeEventListener('pointerdown', this.onFirstPointerDown)
     window.removeEventListener('keydown', this.onFirstKeyDown)
+    this.renderer.canvas.removeEventListener('pointerdown', this.onCanvasPointerDown)
+    this.renderer.canvas.removeEventListener('pointerup', this.onCanvasPointerUp)
+    this.renderer.canvas.removeEventListener('pointercancel', this.onCanvasPointerUp)
+    this.renderer.canvas.removeEventListener('pointerleave', this.onCanvasPointerUp)
     this.dropzone.dispose()
     this.controls.dispose()
+    this.kbdResizer.dispose()
     this.midiInput.dispose()
+    this.keyboardInput.dispose()
     this.clock.dispose()
     this.renderer.destroy()
     this.synth.dispose()

@@ -12,9 +12,22 @@ export class DropZone {
   private dragDepth = 0
   private input!: HTMLInputElement
   private statusEl!: HTMLElement
+
+  private docDragEnter = (e: DragEvent): void => {
+    if (!hasFiles(e)) return
+    this.dragDepth++
+    this.el.classList.add('drag-over')
+  }
+  private docDragLeave = (e: DragEvent): void => {
+    if (!hasFiles(e)) return
+    this.dragDepth = Math.max(0, this.dragDepth - 1)
+    if (this.dragDepth === 0) this.el.classList.remove('drag-over')
+  }
   private docDragOver = (e: DragEvent): void => { e.preventDefault() }
   private docDrop = (e: DragEvent): void => {
     e.preventDefault()
+    this.dragDepth = 0
+    this.el.classList.remove('drag-over')
     const file = e.dataTransfer?.files[0]
     if (file && isMidiFile(file.name)) this.onDrop(file)
   }
@@ -34,8 +47,9 @@ export class DropZone {
     el.id = 'dropzone'
     el.innerHTML = `
       <div class="home-card">
-        <h1 class="home-title">Piano Roll</h1>
-        <p class="home-sub">Open MIDI or play live.</p>
+        <span class="home-kicker">Piano roll · visualizer</span>
+        <h1 class="home-title">Play <em>notes</em>,<br/>see them bloom.</h1>
+        <p class="home-sub">Open a MIDI file to animate it, or go live and play with your keyboard, mouse, or a MIDI controller.</p>
 
         <div class="home-actions">
           <button class="home-primary-btn" id="home-open" type="button">
@@ -44,12 +58,14 @@ export class DropZone {
           </button>
           <button class="home-secondary-btn" id="home-live" type="button">
             ${ICON_MIDI}
-            <span>Live</span>
+            <span>Play live</span>
           </button>
         </div>
 
-        <div class="home-midi-status" id="home-midi-status">Looking for MIDI…</div>
-        <div class="home-drop-hint">Drop <code>.mid</code> anywhere</div>
+        <div class="home-footnotes">
+          <div class="home-midi-status" id="home-midi-status">Looking for MIDI…</div>
+          <div class="home-drop-hint">Drop <code>.mid</code> anywhere · play with <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>…</div>
+        </div>
         <input type="file" id="midi-input" accept=".mid,.midi" style="display:none" />
       </div>
     `
@@ -76,28 +92,8 @@ export class DropZone {
       liveBtn.classList.add('hidden')
     }
 
-    this.el.addEventListener('dragenter', (e) => {
-      e.preventDefault()
-      this.dragDepth++
-      this.el.classList.add('drag-over')
-    })
-
-    this.el.addEventListener('dragleave', () => {
-      this.dragDepth--
-      if (this.dragDepth === 0) this.el.classList.remove('drag-over')
-    })
-
-    this.el.addEventListener('dragover', (e) => { e.preventDefault() })
-
-    this.el.addEventListener('drop', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      this.dragDepth = 0
-      this.el.classList.remove('drag-over')
-      const file = e.dataTransfer?.files[0]
-      if (file && isMidiFile(file.name)) this.onDrop(file)
-    })
-
+    document.addEventListener('dragenter', this.docDragEnter)
+    document.addEventListener('dragleave', this.docDragLeave)
     document.addEventListener('dragover', this.docDragOver)
     document.addEventListener('drop', this.docDrop)
   }
@@ -120,16 +116,22 @@ export class DropZone {
   }
 
   dispose(): void {
+    document.removeEventListener('dragenter', this.docDragEnter)
+    document.removeEventListener('dragleave', this.docDragLeave)
     document.removeEventListener('dragover', this.docDragOver)
     document.removeEventListener('drop', this.docDrop)
   }
 }
 
+function hasFiles(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types ?? []).includes('Files')
+}
+
 function getHomeMidiStatus(status: MidiDeviceStatus, deviceName: string): string {
-  if (status === 'connected') return deviceName || 'MIDI connected'
+  if (status === 'connected') return deviceName || 'MIDI device ready'
   if (status === 'blocked') return 'Enable MIDI from the top bar'
-  if (status === 'unavailable') return 'Web MIDI unavailable'
-  return 'No MIDI keyboard'
+  if (status === 'unavailable') return 'Web MIDI unavailable in this browser'
+  return 'No MIDI device — keyboard & mouse work too'
 }
 
 const ICON_UPLOAD = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">

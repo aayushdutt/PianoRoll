@@ -27,6 +27,7 @@ export interface ControlsOptions {
 export class Controls {
   private topStrip!: HTMLElement
   private hud!: HTMLElement
+  private keyHint!: HTMLElement
   private playBtn!: HTMLButtonElement
   private scrubber!: HTMLInputElement
   private timeDisplay!: HTMLElement
@@ -41,6 +42,9 @@ export class Controls {
   private fileModeBtn!: HTMLButtonElement
   private liveModeBtn!: HTMLButtonElement
   private hudDragHandle!: HTMLButtonElement
+  private themeBtn!: HTMLButtonElement
+  private themeLabelEl!: HTMLElement
+  private octaveEl!: HTMLElement
   private isScrubbing = false
   private idleTimer: ReturnType<typeof setTimeout> | null = null
   private currentMidiStatus: MidiDeviceStatus = 'disconnected'
@@ -63,6 +67,7 @@ export class Controls {
   constructor(private opts: ControlsOptions) {
     this.buildTopStrip()
     this.buildHud()
+    this.buildKeyHint()
     this.bindEvents()
     this.bindState()
     document.addEventListener('mousemove', this.onMouseMoveDoc)
@@ -102,8 +107,9 @@ export class Controls {
           ${ICON_MIDI}
           <span id="ts-midi-label">Enable MIDI</span>
         </button>
-        <button class="ts-btn ts-theme-btn" id="ts-theme" title="Cycle theme" aria-label="Cycle theme">
+        <button class="ts-theme-btn" id="ts-theme" title="Cycle theme" aria-label="Cycle theme">
           <span class="theme-dot" id="ts-theme-dot"></span>
+          <span class="theme-label" id="ts-theme-label">Theme</span>
         </button>
         <button class="ts-record-btn" id="ts-record" type="button" aria-label="Record MP4">
           ${ICON_RECORD}
@@ -163,6 +169,33 @@ export class Controls {
     this.hud = el
   }
 
+  private buildKeyHint(): void {
+    const el = document.createElement('div')
+    el.id = 'key-hint'
+    el.innerHTML = `
+      <div class="kh-body">
+        <div class="kh-row">
+          <span class="kh-section">Keys</span>
+          <span class="kh-map">
+            <kbd>A</kbd><kbd>W</kbd><kbd>S</kbd><kbd>E</kbd><kbd>D</kbd>
+            <span class="kh-dots">· · ·</span>
+          </span>
+          <span class="kh-section kh-section--muted">or plug in MIDI</span>
+        </div>
+        <div class="kh-row">
+          <span class="kh-section">Octave</span>
+          <span class="kh-map">
+            <kbd>↓</kbd><kbd>↑</kbd>
+            <span class="kh-current" id="kh-octave">C4</span>
+          </span>
+        </div>
+      </div>
+    `
+    this.opts.container.appendChild(el)
+    this.keyHint = el
+    this.octaveEl = el.querySelector<HTMLElement>('#kh-octave')!
+  }
+
   private bindEvents(): void {
     const { state, clock, onSeek, onZoom } = this.opts
 
@@ -180,6 +213,8 @@ export class Controls {
     this.fileModeBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-file')!
     this.liveModeBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-live')!
     this.hudDragHandle = this.hud.querySelector<HTMLButtonElement>('#hud-drag')!
+    this.themeBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-theme')!
+    this.themeLabelEl = this.topStrip.querySelector<HTMLElement>('#ts-theme-label')!
 
     this.playBtn.addEventListener('click', () => {
       if (state.mode.value !== 'file') return
@@ -307,6 +342,16 @@ export class Controls {
     if (dot) dot.style.background = color
   }
 
+  updateThemeLabel(name: string): void {
+    this.themeLabelEl.textContent = name
+    this.themeBtn.title = `Theme: ${name} — click to cycle`
+    this.themeBtn.setAttribute('aria-label', `Theme: ${name}. Click to cycle themes.`)
+  }
+
+  updateOctave(octave: number): void {
+    this.octaveEl.textContent = `C${octave}`
+  }
+
   updateMidiStatus(status: MidiDeviceStatus, deviceName: string): void {
     this.currentMidiStatus = status
     this.currentMidiDeviceName = deviceName
@@ -357,6 +402,8 @@ export class Controls {
     this.hud.classList.toggle('hud--exporting', status === 'exporting')
     this.applyHudOffset()
     this.playBtn.innerHTML = status === 'playing' ? ICON_PAUSE : ICON_PLAY
+
+    this.keyHint.classList.toggle('kh--visible', mode === 'live')
 
     this.renderHeader(mode, midi?.name ?? null)
 
@@ -534,9 +581,13 @@ const ICON_PAUSE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="curren
   <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
 </svg>`
 
-const ICON_GRIP = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <line x1="9" y1="6" x2="9" y2="18"/>
-  <line x1="15" y1="6" x2="15" y2="18"/>
+const ICON_GRIP = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <circle cx="9" cy="6" r="1.6"/>
+  <circle cx="15" cy="6" r="1.6"/>
+  <circle cx="9" cy="12" r="1.6"/>
+  <circle cx="15" cy="12" r="1.6"/>
+  <circle cx="9" cy="18" r="1.6"/>
+  <circle cx="15" cy="18" r="1.6"/>
 </svg>`
 
 const ICON_SKIP_BACK = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

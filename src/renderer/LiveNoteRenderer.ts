@@ -62,8 +62,9 @@ export class LiveNoteRenderer {
       return
     }
 
-    // Live notes use the now-line colour so they feel "born from" the line.
-    const color = this.theme.nowLine
+    // Live notes take the theme's primary track color so they visually tie
+    // into the UI accent and any imported MIDI notes.
+    const color = this.theme.trackColors[0] ?? this.theme.nowLine
     const { pixelsPerSecond } = viewport.config
     const nowY = viewport.nowLineY
     let hasHeldNotes = false

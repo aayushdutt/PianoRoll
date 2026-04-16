@@ -10,7 +10,9 @@ import { Viewport } from './viewport'
 import { darkTheme, getTrackColor, type Theme } from './theme'
 import type { LiveNoteStore } from '../midi/LiveNoteStore'
 
-const KEYBOARD_HEIGHT = 120
+const DEFAULT_KEYBOARD_HEIGHT = 120
+export const KEYBOARD_HEIGHT_MIN = 80
+export const KEYBOARD_HEIGHT_MAX = 220
 const DEFAULT_PIXELS_PER_SECOND = 200
 
 export class PianoRollRenderer {
@@ -29,6 +31,7 @@ export class PianoRollRenderer {
   private visibleTrackIds = new Set<string>()
   private theme: Theme = darkTheme
   private pixelsPerSecond = DEFAULT_PIXELS_PER_SECOND
+  private keyboardHeight = DEFAULT_KEYBOARD_HEIGHT
 
   private prevActivePitches = new Set<string>()
   private exportMode = false
@@ -51,7 +54,7 @@ export class PianoRollRenderer {
     this.viewport = new Viewport({
       canvasWidth: this.app.screen.width,
       canvasHeight: this.app.screen.height,
-      keyboardHeight: KEYBOARD_HEIGHT,
+      keyboardHeight: this.keyboardHeight,
       pixelsPerSecond: this.pixelsPerSecond,
     })
 
@@ -163,6 +166,21 @@ export class PianoRollRenderer {
     this.viewport.update({ pixelsPerSecond })
     this.drawBackground()
     this.keyboardRenderer.build(this.viewport, this.viewport.rollHeight)
+  }
+
+  setKeyboardHeight(px: number): void {
+    const clamped = Math.max(KEYBOARD_HEIGHT_MIN, Math.min(KEYBOARD_HEIGHT_MAX, Math.round(px)))
+    if (clamped === this.keyboardHeight) return
+    this.keyboardHeight = clamped
+    this.viewport.update({ keyboardHeight: clamped })
+    document.documentElement.style.setProperty('--keyboard-h', `${clamped}px`)
+    this.drawBackground()
+    this.keyboardRenderer.build(this.viewport, this.viewport.rollHeight)
+    this.renderStaticFrame(this.midi ? 0 : 0)
+  }
+
+  get currentKeyboardHeight(): number {
+    return this.keyboardHeight
   }
 
   setTheme(theme: Theme): void {
@@ -280,6 +298,12 @@ export class PianoRollRenderer {
 
   get canvas(): HTMLCanvasElement {
     return this.app.canvas as HTMLCanvasElement
+  }
+
+  // Convert a client-space (canvas) point into a MIDI pitch if it lands on a key.
+  pitchAtClientPoint(clientX: number, clientY: number): number | null {
+    const rect = this.app.canvas.getBoundingClientRect()
+    return this.viewport.pitchAtPoint(clientX - rect.left, clientY - rect.top)
   }
 
   private handleResize = (): void => {

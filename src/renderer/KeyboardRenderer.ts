@@ -87,30 +87,37 @@ export class KeyboardRenderer {
     this.activeLayer.y = yOffset
   }
 
-  // Called every frame — draws only the keys that are currently pressed
+  // Called every frame — draws only the keys that are currently pressed.
+  // Synthesia-style: a tinted key body plus a bright accent band at the top
+  // where the falling note "lands", giving a clear landing-point cue.
   drawActiveKeys(activePitches: Set<number>, viewport: Viewport): void {
     this.activeLayer.clear()
 
     const { keyboardHeight } = viewport.config
     const positions = viewport.getAllKeyPositions()
+    const accent = this.theme.trackColors[0] ?? this.theme.nowLine
+    const bandThickness = Math.max(3, Math.round(keyboardHeight * 0.045))
 
     for (const pitch of activePitches) {
       const pos = positions.get(pitch)
       if (!pos) continue
 
       const isBlack = isBlackKey(pitch)
-      const color = isBlack ? this.theme.blackKeyActive : this.theme.whiteKeyActive
+      const bodyColor = isBlack ? this.theme.blackKeyActive : this.theme.whiteKeyActive
       const h = isBlack ? keyboardHeight * 0.62 : keyboardHeight - 4
-
       const margin = isBlack ? 0 : 1
-      this.activeLayer.roundRect(
-        pos.x + margin,
-        isBlack ? 0 : 2,
-        pos.width - margin * 2,
-        h,
-        isBlack ? 2 : 3,
-      )
-      this.activeLayer.fill({ color, alpha: 0.9 })
+      const x = pos.x + margin
+      const w = pos.width - margin * 2
+      const y = isBlack ? 0 : 2
+      const radius = isBlack ? 2 : 3
+
+      // Body tint
+      this.activeLayer.roundRect(x, y, w, h, radius)
+      this.activeLayer.fill({ color: bodyColor, alpha: 0.88 })
+
+      // Landing band (top edge, where notes meet the key)
+      this.activeLayer.roundRect(x, y, w, bandThickness, radius)
+      this.activeLayer.fill({ color: accent, alpha: 1 })
     }
   }
 

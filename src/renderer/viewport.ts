@@ -72,6 +72,28 @@ export class Viewport {
     return this.keyPositions
   }
 
+  // Find which piano key the given canvas-space point falls on.
+  // Black keys are checked first because they visually sit on top of whites.
+  pitchAtPoint(x: number, y: number): number | null {
+    const { keyboardHeight, canvasHeight } = this.cfg
+    const keyboardTop = canvasHeight - keyboardHeight
+    if (y < keyboardTop || y > canvasHeight) return null
+
+    const blackZoneBottom = keyboardTop + keyboardHeight * 0.62
+    if (y <= blackZoneBottom) {
+      for (const [pitch, pos] of this.keyPositions) {
+        if (!isBlackKey(pitch)) continue
+        if (x >= pos.x && x < pos.x + pos.width) return pitch
+      }
+    }
+
+    for (const [pitch, pos] of this.keyPositions) {
+      if (isBlackKey(pitch)) continue
+      if (x >= pos.x && x < pos.x + pos.width) return pitch
+    }
+    return null
+  }
+
   private buildKeyLayout(): void {
     this.keyPositions.clear()
 
