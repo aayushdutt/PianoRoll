@@ -3,10 +3,12 @@ import type { MidiFile } from '../core/midi/types'
 import type { MasterClock } from '../core/clock/MasterClock'
 import { NoteRenderer } from './NoteRenderer'
 import { KeyboardRenderer } from './KeyboardRenderer'
+import { LiveNoteRenderer } from './LiveNoteRenderer'
 import { ParticleSystem } from './ParticleSystem'
 import { BeatGrid } from './BeatGrid'
 import { Viewport } from './viewport'
 import { darkTheme, getTrackColor, type Theme } from './theme'
+import type { LiveNoteStore } from '../midi/LiveNoteStore'
 
 const KEYBOARD_HEIGHT = 120
 const DEFAULT_PIXELS_PER_SECOND = 200
@@ -16,12 +18,14 @@ export class PianoRollRenderer {
   private viewport!: Viewport
   private noteRenderer!: NoteRenderer
   private keyboardRenderer!: KeyboardRenderer
+  private liveNoteRenderer!: LiveNoteRenderer
   private particles!: ParticleSystem
   private beatGrid!: BeatGrid
   private nowLineGraphics!: Graphics
   private backgroundGraphics!: Graphics
 
   private midi: MidiFile | null = null
+  private liveNoteStore: LiveNoteStore | null = null
   private visibleTrackIds = new Set<string>()
   private theme: Theme = darkTheme
   private pixelsPerSecond = DEFAULT_PIXELS_PER_SECOND
@@ -61,7 +65,7 @@ export class PianoRollRenderer {
     const stage = this.app.stage
 
     // Layer order (bottom → top):
-    // 1. background  2. beat-grid  3. notes  4. now-line  5. keyboard  6. particles
+    // 1. background  2. beat-grid  3. notes  4. live-notes  5. now-line  6. keyboard  7. particles
 
     this.backgroundGraphics = new Graphics()
     this.backgroundGraphics.label = 'background'
@@ -72,6 +76,9 @@ export class PianoRollRenderer {
 
     this.noteRenderer = new NoteRenderer(this.theme)
     stage.addChild(this.noteRenderer.container)
+
+    this.liveNoteRenderer = new LiveNoteRenderer(this.theme)
+    stage.addChild(this.liveNoteRenderer.container)
 
     this.nowLineGraphics = new Graphics()
     this.nowLineGraphics.label = 'now-line'
@@ -149,8 +156,8 @@ export class PianoRollRenderer {
     this.theme = theme
     this.app.renderer.background.color = theme.background
     this.noteRenderer.updateTheme(theme)
+    this.liveNoteRenderer.updateTheme(theme)
     this.keyboardRenderer.updateTheme(theme)
-    // No lookahead/trail to pass — those are computed by Viewport
     this.drawBackground()
     this.keyboardRenderer.build(this.viewport, this.viewport.rollHeight)
   }
@@ -160,7 +167,10 @@ export class PianoRollRenderer {
   }
 
   private onTick(clock: MasterClock, _ticker: Ticker): void {
-    if (!this.midi || this.exportMode) return
+    if (this.exportMode) return
+    // Render if we have a MIDI file OR live notes are being played
+    const hasLive = (this.liveNoteStore?.activeNotes.size ?? 0) > 0
+    if (!this.midi && !hasLive) return
     const dt = _ticker.deltaMS / 1000
     this.renderFrame(clock.currentTime, dt, clock.playing)
   }
@@ -172,42 +182,63 @@ export class PianoRollRenderer {
   }
 
   private renderFrame(currentTime: number, dt: number, emitParticles: boolean): void {
-    if (!this.midi) return
+    const activePitches    = new Set<string>()
+    const activePitchNums  = new Set<number>()
 
-    const activePitches = new Set<string>()
-    const activePitchNums = new Set<number>()
-
-    for (const track of this.midi.tracks) {
-      if (!this.visibleTrackIds.has(track.id)) continue
-      for (const note of track.notes) {
-        if (note.time <= currentTime && note.time + note.duration >= currentTime) {
-          activePitches.add(`${track.id}:${note.pitch}`)
-          activePitchNums.add(note.pitch)
-        }
-      }
-    }
-
-    // Particle burst at the moment of note-on — fires at the now-line Y
-    if (emitParticles) {
+    // ── Scheduled MIDI notes ──────────────────────────────────────────────
+    if (this.midi) {
       for (const track of this.midi.tracks) {
         if (!this.visibleTrackIds.has(track.id)) continue
-        const particleColor = getTrackColor(track, this.theme)
         for (const note of track.notes) {
-          const key = `${track.id}:${note.pitch}`
-          if (activePitches.has(key) && !this.prevActivePitches.has(key)) {
-            const cx = this.viewport.pitchToX(note.pitch) + this.viewport.pitchWidth(note.pitch) / 2
-            this.particles.burst(cx, this.viewport.nowLineY, particleColor)
+          if (note.time <= currentTime && note.time + note.duration >= currentTime) {
+            activePitches.add(`${track.id}:${note.pitch}`)
+            activePitchNums.add(note.pitch)
           }
         }
       }
+
+      // Particle bursts on note-on crossing
+      if (emitParticles) {
+        for (const track of this.midi.tracks) {
+          if (!this.visibleTrackIds.has(track.id)) continue
+          const particleColor = getTrackColor(track, this.theme)
+          for (const note of track.notes) {
+            const key = `${track.id}:${note.pitch}`
+            if (activePitches.has(key) && !this.prevActivePitches.has(key)) {
+              const cx = this.viewport.pitchToX(note.pitch) + this.viewport.pitchWidth(note.pitch) / 2
+              this.particles.burst(cx, this.viewport.nowLineY, particleColor)
+            }
+          }
+        }
+      }
+
+      this.beatGrid.draw(currentTime, this.midi.bpm, this.midi.timeSignature[0] ?? 4, this.viewport, this.theme)
+      this.noteRenderer.draw(this.midi.tracks, currentTime, this.viewport, this.visibleTrackIds)
     }
+
     this.prevActivePitches = activePitches
 
-    this.beatGrid.draw(currentTime, this.midi.bpm, this.midi.timeSignature[0] ?? 4, this.viewport, this.theme)
-    this.noteRenderer.draw(this.midi.tracks, currentTime, this.viewport, this.visibleTrackIds)
+    // ── Live MIDI keyboard notes ──────────────────────────────────────────
+    if (this.liveNoteStore) {
+      for (const [pitch] of this.liveNoteStore.activeNotes) {
+        activePitchNums.add(pitch)
+      }
+      this.liveNoteRenderer.draw(this.liveNoteStore.activeNotes, currentTime, this.viewport)
+    }
+
     this.keyboardRenderer.drawActiveKeys(activePitchNums, this.viewport)
     this.particles.update(dt)
     this.drawNowLine()
+  }
+
+  // Trigger a particle burst at a specific pitch — used for live MIDI note-on.
+  burstParticleAt(pitch: number): void {
+    const cx = this.viewport.pitchToX(pitch) + this.viewport.pitchWidth(pitch) / 2
+    this.particles.burst(cx, this.viewport.nowLineY, this.theme.nowLine)
+  }
+
+  setLiveNoteStore(store: LiveNoteStore): void {
+    this.liveNoteStore = store
   }
 
   pauseAutoRender(): void {
@@ -215,6 +246,7 @@ export class PianoRollRenderer {
     this.app.ticker.stop()
     this.particles.clear()
     this.prevActivePitches.clear()
+    this.liveNoteRenderer.draw(new Map(), 0, this.viewport)  // clear live notes from screen
   }
 
   resumeAutoRender(): void {

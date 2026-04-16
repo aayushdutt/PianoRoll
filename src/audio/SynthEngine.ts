@@ -36,7 +36,10 @@ export class SynthEngine implements AudioEngine {
       this.midi = source as MidiFile
     }
 
-    this.readyPromise = this.initInstrument()
+    // Only (re)initialize if no instrument is loaded yet
+    if (!this.pianoInstance && !this.fallbackSynth) {
+      this.readyPromise = this.initInstrument()
+    }
     return this.readyPromise
   }
 
@@ -125,6 +128,46 @@ export class SynthEngine implements AudioEngine {
   setSpeed(s: number): void {
     Tone.getTransport().bpm.value = (this.midi?.bpm ?? 120) * s
   }
+
+  // ── Live MIDI keyboard input ─────────────────────────────────────────────
+
+  // Call during the user-gesture that connects MIDI so the instrument starts
+  // loading in the background. By the time they play their first note it's ready.
+  async ensureInstrument(): Promise<void> {
+    await Tone.start()
+    if (!this.pianoInstance && !this.fallbackSynth) {
+      this.readyPromise = this.initInstrument()
+    }
+    await this.readyPromise
+  }
+
+  // Trigger a note immediately (no Transport scheduling) for live input.
+  liveNoteOn(pitch: number, velocity: number): void {
+    const name = midiToNoteName(pitch)
+    const t    = Tone.now()
+    if (this.pianoInstance) {
+      this.pianoInstance.keyDown({ note: name, velocity, time: t })
+    } else {
+      this.fallbackSynth?.triggerAttack(name, t, velocity)
+    }
+  }
+
+  liveNoteOff(pitch: number): void {
+    const name = midiToNoteName(pitch)
+    const t    = Tone.now()
+    if (this.pianoInstance) {
+      this.pianoInstance.keyUp({ note: name, time: t })
+    } else {
+      this.fallbackSynth?.triggerRelease(name, t)
+    }
+  }
+
+  liveReleaseAll(): void {
+    this.pianoInstance?.stopAll()
+    this.fallbackSynth?.releaseAll()
+  }
+
+  // ── Scheduled playback (internal) ────────────────────────────────────────
 
   private triggerNoteOn(note: MidiNote, track: MidiTrack, time: number): void {
     const name = midiToNoteName(note.pitch)

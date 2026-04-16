@@ -29,10 +29,10 @@ export class Signal<T> {
 export type PlaybackStatus = 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'exporting'
 
 export const appState = {
-  status:      new Signal<PlaybackStatus>('idle'),
-  midi:        new Signal<MidiFile | null>(null),
-  currentTime: new Signal<number>(0),
-  duration:    new Signal<number>(0),
-  volume:      new Signal<number>(0.8),
-  speed:       new Signal<number>(1),
+  status:           new Signal<PlaybackStatus>('idle'),
+  midi:             new Signal<MidiFile | null>(null),
+  currentTime:      new Signal<number>(0),
+  duration:         new Signal<number>(0),
+  volume:           new Signal<number>(0.8),
+  speed:            new Signal<number>(1),
 }

@@ -68,7 +68,9 @@ export class ParticleSystem {
       const p = this.active[i]!
       p.life -= dt / p.maxLife
       if (p.life <= 0) {
-        this.active.splice(i, 1)
+        // Swap with last element then pop — O(1) removal from unordered array
+        this.active[i] = this.active[this.active.length - 1]!
+        this.active.pop()
         this.pool.push(p)
         continue
       }

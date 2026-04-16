@@ -40,8 +40,9 @@ export class NoteRenderer {
   // Call once when tracks are loaded — sets up one Graphics per track
   setTracks(tracks: MidiTrack[]): void {
     // Remove stale graphics
+    const incomingIds = new Set(tracks.map(t => t.id))
     for (const [id, g] of this.trackGraphics) {
-      if (!tracks.find(t => t.id === id)) {
+      if (!incomingIds.has(id)) {
         this.container.removeChild(g)
         g.destroy()
         this.trackGraphics.delete(id)

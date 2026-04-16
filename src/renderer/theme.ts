@@ -1,9 +1,5 @@
 import type { MidiTrack } from '../core/midi/types'
 
-export function getTrackColor(track: MidiTrack, theme: Theme): number {
-  return theme.trackColors[track.colorIndex % theme.trackColors.length]!
-}
-
 export interface Theme {
   name: string
   background: number
@@ -29,6 +25,10 @@ export interface Theme {
 
   // Per-track note/particle colors — indexed by MidiTrack.colorIndex
   trackColors: number[]
+}
+
+export function getTrackColor(track: MidiTrack, theme: Theme): number {
+  return theme.trackColors[track.colorIndex % theme.trackColors.length]!
 }
 
 export const darkTheme: Theme = {
@@ -138,5 +138,3 @@ export const THEMES: Theme[] = [
   sunsetTheme,
   oceanTheme,
 ]
-
-export const defaultTheme = darkTheme

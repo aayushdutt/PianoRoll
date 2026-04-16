@@ -20,7 +20,16 @@ export type ExportProgressCallback = (stage: string, pct: number) => void
 const FFMPEG_CDN_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm'
 
 export class VideoExporter {
+  private _cancelled = false
+  private _ffmpeg: { terminate(): void } | null = null
+
   constructor(private canvas: HTMLCanvasElement) {}
+
+  /** Abort an in-progress export. Safe to call at any point. */
+  cancel(): void {
+    this._cancelled = true
+    this._ffmpeg?.terminate()
+  }
 
   async export(opts: {
     fps?: number
@@ -46,6 +55,7 @@ export class VideoExporter {
     recorder.start()
 
     for (let i = 0; i <= totalFrames; i++) {
+      if (this._cancelled) throw new DOMException('Export cancelled', 'AbortError')
       const t = i * dt
       onSeek(t)
       onRenderFrame(t, dt)
@@ -56,6 +66,7 @@ export class VideoExporter {
 
     recorder.stop()
     await new Promise<void>(resolve => { recorder.onstop = () => resolve() })
+    if (this._cancelled) throw new DOMException('Export cancelled', 'AbortError')
 
     onProgress?.('Encoding', 0.55)
 
@@ -68,10 +79,19 @@ export class VideoExporter {
       onProgress?.('Encoding', 0.55 + progress * 0.43)
     })
 
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${FFMPEG_CDN_BASE}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${FFMPEG_CDN_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
-    })
+    this._ffmpeg = ffmpeg
+    try {
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${FFMPEG_CDN_BASE}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${FFMPEG_CDN_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
+      })
+    } catch (err) {
+      if (this._cancelled) throw new DOMException('Export cancelled', 'AbortError')
+      throw new Error(
+        'Could not load the video encoder — check your internet connection and try again.',
+        { cause: err },
+      )
+    }
 
     // ── Phase 3: encode ───────────────────────────────────────────────────
     const webmBytes = new Uint8Array(await new Blob(chunks, { type: mimeType }).arrayBuffer())
@@ -93,12 +113,11 @@ export class VideoExporter {
     onProgress?.('Saving', 0.99)
 
     const out = await ffmpeg.readFile('output.mp4')
-    const blob = new Blob(
-      [out instanceof Uint8Array ? (out.buffer as ArrayBuffer) : (out as string)],
-      { type: 'video/mp4' },
-    )
+    if (!(out instanceof Uint8Array)) throw new Error('Unexpected output type from ffmpeg')
+    const blob = new Blob([out.buffer as ArrayBuffer], { type: 'video/mp4' })
     triggerDownload(URL.createObjectURL(blob), 'pianoroll.mp4')
 
+    this._ffmpeg = null
     ffmpeg.terminate()
     onProgress?.('Done', 1)
   }
