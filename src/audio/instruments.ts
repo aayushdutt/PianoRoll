@@ -3,7 +3,20 @@
 
 import * as Tone from 'tone'
 
-export type InstrumentId = 'piano' | 'rhodes' | 'pad' | 'pluck'
+export type InstrumentId =
+  | 'piano'
+  | 'upright'
+  | 'digital'
+  | 'rhodes'
+  | 'pad'
+  | 'pluck'
+  | 'marimba'
+  | 'bells'
+  | 'strings'
+  | 'bass'
+  | 'violin'
+  | 'flute'
+  | 'guitar'
 
 export interface InstrumentInfo {
   id: InstrumentId
@@ -13,10 +26,19 @@ export interface InstrumentInfo {
 }
 
 export const INSTRUMENTS: readonly InstrumentInfo[] = [
-  { id: 'piano',  name: 'Piano',  description: 'Warm acoustic grand',    sampled: true  },
-  { id: 'rhodes', name: 'Rhodes', description: 'Mellow electric piano',  sampled: false },
-  { id: 'pad',    name: 'Pad',    description: 'Airy sustained pad',     sampled: false },
-  { id: 'pluck',  name: 'Pluck',  description: 'Bright percussive',      sampled: false },
+  { id: 'piano',   name: 'Piano',   description: 'Warm acoustic grand',    sampled: true  },
+  { id: 'upright', name: 'Upright', description: 'Intimate upright · HD',  sampled: true  },
+  { id: 'digital', name: 'Digital', description: 'Clean stage piano',      sampled: false },
+  { id: 'rhodes',  name: 'Rhodes',  description: 'Mellow electric piano',  sampled: false },
+  { id: 'guitar',  name: 'Guitar',  description: 'Acoustic nylon · HD',    sampled: true  },
+  { id: 'violin',  name: 'Violin',  description: 'Bowed strings · HD',     sampled: true  },
+  { id: 'flute',   name: 'Flute',   description: 'Breathy wind · HD',      sampled: true  },
+  { id: 'marimba', name: 'Marimba', description: 'Woody mallet',           sampled: false },
+  { id: 'bells',   name: 'Bells',   description: 'Crystalline chimes',     sampled: false },
+  { id: 'strings', name: 'Strings', description: 'Swelling ensemble',      sampled: false },
+  { id: 'pad',     name: 'Pad',     description: 'Airy sustained pad',     sampled: false },
+  { id: 'pluck',   name: 'Pluck',   description: 'Bright percussive',      sampled: false },
+  { id: 'bass',    name: 'Bass',    description: 'Round low sustain',      sampled: false },
 ]
 
 export interface InstrumentRuntime {
@@ -39,10 +61,19 @@ async function getPianoModule(): Promise<PianoModule> {
 
 export async function createInstrument(id: InstrumentId): Promise<InstrumentRuntime> {
   switch (id) {
-    case 'piano':  return await createPiano()
-    case 'rhodes': return createRhodes()
-    case 'pad':    return createPad()
-    case 'pluck':  return createPluck()
+    case 'piano':   return await createPiano()
+    case 'upright': return await createUpright()
+    case 'digital': return createDigitalPiano()
+    case 'rhodes':  return createRhodes()
+    case 'pad':     return createPad()
+    case 'pluck':   return createPluck()
+    case 'marimba': return createMarimba()
+    case 'bells':   return createBells()
+    case 'strings': return createStrings()
+    case 'bass':    return createBass()
+    case 'violin':  return await createViolin()
+    case 'flute':   return await createFlute()
+    case 'guitar':  return await createGuitar()
   }
 }
 
@@ -109,6 +140,266 @@ function createPluck(): InstrumentRuntime {
   const lowpass = new Tone.Filter({ frequency: 6500, type: 'lowpass', rolloff: -24 })
   synth.chain(filter, lowpass, Tone.getDestination())
   return wrapPolySynth(synth)
+}
+
+function createMarimba(): InstrumentRuntime {
+  // Bright FM mallet — high harmonicity for crisp "wood" partials, punchy
+  // attack with zero sustain so notes pop and die quickly.
+  const synth = new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity: 4.2,
+    modulationIndex: 12,
+    oscillator: { type: 'sine' },
+    envelope:   { attack: 0.001, decay: 0.18, sustain: 0, release: 0.25 },
+    modulation: { type: 'triangle' },
+    modulationEnvelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.08 },
+  })
+  synth.volume.value = -4
+  const reverb = new Tone.Reverb({ decay: 1.2, wet: 0.2 })
+  synth.chain(reverb, Tone.getDestination())
+  return wrapPolySynth(synth)
+}
+
+function createBells(): InstrumentRuntime {
+  // Near-integer harmonicity offset gives the inharmonic overtone stack that
+  // reads as "bell". Long modulation + carrier decay lets each strike ring
+  // out through the reverb tail.
+  const synth = new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity: 3.01,
+    modulationIndex: 8,
+    oscillator: { type: 'sine' },
+    envelope:   { attack: 0.002, decay: 2.4, sustain: 0, release: 2.8 },
+    modulation: { type: 'sine' },
+    modulationEnvelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 1.8 },
+  })
+  synth.volume.value = -8
+  const reverb = new Tone.Reverb({ decay: 4.0, wet: 0.4 })
+  synth.chain(reverb, Tone.getDestination())
+  return wrapPolySynth(synth)
+}
+
+function createStrings(): InstrumentRuntime {
+  // Slow-attack fat sawtooth ensemble + lowpass + reverb reads as a section
+  // of bowed strings. Detune + spread gives the "many players" feel.
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'fatsawtooth', count: 5, spread: 40 },
+    envelope:   { attack: 0.35, decay: 0.25, sustain: 0.85, release: 1.4 },
+  })
+  synth.volume.value = -12
+  const filter = new Tone.Filter({ frequency: 2400, type: 'lowpass', rolloff: -12 })
+  const reverb = new Tone.Reverb({ decay: 2.4, wet: 0.32 })
+  synth.chain(filter, reverb, Tone.getDestination())
+  return wrapPolySynth(synth)
+}
+
+function createBass(): InstrumentRuntime {
+  // Triangle core with a lowpass emphasis — round and pillowy even when
+  // played in the middle register. Shorter release keeps fast bass lines tight.
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope:   { attack: 0.005, decay: 0.3, sustain: 0.75, release: 0.35 },
+  })
+  synth.volume.value = -4
+  const filter = new Tone.Filter({ frequency: 1200, type: 'lowpass', rolloff: -24, Q: 0.8 })
+  synth.chain(filter, Tone.getDestination())
+  return wrapPolySynth(synth)
+}
+
+// ── Sampled instruments (lazy-loaded from bundled assets) ──────────────────
+//
+// Samples sourced from the MIT-licensed nbrosowsky/tonejs-instruments project
+// and committed into `public/instrument-samples/` so the app doesn't depend on
+// any upstream CDN remaining online. Each call builds a Tone.Sampler from the
+// instrument's sample map; Tone interpolates between the sampled pitches to
+// cover the full piano range. If a fetch still fails (e.g. offline), the
+// caller falls through to a synth patch so the app never silently drops notes.
+
+const SAMPLE_BASE = `${import.meta.env.BASE_URL}instrument-samples/`
+const SAMPLE_LOAD_TIMEOUT_MS = 15_000
+
+interface SampleSpec {
+  folder: string              // under SAMPLE_BASE, trailing slash omitted
+  files: readonly string[]    // raw filenames like ['A4.mp3', 'As3.mp3']
+  release?: number
+  attack?: number
+  volumeDb?: number
+}
+
+// Filename convention: 'As3.mp3' = A#3, 'Cs4.mp3' = C#4 (lowercase 's' for
+// sharp since '#' isn't URL-safe). Target only the exact sharp pattern
+// `<A-G>s<digit>` so malformed filenames fail loud at Tone.Sampler setup
+// instead of being silently mangled by a loose global replace.
+function filenameToNote(file: string): string {
+  const raw = file.replace(/\.mp3$/, '')
+  return raw.replace(/^([A-G])s(\d)$/, '$1#$2')
+}
+
+async function createSampled(
+  spec: SampleSpec,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  chain?: (sampler: any) => void,
+): Promise<InstrumentRuntime> {
+  const urls: Record<string, string> = {}
+  for (const file of spec.files) urls[filenameToNote(file)] = file
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sampler: any = new Tone.Sampler({
+    urls,
+    baseUrl: `${SAMPLE_BASE}${spec.folder}/`,
+    release: spec.release ?? 1,
+    attack: spec.attack ?? 0,
+  })
+  if (spec.volumeDb !== undefined) sampler.volume.value = spec.volumeDb
+  if (chain) chain(sampler)
+  else sampler.toDestination()
+
+  // Tone.loaded() resolves when every registered buffer is ready. Race against
+  // a hard timeout so a slow or dead CDN can't keep the UI in a loading state.
+  await Promise.race([
+    Tone.loaded(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Sample load timeout: ${spec.folder}`)), SAMPLE_LOAD_TIMEOUT_MS),
+    ),
+  ])
+
+  return {
+    triggerAttack: (note, time, velocity) => sampler.triggerAttack(note, time, velocity),
+    triggerRelease: (note, time) => sampler.triggerRelease(note, time),
+    releaseAll: () => sampler.releaseAll(),
+    dispose: () => sampler.dispose(),
+  }
+}
+
+async function createViolin(): Promise<InstrumentRuntime> {
+  try {
+    return await createSampled(
+      {
+        folder: 'violin',
+        files: [
+          'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3',
+          'C4.mp3', 'C5.mp3', 'C6.mp3', 'C7.mp3',
+          'E4.mp3', 'E5.mp3', 'E6.mp3',
+          'G3.mp3', 'G4.mp3', 'G5.mp3', 'G6.mp3',
+        ],
+        release: 1.4,
+        volumeDb: -4,
+      },
+      (s) => {
+        const reverb = new Tone.Reverb({ decay: 1.8, wet: 0.22 })
+        s.chain(reverb, Tone.getDestination())
+      },
+    )
+  } catch (err) {
+    console.warn('Violin samples unavailable, falling back to synth strings', err)
+    return createStrings()
+  }
+}
+
+async function createFlute(): Promise<InstrumentRuntime> {
+  try {
+    return await createSampled(
+      {
+        folder: 'flute',
+        files: [
+          'A4.mp3', 'A5.mp3', 'A6.mp3',
+          'C4.mp3', 'C5.mp3', 'C6.mp3', 'C7.mp3',
+          'E4.mp3', 'E5.mp3', 'E6.mp3',
+        ],
+        release: 0.9,
+        volumeDb: -6,
+      },
+      (s) => {
+        const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.18 })
+        s.chain(reverb, Tone.getDestination())
+      },
+    )
+  } catch (err) {
+    console.warn('Flute samples unavailable, falling back to synth', err)
+    // No existing flute-ish synth — a soft triangle with gentle attack is the
+    // closest approximation among what we already have.
+    return createTriangleFallback()
+  }
+}
+
+async function createUpright(): Promise<InstrumentRuntime> {
+  try {
+    // Eight well-spaced samples (one per octave plus C8) — Tone.Sampler
+    // interpolates the semitones between. Piano interpolation sounds clean
+    // because timbre doesn't change much within an octave.
+    return await createSampled(
+      {
+        folder: 'piano',
+        files: [
+          'A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3',
+          'A5.mp3', 'A6.mp3', 'A7.mp3', 'C8.mp3',
+        ],
+        release: 1.1,
+        volumeDb: -3,
+      },
+      (s) => {
+        // Slight room reverb — the upright sits "in the room" vs the Grand's
+        // concert stage, but neither wants heavy ambience.
+        const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.15 })
+        s.chain(reverb, Tone.getDestination())
+      },
+    )
+  } catch (err) {
+    console.warn('Upright samples unavailable, falling back to Grand', err)
+    return createPiano()
+  }
+}
+
+function createDigitalPiano(): InstrumentRuntime {
+  // Clean stage-piano voice: a near-unity-harmonicity FM patch gives a subtle
+  // bell attack over a mostly sine body — reads as "digital Yamaha-style"
+  // rather than acoustic grand. Gentle chorus widens the stereo image.
+  const synth = new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity: 1.0,
+    modulationIndex: 2.6,
+    oscillator: { type: 'sine' },
+    envelope:   { attack: 0.003, decay: 0.9, sustain: 0.25, release: 0.85 },
+    modulation: { type: 'sine' },
+    modulationEnvelope: { attack: 0.003, decay: 0.35, sustain: 0, release: 0.3 },
+  })
+  synth.volume.value = -6
+  const chorus = new Tone.Chorus(1.1, 2.0, 0.2).start()
+  const reverb = new Tone.Reverb({ decay: 1.1, wet: 0.14 })
+  synth.chain(chorus, reverb, Tone.getDestination())
+  return wrapPolySynth(synth)
+}
+
+async function createGuitar(): Promise<InstrumentRuntime> {
+  try {
+    // Guitar has a dense sample map (every semitone A2..G#4), so interpolation
+    // artefacts are minimal and the plucked attack reads cleanly.
+    return await createSampled(
+      {
+        folder: 'guitar-acoustic',
+        files: [
+          'A2.mp3', 'A3.mp3', 'A4.mp3',
+          'As2.mp3', 'As3.mp3', 'As4.mp3',
+          'B2.mp3', 'B3.mp3', 'B4.mp3',
+          'C3.mp3', 'C4.mp3', 'C5.mp3',
+          'Cs3.mp3', 'Cs4.mp3', 'Cs5.mp3',
+          'D2.mp3', 'D3.mp3', 'D4.mp3', 'D5.mp3',
+          'Ds2.mp3', 'Ds3.mp3', 'Ds4.mp3',
+          'E2.mp3', 'E3.mp3', 'E4.mp3',
+          'F2.mp3', 'F3.mp3', 'F4.mp3',
+          'Fs2.mp3', 'Fs3.mp3', 'Fs4.mp3',
+          'G2.mp3', 'G3.mp3', 'G4.mp3',
+          'Gs2.mp3', 'Gs3.mp3', 'Gs4.mp3',
+        ],
+        release: 0.8,
+        volumeDb: -2,
+      },
+      (s) => {
+        const reverb = new Tone.Reverb({ decay: 1.2, wet: 0.14 })
+        s.chain(reverb, Tone.getDestination())
+      },
+    )
+  } catch (err) {
+    console.warn('Guitar samples unavailable, falling back to synth pluck', err)
+    return createPluck()
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

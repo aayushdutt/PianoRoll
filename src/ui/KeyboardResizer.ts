@@ -1,6 +1,6 @@
 import { KEYBOARD_HEIGHT_MIN, KEYBOARD_HEIGHT_MAX } from '../renderer/PianoRollRenderer'
 
-const STORAGE_KEY = 'pianoroll.keyboardHeight'
+const STORAGE_KEY = 'midee.keyboardHeight'
 
 // Slim horizontal drag bar sitting on the seam between the piano roll and the
 // keyboard. DAW-style (Logic / GarageBand): grab it and drag vertically to

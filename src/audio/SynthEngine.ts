@@ -1,6 +1,7 @@
 import * as Tone from 'tone'
 import type { MidiFile, MidiNote } from '../core/midi/types'
 import type { AudioEngine } from './AudioEngine'
+import { Signal } from '../store/state'
 import {
   createInstrument,
   midiToNoteName,
@@ -14,7 +15,16 @@ export type { InstrumentId, InstrumentInfo } from './instruments'
 export class SynthEngine implements AudioEngine {
   private instruments = new Map<InstrumentId, InstrumentRuntime>()
   private loadingPromises = new Map<InstrumentId, Promise<InstrumentRuntime>>()
-  private currentId: InstrumentId = 'piano'
+  // Default voice is Upright (1.2 MB of our own samples) instead of the 30 MB
+  // Salamander Grand set that @tonejs/piano pulls from an external CDN —
+  // 25× lighter first-load, bulletproof against upstream CDN outages, still
+  // musically pleasing. Users who specifically want the concert grand are
+  // one tap away in the instrument dropdown.
+  private currentId: InstrumentId = 'upright'
+  // Emits the currently-active instrument id while its samples/patch are
+  // loading, null otherwise. Only tracks the *current* instrument — background
+  // preloads of other voices don't flicker the signal.
+  readonly loadingInstrument = new Signal<InstrumentId | null>(null)
   private midi: MidiFile | null = null
   private scheduledIds: number[] = []
   private _volume = 0.8
@@ -57,11 +67,26 @@ export class SynthEngine implements AudioEngine {
     const existing = this.loadingPromises.get(id)
     if (existing) return existing
 
-    const promise = createInstrument(id).then((inst) => {
-      this.instruments.set(id, inst)
-      this.loadingPromises.delete(id)
-      return inst
-    })
+    // Reflect loading in the signal only when we're loading the *current*
+    // instrument — preloads of others happen silently in the background.
+    if (id === this.currentId) this.loadingInstrument.set(id)
+
+    const clearIfCurrent = (): void => {
+      if (this.loadingInstrument.value === id) this.loadingInstrument.set(null)
+    }
+    const promise = createInstrument(id).then(
+      (inst) => {
+        this.instruments.set(id, inst)
+        this.loadingPromises.delete(id)
+        clearIfCurrent()
+        return inst
+      },
+      (err) => {
+        this.loadingPromises.delete(id)
+        clearIfCurrent()
+        throw err
+      },
+    )
     this.loadingPromises.set(id, promise)
     return promise
   }

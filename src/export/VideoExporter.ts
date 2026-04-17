@@ -190,7 +190,7 @@ export class VideoExporter {
       opts.onProgress?.('Saving', 0.99)
       const { buffer } = muxer.target
       const blob = new Blob([buffer], { type: 'video/mp4' })
-      triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'pianoroll.mp4')
+      triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.mp4')
       opts.onProgress?.('Done', 1)
     } finally {
       if (encoder.state !== 'closed') encoder.close()
@@ -232,7 +232,7 @@ export class VideoExporter {
     opts.onProgress?.('Saving', 0.99)
     const { buffer } = muxer.target
     const blob = new Blob([buffer], { type: 'audio/mp4' })
-    triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'pianoroll.m4a')
+    triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.m4a')
     opts.onProgress?.('Done', 1)
   }
 

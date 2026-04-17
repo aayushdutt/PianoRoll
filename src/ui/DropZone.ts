@@ -54,7 +54,7 @@ export class DropZone {
     el.id = 'dropzone'
     el.innerHTML = `
       <div class="home-card">
-        <span class="home-kicker">Piano roll · visualizer</span>
+        <span class="home-kicker">midee · MIDI visualizer</span>
         <h1 class="home-title">Play <em>notes</em>,<br/>see them bloom.</h1>
         <p class="home-sub">Open a MIDI file to animate it, or go live and play with your keyboard, mouse, or a MIDI controller.</p>
 

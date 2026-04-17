@@ -191,6 +191,8 @@ export class App {
 
     this.instrumentMenu = new InstrumentMenu(this.controls.instrumentSlot, overlay)
     this.instrumentMenu.onSelect = (id) => this.setInstrumentById(id)
+    this.synth.loadingInstrument.subscribe((id) => this.instrumentMenu.setLoading(id))
+    this.instrumentMenu.setLoading(this.synth.loadingInstrument.value)
 
     this.exportModal = new ExportModal(overlay)
     this.exportModal.onStart  = (settings) => void this.startExport(settings)
@@ -375,7 +377,7 @@ export class App {
       appState.completeFileLoad(midi)
       this.renderer.loadMidi(midi)
       this.trackPanel.render(midi)
-      document.title = `${midi.name} · Piano Roll`
+      document.title = `${midi.name} · midee`
       this.dropzone.hide()
     } catch (err) {
       console.error('Failed to load MIDI:', err)
@@ -494,8 +496,8 @@ export class App {
     }
 
     const filename = settings.output === 'audio-only'
-      ? 'pianoroll.m4a'
-      : 'pianoroll.mp4'
+      ? 'midee.m4a'
+      : 'midee.mp4'
 
     const exporter = new VideoExporter(this.renderer.canvas)
     this.currentExporter = exporter
@@ -614,7 +616,7 @@ export class App {
     // Keep computer keyboard live — pressing a note from the home screen
     // seamlessly dissolves into live mode.
     this.keyboardInput.enable()
-    document.title = 'Piano Roll'
+    document.title = 'midee — drop a MIDI, watch it sing'
   }
 
   private enterLiveMode(primeAudio = true): void {
@@ -624,7 +626,7 @@ export class App {
     this.trackPanel.close()
     this.dropzone.hide()
     this.keyboardInput.enable()
-    document.title = 'Piano Roll · Live'
+    document.title = 'midee · live'
     if (primeAudio) this.primeInteractiveAudio()
   }
 
@@ -641,7 +643,7 @@ export class App {
     this.dropzone.hide()
     // Typing keyboard stays enabled — users can play along with the file.
     this.keyboardInput.enable()
-    document.title = `${midi.name} · Piano Roll`
+    document.title = `${midi.name} · midee`
   }
 
   // Schedules a UI side-effect to run at (roughly) the AudioContext time
@@ -686,11 +688,11 @@ export class App {
       const bytes = encodeCapturedEvents(pending.events, {
         bpm:            this.metronomeBpm(),
         closeOrphansAt: pending.duration,
-        midiName:       'Pianoroll session',
+        midiName:       'midee session',
         trackName:      'Live performance',
       })
-      triggerMidiDownload(bytes, 'pianoroll-session.mid')
-      this.showSuccess(`↓ pianoroll-session.mid · ${Math.round(pending.duration)}s`)
+      triggerMidiDownload(bytes, 'midee-session.mid')
+      this.showSuccess(`↓ midee-session.mid · ${Math.round(pending.duration)}s`)
       this.pendingSession = null
       return
     }
@@ -721,7 +723,7 @@ export class App {
     this.dropzone.hide()
     // Typing keyboard stays on — users can play along with their own session.
     this.keyboardInput.enable()
-    document.title = `${midi.name} · Piano Roll`
+    document.title = `${midi.name} · midee`
   }
 
   private saveLoopAsMidi(): void {
@@ -730,11 +732,11 @@ export class App {
     const bytes = encodeCapturedEvents(snap.events, {
       bpm:            this.metronomeBpm(),
       closeOrphansAt: snap.duration,
-      midiName:       'Pianoroll loop',
+      midiName:       'midee loop',
       trackName:      'Loop',
     })
-    triggerMidiDownload(bytes, 'pianoroll-loop.mid')
-    this.showSuccess('↓ pianoroll-loop.mid')
+    triggerMidiDownload(bytes, 'midee-loop.mid')
+    this.showSuccess('↓ midee-loop.mid')
   }
 
   private metronomeBpm(): number {
@@ -831,11 +833,11 @@ export class App {
   }
 }
 
-const THEME_STORAGE_KEY = 'pianoroll.themeIndex'
-const INSTRUMENT_STORAGE_KEY = 'pianoroll.instrumentIndex'
-const PARTICLE_STORAGE_KEY = 'pianoroll.particleIndex'
-const METRONOME_BPM_KEY = 'pianoroll.metronomeBpm'
-const HUD_PINNED_KEY = 'pianoroll.hudPinned'
+const THEME_STORAGE_KEY = 'midee.themeIndex'
+const INSTRUMENT_STORAGE_KEY = 'midee.instrumentIndex'
+const PARTICLE_STORAGE_KEY = 'midee.particleIndex'
+const METRONOME_BPM_KEY = 'midee.metronomeBpm'
+const HUD_PINNED_KEY = 'midee.hudPinned'
 
 function loadThemeIndex(): number {
   const defaultIdx = THEMES.findIndex(t => t.name === 'Sunset')
@@ -851,10 +853,15 @@ function saveThemeIndex(index: number): void {
 }
 
 function loadInstrumentIndex(): number {
+  // New visitors default to Upright (light self-hosted samples, 1.2 MB) so
+  // first-load is fast. Returning users with a saved preference keep whatever
+  // they had, including the heavy Salamander Grand.
+  const defaultIdx = INSTRUMENTS.findIndex(i => i.id === 'upright')
+  const fallback = defaultIdx >= 0 ? defaultIdx : 0
   const raw = localStorage.getItem(INSTRUMENT_STORAGE_KEY)
-  if (raw === null) return 0
+  if (raw === null) return fallback
   const n = Number(raw)
-  return Number.isInteger(n) && n >= 0 && n < INSTRUMENTS.length ? n : 0
+  return Number.isInteger(n) && n >= 0 && n < INSTRUMENTS.length ? n : fallback
 }
 
 function saveInstrumentIndex(index: number): void {
@@ -918,7 +925,7 @@ function speedToPps(speed: 'compact' | 'standard' | 'drama'): number {
 // Falls back to a constant if the result is empty.
 function sanitiseFilename(name: string): string {
   const cleaned = name.replace(/[\\/:*?"<>|]+/g, ' ').trim()
-  return cleaned.length > 0 ? cleaned : 'pianoroll'
+  return cleaned.length > 0 ? cleaned : 'midee'
 }
 
 function loadHudPinned(): boolean {

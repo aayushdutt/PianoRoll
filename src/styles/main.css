@@ -16,9 +16,12 @@
   --text-muted:  #b0b4d4;
   --text-dim:    #6c7298;
 
-  --accent:      #6366f1;
-  --accent-soft: rgba(99, 102, 241, 0.16);
-  --accent-glow: rgba(99, 102, 241, 0.30);
+  /* Pre-JS defaults for the accent triplet — match the Sunset theme, which
+     is the current app default. Overwritten by applyTheme() on load; these
+     values only matter for the first paint frame and the favicon. */
+  --accent:      #f97316;
+  --accent-soft: rgba(249, 115, 22, 0.16);
+  --accent-glow: rgba(249, 115, 22, 0.30);
 
   --red:         rgba(239, 68, 68, 0.10);
   --red-border:  rgba(239, 68, 68, 0.22);
@@ -491,37 +494,61 @@ html, body {
   margin: 0 1px;
 }
 
-@media (max-width: 900px) {
+/* ───────────────────────────────────────────────────────────────────────
+   TOP STRIP — progressive label cascade
+   ≥1121px  Full layout
+   ≤1120    Tier 1: drop decorative labels (wordmark text, theme/particle
+            labels, instrument name, status kicker). Tightens pill padding.
+   ≤900     Tier 2: collapse primary pill labels (Open MIDI / Tracks / Live /
+            MIDI) into icons. Status title truncates harder. Instrument
+            chevron hides — the pill itself is still obviously a menu.
+   ≤680     Tier 3: status zone collapses to the dot. Export goes icon-only.
+            Everything hugs the edges with minimal gaps.
+────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1120px) {
   .home-card {
     width: min(100%, calc(100vw - 32px));
     padding: 32px 26px;
     gap: 14px;
   }
 
+  .ts-home-name { display: none; }
+  .ts-status-kicker { display: none; }
+  .ts-status-title { max-width: 220px; }
+  .theme-label { display: none; }
+  .ts-instrument-label { display: none; }
+  .ts-end { gap: 4px; }
+  .ts-pill { padding: 0 11px; }
+}
+
+@media (max-width: 900px) {
   #top-strip {
     top: 10px;
     left: 10px;
     right: 10px;
-    height: auto;
-    min-height: 64px;
-    padding: 12px 14px;
-    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 6px 0 10px;
   }
+  /* Hide label spans across action pills, but keep the instrument's icon
+     slot (which wraps the glyph + loading spinner) visible. */
+  .ts-pill > span:not(.ts-instrument-icon-slot) { display: none; }
+  .ts-pill { padding: 0 9px; gap: 0; }
+  .ts-midi-label { display: none; }
+  .ts-status-title { max-width: 150px; font-size: 12px; }
+  /* Instrument pill is clearly a menu affordance even without the chevron. */
+  .ts-pill--instrument > svg { display: none; }
+  .ts-sep { margin: 0 2px; }
+}
 
-  .ts-left,
-  .ts-end,
-  .ts-center {
-    width: 100%;
-  }
-
-  #top-strip {
-    grid-template-columns: auto 1fr auto;
-    height: 54px;
-  }
-
-  .ts-home-name { display: none; }
-
-  .ts-context-title { max-width: 180px; }
+@media (max-width: 680px) {
+  .ts-status-main,
+  .ts-bars { display: none; }
+  .ts-status { padding: 0 4px; gap: 0; }
+  .ts-record-btn span { display: none; }
+  .ts-record-btn { padding: 0 10px; }
+  #top-strip { padding: 0 6px 0 8px; }
+  .ts-end { gap: 3px; }
 }
 
 @media (max-width: 640px) {
@@ -553,9 +580,7 @@ html, body {
     width: 100%;
   }
 
-  .ts-record-btn span {
-    display: none;
-  }
+  /* .ts-record-btn span already hidden by the 680px top-strip tier above. */
 
   #hud {
     width: min(100vw - 20px, 760px);
@@ -1849,6 +1874,49 @@ html, body {
   font-weight: 500;
 }
 
+/* Icon slot — holds the instrument glyph and the loading spinner as
+   overlapping layers. The glyph fades out while loading, the spinner fades
+   in, so the pill width stays steady. */
+.ts-instrument-icon-slot {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.ts-instrument-icon-slot > svg {
+  transition: opacity 0.18s var(--ease-out);
+}
+
+.ts-instrument-spinner {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-top-color: var(--accent);
+  opacity: 0;
+  transform: scale(0.75);
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+}
+
+.ts-pill--loading .ts-instrument-icon-slot > svg { opacity: 0; }
+.ts-pill--loading .ts-instrument-spinner {
+  opacity: 1;
+  transform: scale(1);
+  animation: ts-instrument-spin 0.7s linear infinite;
+}
+
+.ts-pill--loading .ts-instrument-label {
+  color: var(--text-muted);
+}
+
+@keyframes ts-instrument-spin {
+  to { transform: scale(1) rotate(360deg); }
+}
+
 .ts-pill--open {
   background: var(--accent-soft);
   border-color: var(--accent);
@@ -1921,6 +1989,29 @@ html, body {
 }
 
 .instrument-item--on .instrument-item-check { opacity: 1; }
+
+/* Loading row: swap the left status dot for a spinner and dim the subtitle
+   to "Loading samples…" via CSS only. The click still works — if the user
+   re-picks during load, the signal just re-emits the same id. */
+.instrument-item--loading .instrument-item-dot {
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  box-shadow: none;
+  animation: ts-instrument-spin 0.7s linear infinite;
+}
+
+.instrument-item--loading .instrument-item-sub {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.instrument-item--loading .instrument-item-sub::after {
+  content: ' · loading samples';
+}
 
 /* Track items (shared with panel) */
 .track-item {

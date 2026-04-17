@@ -10,7 +10,11 @@ import { Viewport } from './viewport'
 import { darkTheme, getTrackColor, type Theme } from './theme'
 import type { LiveNoteStore } from '../midi/LiveNoteStore'
 
-const DEFAULT_KEYBOARD_HEIGHT = 140
+// Must match the `--keyboard-h` value in main.css :root and the reset value
+// in KeyboardResizer.onDoubleClick — all three describe the same default,
+// and drift between them shows up as a gap under the resize handle on first
+// load (before any saved preference or user drag has synced the CSS var).
+const DEFAULT_KEYBOARD_HEIGHT = 120
 export const KEYBOARD_HEIGHT_MIN = 80
 export const KEYBOARD_HEIGHT_MAX = 220
 const DEFAULT_PIXELS_PER_SECOND = 200
@@ -76,6 +80,11 @@ export class PianoRollRenderer {
       keyboardHeight: this.keyboardHeight,
       pixelsPerSecond: this.pixelsPerSecond,
     })
+
+    // Keep the CSS --keyboard-h in lockstep with the JS-side height from the
+    // very first paint — the resize handle + HUD positioning reads this var
+    // and would otherwise drift until the first setKeyboardHeight() call.
+    document.documentElement.style.setProperty('--keyboard-h', `${this.keyboardHeight}px`)
 
     this.buildScene()
     this.handleResize()

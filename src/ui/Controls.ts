@@ -118,9 +118,9 @@ export class Controls {
     const el = document.createElement('div')
     el.id = 'top-strip'
     el.innerHTML = `
-      <button class="ts-home" id="ts-home" type="button" aria-label="Piano Roll home">
+      <button class="ts-home" id="ts-home" type="button" aria-label="midee home">
         ${ICON_WORDMARK}
-        <span class="ts-home-name">Piano Roll</span>
+        <span class="ts-home-name">midee</span>
       </button>
 
       <div class="ts-status" id="ts-status" aria-live="polite">

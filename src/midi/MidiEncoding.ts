@@ -25,7 +25,7 @@ export function encodeCapturedEvents(
 ): Uint8Array {
   const bpm = opts.bpm ?? 120
   const trackName = opts.trackName ?? 'Performance'
-  const midiName = opts.midiName ?? 'Pianoroll capture'
+  const midiName = opts.midiName ?? 'midee capture'
 
   const lastEventTime = events.length === 0 ? 0 : events[events.length - 1]!.time
   const orphanCloseAt = opts.closeOrphansAt ?? lastEventTime

@@ -32,7 +32,10 @@ export class InstrumentMenu {
     this.trigger.title = 'Instrument'
     this.trigger.setAttribute('aria-label', 'Choose instrument')
     this.trigger.innerHTML = `
-      ${ICON_INSTRUMENT}
+      <span class="ts-instrument-icon-slot">
+        ${ICON_INSTRUMENT}
+        <span class="ts-instrument-spinner" aria-hidden="true"></span>
+      </span>
       <span class="ts-instrument-label" id="ts-instrument-label">Piano</span>
       ${ICON_CHEV}
     `
@@ -76,6 +79,16 @@ export class InstrumentMenu {
     if (info) this.labelEl.textContent = info.name
     this.menu.querySelectorAll<HTMLButtonElement>('.instrument-item').forEach(btn => {
       btn.classList.toggle('instrument-item--on', btn.dataset['id'] === id)
+    })
+  }
+
+  // Drives the loading indicator on both the trigger pill and the matching
+  // dropdown row. Pass the id being loaded, or null when nothing is loading.
+  setLoading(id: InstrumentId | null): void {
+    this.trigger.classList.toggle('ts-pill--loading', id !== null)
+    this.trigger.setAttribute('aria-busy', id !== null ? 'true' : 'false')
+    this.menu.querySelectorAll<HTMLButtonElement>('.instrument-item').forEach(btn => {
+      btn.classList.toggle('instrument-item--loading', btn.dataset['id'] === id)
     })
   }
 
