@@ -617,7 +617,7 @@ html, body {
   right: 14px;
   height: 54px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
   gap: 12px;
   padding: 0 8px 0 14px;
@@ -689,6 +689,113 @@ html, body {
 
 .ts-home-name {
   white-space: nowrap;
+}
+
+/* ─── Mode switcher (File · Live) ──────────────────────────────────── */
+
+/* A small segmented control that reflects the current app mode. The
+   sliding "thumb" makes the state change feel tactile without relying on
+   the accent color (which is reserved for "active/recording" semantics
+   elsewhere in the bar). When no mode is active (home screen), the thumb
+   hides so both segments read as available. */
+.ts-mode-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ts-mode-seg {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 26px;
+  min-width: 66px;
+  padding: 0 13px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: color 0.18s var(--ease-out);
+}
+
+.ts-mode-seg:hover { color: var(--text-muted); }
+
+.ts-mode-seg.is-active {
+  color: #fff;
+  font-weight: 600;
+}
+
+.ts-mode-seg.is-active:hover { color: #fff; }
+
+/* Icon color: dim when inactive, accent when active. The small hit of
+   accent signals "you are in this mode" without coloring the whole thumb. */
+.ts-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  color: currentColor;
+  opacity: 0.75;
+  transition: color 0.18s var(--ease-out), opacity 0.18s var(--ease-out);
+}
+
+.ts-mode-seg:hover .ts-mode-icon { opacity: 0.95; }
+
+.ts-mode-seg.is-active .ts-mode-icon {
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* Sliding thumb — positioned absolutely and animated to the active segment.
+   Uses a neutral fill (not accent) so mode selection stays calm and the
+   accent remains meaningful for "something is happening" states. A gentle
+   gradient + inset highlight + drop shadow gives the segment a raised,
+   clearly-pressed look without competing with pills on the right. */
+.ts-mode-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: var(--r-pill);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.08)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.26s var(--ease-spring), opacity 0.18s var(--ease-out);
+}
+
+.ts-mode-switch[data-active="file"] .ts-mode-thumb {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.ts-mode-switch[data-active="live"] .ts-mode-thumb {
+  opacity: 1;
+  transform: translateX(100%);
+}
+
+/* Compact widths: shrink segment padding, still show both labels. */
+@media (max-width: 640px) {
+  .ts-mode-seg { min-width: 0; padding: 0 10px; font-size: 11.5px; }
 }
 
 /* ─── Status display (center zone) — display-only, not interactive ─── */

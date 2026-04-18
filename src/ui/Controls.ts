@@ -49,8 +49,9 @@ export class Controls {
   private contextKickerEl!: HTMLElement
   private contextTitleEl!: HTMLElement
   private openBtn!: HTMLButtonElement
-  private liveBtn!: HTMLButtonElement
-  private liveLabelEl!: HTMLElement
+  private modeSwitchEl!: HTMLElement
+  private modeFileBtn!: HTMLButtonElement
+  private modeLiveBtn!: HTMLButtonElement
   private tracksBtn!: HTMLButtonElement
   private midiBtn!: HTMLButtonElement
   private midiLabelEl!: HTMLElement
@@ -123,6 +124,20 @@ export class Controls {
         <span class="ts-home-name">midee</span>
       </button>
 
+      <div class="ts-mode-switch" role="tablist" aria-label="App mode">
+        <button class="ts-mode-seg" id="ts-mode-file" type="button"
+                role="tab" aria-selected="false">
+          <span class="ts-mode-icon" aria-hidden="true">${ICON_MODE_FILE}</span>
+          <span class="ts-mode-label">File</span>
+        </button>
+        <button class="ts-mode-seg" id="ts-mode-live" type="button"
+                role="tab" aria-selected="false">
+          <span class="ts-mode-icon" aria-hidden="true">${ICON_MODE_LIVE}</span>
+          <span class="ts-mode-label">Live</span>
+        </button>
+        <span class="ts-mode-thumb" aria-hidden="true"></span>
+      </div>
+
       <div class="ts-status" id="ts-status" aria-live="polite">
         <span class="ts-status-dot" aria-hidden="true"></span>
         <span class="ts-status-main">
@@ -137,9 +152,6 @@ export class Controls {
       <div class="ts-end">
         <button class="ts-pill" id="ts-open" type="button" aria-label="Open MIDI file">
           ${ICON_UPLOAD}<span>Open MIDI</span>
-        </button>
-        <button class="ts-pill ts-pill--live" id="ts-live" type="button" aria-label="Go live">
-          ${ICON_WAVE}<span class="ts-live-label">Live</span>
         </button>
         <button class="ts-pill ts-pill--file" id="ts-tracks" type="button" aria-label="Tracks">
           ${ICON_TRACKS}<span>Tracks</span>
@@ -316,8 +328,9 @@ export class Controls {
     this.contextKickerEl = this.topStrip.querySelector<HTMLElement>('#ts-context-kicker')!
     this.contextTitleEl = this.topStrip.querySelector<HTMLElement>('#ts-context-title')!
     this.openBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-open')!
-    this.liveBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-live')!
-    this.liveLabelEl = this.topStrip.querySelector<HTMLElement>('.ts-live-label')!
+    this.modeSwitchEl = this.topStrip.querySelector<HTMLElement>('.ts-mode-switch')!
+    this.modeFileBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-file')!
+    this.modeLiveBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-live')!
     this.tracksBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-tracks')!
     this.midiBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-midi')!
     this.midiLabelEl = this.topStrip.querySelector<HTMLElement>('#ts-menu-midi-label')!
@@ -412,9 +425,11 @@ export class Controls {
     this.openBtn.addEventListener('click', () => this.opts.onOpenFile?.())
     this.tracksBtn.addEventListener('click', () => this.opts.onOpenTracks?.())
     this.midiBtn.addEventListener('click', () => this.opts.onMidiConnect?.())
-    this.liveBtn.addEventListener('click', () => {
-      if (this.opts.state.mode.value === 'live') this.opts.onHome?.()
-      else this.opts.onModeRequest?.('live')
+    this.modeFileBtn.addEventListener('click', () => {
+      this.opts.onModeRequest?.('file')
+    })
+    this.modeLiveBtn.addEventListener('click', () => {
+      this.opts.onModeRequest?.('live')
     })
     this.loopBtn.addEventListener('click', () => this.opts.onLoopToggle?.())
     this.loopClearBtn.addEventListener('click', () => this.opts.onLoopClear?.())
@@ -683,9 +698,15 @@ export class Controls {
     this.tracksBtn.classList.toggle('hidden', !isFileMode || !hasFile || isLoadingFile)
     this.recordBtn.classList.toggle('hidden', !isFileMode || !hasFile || isLoadingFile)
 
-    // "Live" pill: active state in live mode, label flips to Home
-    this.liveBtn.classList.toggle('ts-pill--on', mode === 'live')
-    this.liveLabelEl.textContent = mode === 'live' ? 'Home' : 'Live'
+    // Mode switcher: reflect current mode. `home` leaves both neutral so the
+    // user sees both as open paths. The thumb element is positioned via a
+    // data-attribute so the highlight can slide between segments.
+    const activeMode = mode === 'file' || mode === 'live' ? mode : 'none'
+    this.modeSwitchEl.dataset['active'] = activeMode
+    this.modeFileBtn.classList.toggle('is-active', mode === 'file')
+    this.modeLiveBtn.classList.toggle('is-active', mode === 'live')
+    this.modeFileBtn.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false')
+    this.modeLiveBtn.setAttribute('aria-selected', mode === 'live' ? 'true' : 'false')
 
     this.hud.classList.toggle('hud--active', showHud)
     this.hud.classList.toggle('hud--playing', isFileMode && status === 'playing')
@@ -944,8 +965,16 @@ const ICON_UPLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
   <line x1="12" y1="3" x2="12" y2="15"/>
 </svg>`
 
-const ICON_WAVE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <path d="M3 12h2l2-6 3 12 3-10 3 8 2-4h3"/>
+/* File mode — three stacked note-bars, echoing the piano-roll visual. */
+const ICON_MODE_FILE = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+  <rect x="2" y="3.5" width="7" height="2.2" rx="0.8"/>
+  <rect x="2" y="7" width="12" height="2.2" rx="0.8"/>
+  <rect x="2" y="10.5" width="5" height="2.2" rx="0.8"/>
+</svg>`
+
+/* Live mode — a clean pulse waveform, evoking real-time input. */
+const ICON_MODE_LIVE = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M1.5 8h2l1.2-3.5L7 12l1.8-6 1.3 3 0.9-1.2H14"/>
 </svg>`
 
 const ICON_CLOSE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
