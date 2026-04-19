@@ -1,16 +1,16 @@
 import * as Tone from 'tone'
 import type { MidiFile, MidiNote } from '../core/midi/types'
-import type { AudioEngine } from './AudioEngine'
 import { Signal } from '../store/state'
+import type { AudioEngine } from './AudioEngine'
 import {
   createInstrument,
-  midiToNoteName,
   type InstrumentId,
   type InstrumentRuntime,
+  midiToNoteName,
 } from './instruments'
 
-export { INSTRUMENTS } from './instruments'
 export type { InstrumentId, InstrumentInfo } from './instruments'
+export { INSTRUMENTS } from './instruments'
 
 export class SynthEngine implements AudioEngine {
   private instruments = new Map<InstrumentId, InstrumentRuntime>()
@@ -27,7 +27,6 @@ export class SynthEngine implements AudioEngine {
   readonly loadingInstrument = new Signal<InstrumentId | null>(null)
   private midi: MidiFile | null = null
   private scheduledIds: number[] = []
-  private _volume = 0.8
   private _speed = 1
   private scheduledFromTime = 0
   private readyPromise: Promise<void> = Promise.resolve()
@@ -97,8 +96,7 @@ export class SynthEngine implements AudioEngine {
     await Tone.start()
 
     const transport = Tone.getTransport()
-    if (transport.state === 'paused'
-        && Math.abs(fromTime - this.scheduledFromTime) < 0.05) {
+    if (transport.state === 'paused' && Math.abs(fromTime - this.scheduledFromTime) < 0.05) {
       transport.start()
       return
     }
@@ -148,7 +146,6 @@ export class SynthEngine implements AudioEngine {
   }
 
   setVolume(v: number): void {
-    this._volume = v
     Tone.getDestination().volume.value = Tone.gainToDb(v)
   }
 

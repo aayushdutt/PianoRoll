@@ -28,7 +28,9 @@ export function registerAnalyticsContext(): void {
   const h = window.innerHeight
   const deviceType = w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop'
   const pointer = window.matchMedia?.('(pointer: coarse)').matches ? 'coarse' : 'fine'
-  const orientation = window.matchMedia?.('(orientation: portrait)').matches ? 'portrait' : 'landscape'
+  const orientation = window.matchMedia?.('(orientation: portrait)').matches
+    ? 'portrait'
+    : 'landscape'
   const isPwa = window.matchMedia?.('(display-mode: standalone)').matches ?? false
   posthog.register({
     device_type: deviceType,
@@ -43,8 +45,8 @@ export function registerAnalyticsContext(): void {
   posthog.register_once({
     landing_path: url.pathname,
     landing_referrer: document.referrer || '(direct)',
-    landing_utm_source:   url.searchParams.get('utm_source')   ?? null,
-    landing_utm_medium:   url.searchParams.get('utm_medium')   ?? null,
+    landing_utm_source: url.searchParams.get('utm_source') ?? null,
+    landing_utm_medium: url.searchParams.get('utm_medium') ?? null,
     landing_utm_campaign: url.searchParams.get('utm_campaign') ?? null,
   })
 }
@@ -72,9 +74,18 @@ export function trackActivation(trigger: 'playback_30s' | 'live_note' | 'export_
 // cardinality and occasionally PII. Enum is stable, queryable, and
 // covers the long tail with 'other'.
 const MIDI_VENDORS = [
-  'korg', 'akai', 'roland', 'yamaha', 'arturia',
-  'novation', 'nektar', 'native instruments',
-  'm-audio', 'alesis', 'casio', 'presonus',
+  'korg',
+  'akai',
+  'roland',
+  'yamaha',
+  'arturia',
+  'novation',
+  'nektar',
+  'native instruments',
+  'm-audio',
+  'alesis',
+  'casio',
+  'presonus',
 ] as const
 export function categorizeMidiDevice(name: string): string {
   const lower = name.toLowerCase()

@@ -1,51 +1,59 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS
 ───────────────────────────────────────── */
 
 :root {
-  --bg:          #06060e;
-  --surface:     rgba(11, 13, 24, 0.84);
-  --surface-hi:  rgba(10, 12, 22, 0.96);
+  --bg: #06060e;
+  --surface: rgba(11, 13, 24, 0.84);
+  --surface-hi: rgba(10, 12, 22, 0.96);
 
-  --border:      rgba(255, 255, 255, 0.07);
-  --border-hi:   rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hi: rgba(255, 255, 255, 0.12);
 
-  --text:        #f4f4fb;
-  --text-muted:  #b0b4d4;
-  --text-dim:    #6c7298;
+  --text: #f4f4fb;
+  --text-muted: #b0b4d4;
+  --text-dim: #6c7298;
 
   /* Pre-JS defaults for the accent triplet — match the Sunset theme, which
      is the current app default. Overwritten by applyTheme() on load; these
      values only matter for the first paint frame and the favicon. */
-  --accent:      #f97316;
+  --accent: #f97316;
   --accent-soft: rgba(249, 115, 22, 0.16);
-  --accent-glow: rgba(249, 115, 22, 0.30);
+  --accent-glow: rgba(249, 115, 22, 0.3);
 
-  --red:         rgba(239, 68, 68, 0.10);
-  --red-border:  rgba(239, 68, 68, 0.22);
-  --red-text:    #fca5a5;
+  --red: rgba(239, 68, 68, 0.1);
+  --red-border: rgba(239, 68, 68, 0.22);
+  --red-text: #fca5a5;
 
-  --r-sm:   6px;
-  --r-md:   10px;
-  --r-lg:   16px;
-  --r-xl:   22px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 22px;
   --r-pill: 999px;
 
   --keyboard-h: 120px;
-  --hud-gap: 28px;     /* gap between keyboard top and hud bottom */
+  --hud-gap: 28px; /* gap between keyboard top and hud bottom */
 
-  --font:         'Inter', system-ui, sans-serif;
-  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font: "Inter", system-ui, sans-serif;
+  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-html, body {
-  width: 100%; height: 100%;
+html,
+body {
+  width: 100%;
+  height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -85,8 +93,9 @@ html, body {
 /* Each interactive child sets its own pointer-events — no blanket override here,
    which would break .panel-backdrop (class selector loses to this ID-based rule). */
 
-.hidden { display: none !important; }
-
+.hidden {
+  display: none !important;
+}
 
 /* ─────────────────────────────────────────
    DROP ZONE
@@ -103,7 +112,9 @@ html, body {
   /* Background is click-through — only the card and its controls receive pointer events.
      This lets users click the piano keys behind the home card to start live mode. */
   pointer-events: none;
-  transition: opacity 0.45s var(--ease-out), transform 0.45s var(--ease-out);
+  transition:
+    opacity 0.45s var(--ease-out),
+    transform 0.45s var(--ease-out);
   padding: 28px;
 }
 
@@ -121,11 +132,14 @@ html, body {
   /* Children explicitly disabled — prevents the hidden home-card from
      intercepting clicks to the HUD / canvas underneath. */
   visibility: hidden;
-  transition: opacity 0.45s var(--ease-out), transform 0.45s var(--ease-out), visibility 0s linear 0.45s;
+  transition:
+    opacity 0.45s var(--ease-out),
+    transform 0.45s var(--ease-out),
+    visibility 0s linear 0.45s;
 }
 
 #dropzone::before {
-  content: '';
+  content: "";
   position: absolute;
   width: min(86vw, 920px);
   height: min(86vw, 920px);
@@ -146,8 +160,7 @@ html, body {
   width: min(620px, calc(100vw - 48px));
   padding: 44px 44px 30px;
   background:
-    linear-gradient(145deg, rgba(12, 15, 28, 0.94), rgba(7, 8, 18, 0.90)),
-    rgba(6, 6, 14, 0.84);
+    linear-gradient(145deg, rgba(12, 15, 28, 0.94), rgba(7, 8, 18, 0.9)), rgba(6, 6, 14, 0.84);
   backdrop-filter: blur(34px) saturate(132%);
   -webkit-backdrop-filter: blur(34px) saturate(132%);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -156,7 +169,10 @@ html, body {
     0 28px 72px rgba(0, 0, 0, 0.68),
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     inset 0 0 48px rgba(255, 255, 255, 0.015);
-  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s var(--ease-spring);
+  transition:
+    border-color 0.3s,
+    box-shadow 0.3s,
+    transform 0.3s var(--ease-spring);
 }
 
 #dropzone.drag-over .home-card {
@@ -200,7 +216,7 @@ html, body {
 }
 
 .home-kicker::before {
-  content: '';
+  content: "";
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -211,8 +227,13 @@ html, body {
 }
 
 @keyframes pulse-dot {
-  0%, 100% { opacity: 0.5; }
-  50%       { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .home-sub {
@@ -277,14 +298,21 @@ html, body {
   cursor: pointer;
   text-align: left;
   overflow: hidden;
-  transition: border-color 0.18s, transform 0.16s var(--ease-spring), box-shadow 0.18s;
+  transition:
+    border-color 0.18s,
+    transform 0.16s var(--ease-spring),
+    box-shadow 0.18s;
 }
 
 .sample-card::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 60% at 100% 0%, color-mix(in srgb, var(--sample-accent) 28%, transparent) 0%, transparent 70%);
+  background: radial-gradient(
+    120% 60% at 100% 0%,
+    color-mix(in srgb, var(--sample-accent) 28%, transparent) 0%,
+    transparent 70%
+  );
   pointer-events: none;
   opacity: 0.65;
 }
@@ -295,7 +323,9 @@ html, body {
   box-shadow: 0 12px 32px -12px color-mix(in srgb, var(--sample-accent) 45%, transparent);
 }
 
-.sample-card:active { transform: translateY(0); }
+.sample-card:active {
+  transform: translateY(0);
+}
 
 /* Sample card visualizer — a sparkline of note-density bars, styled so each
    bar reads as a little accent-colored pillar with depth, bloom, and an
@@ -311,15 +341,19 @@ html, body {
 
 .sample-card-viz::before {
   /* Faint ground line under the bars for visual weight. */
-  content: '';
+  content: "";
   position: absolute;
-  left: 0; right: 0; bottom: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 1px;
-  background: linear-gradient(90deg,
+  background: linear-gradient(
+    90deg,
     transparent,
     color-mix(in srgb, var(--sample-accent) 50%, transparent) 20%,
     color-mix(in srgb, var(--sample-accent) 50%, transparent) 80%,
-    transparent);
+    transparent
+  );
   opacity: 0.5;
 }
 
@@ -347,15 +381,20 @@ html, body {
     color-mix(in srgb, var(--sample-accent) 25%, transparent) 100%
   );
   transform-origin: bottom center;
-  transition: height 0.45s var(--ease-spring), transform 0.35s var(--ease-spring),
-              filter 0.25s ease-out, opacity 0.25s ease-out;
+  transition:
+    height 0.45s var(--ease-spring),
+    transform 0.35s var(--ease-spring),
+    filter 0.25s ease-out,
+    opacity 0.25s ease-out;
 }
 
 /* Tiny highlight cap — a 1px-high white sliver on top of each bar for depth. */
 .sample-card-bars span::after {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1.5px;
   background: color-mix(in srgb, var(--sample-accent) 80%, #fff 40%);
   border-radius: 2px 2px 0 0;
@@ -374,8 +413,15 @@ html, body {
 }
 
 @keyframes sample-bar-breathe {
-  0%, 100% { transform: scaleY(1);     opacity: 1; }
-  50%      { transform: scaleY(1.12);  opacity: 0.92; }
+  0%,
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleY(1.12);
+    opacity: 0.92;
+  }
 }
 
 .sample-card-meta {
@@ -423,7 +469,12 @@ html, body {
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  transition: transform 0.16s var(--ease-spring), color 0.16s, background 0.16s, border-color 0.16s, box-shadow 0.16s;
+  transition:
+    transform 0.16s var(--ease-spring),
+    color 0.16s,
+    background 0.16s,
+    border-color 0.16s,
+    box-shadow 0.16s;
 }
 
 .home-primary-btn {
@@ -471,7 +522,7 @@ html, body {
 .home-midi-status[data-midi-status="blocked"] {
   color: #ffd89c;
   border-color: rgba(255, 197, 94, 0.28);
-  background: rgba(255, 197, 94, 0.10);
+  background: rgba(255, 197, 94, 0.1);
 }
 
 .home-drop-hint {
@@ -521,7 +572,10 @@ html, body {
   border-radius: 50%;
   color: var(--text-muted);
   opacity: 0.72;
-  transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease;
 }
 
 .home-meta-link:hover,
@@ -532,7 +586,9 @@ html, body {
   outline: none;
 }
 
-#dropzone.dropzone--touch .home-meta-links { margin-top: 0; }
+#dropzone.dropzone--touch .home-meta-links {
+  margin-top: 0;
+}
 
 /* ───────────────────────────────────────────────────────────────────────
    TOP STRIP — progressive label cascade
@@ -553,13 +609,27 @@ html, body {
     gap: 14px;
   }
 
-  .ts-home-name { display: none; }
-  .ts-status-kicker { display: none; }
-  .ts-status-title { max-width: 220px; }
-  .theme-label { display: none; }
-  .ts-instrument-label { display: none; }
-  .ts-end { gap: 4px; }
-  .ts-pill { padding: 0 11px; }
+  .ts-home-name {
+    display: none;
+  }
+  .ts-status-kicker {
+    display: none;
+  }
+  .ts-status-title {
+    max-width: 220px;
+  }
+  .theme-label {
+    display: none;
+  }
+  .ts-instrument-label {
+    display: none;
+  }
+  .ts-end {
+    gap: 4px;
+  }
+  .ts-pill {
+    padding: 0 11px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -572,23 +642,50 @@ html, body {
   }
   /* Hide label spans across action pills, but keep the instrument's icon
      slot (which wraps the glyph + loading spinner) visible. */
-  .ts-pill > span:not(.ts-instrument-icon-slot) { display: none; }
-  .ts-pill { padding: 0 9px; gap: 0; }
-  .ts-midi-label { display: none; }
-  .ts-status-title { max-width: 150px; font-size: 12px; }
+  .ts-pill > span:not(.ts-instrument-icon-slot) {
+    display: none;
+  }
+  .ts-pill {
+    padding: 0 9px;
+    gap: 0;
+  }
+  .ts-midi-label {
+    display: none;
+  }
+  .ts-status-title {
+    max-width: 150px;
+    font-size: 12px;
+  }
   /* Instrument pill is clearly a menu affordance even without the chevron. */
-  .ts-pill--instrument > svg { display: none; }
-  .ts-sep { margin: 0 2px; }
+  .ts-pill--instrument > svg {
+    display: none;
+  }
+  .ts-sep {
+    margin: 0 2px;
+  }
 }
 
 @media (max-width: 680px) {
   .ts-status-main,
-  .ts-bars { display: none; }
-  .ts-status { padding: 0 4px; gap: 0; }
-  .ts-record-btn span { display: none; }
-  .ts-record-btn { padding: 0 10px; }
-  #top-strip { padding: 0 6px 0 8px; }
-  .ts-end { gap: 3px; }
+  .ts-bars {
+    display: none;
+  }
+  .ts-status {
+    padding: 0 4px;
+    gap: 0;
+  }
+  .ts-record-btn span {
+    display: none;
+  }
+  .ts-record-btn {
+    padding: 0 10px;
+  }
+  #top-strip {
+    padding: 0 6px 0 8px;
+  }
+  .ts-end {
+    gap: 3px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -645,7 +742,6 @@ html, body {
   }
 }
 
-
 /* ─────────────────────────────────────────
    TOP STRIP — three zones: wordmark · context chip · actions
 ───────────────────────────────────────── */
@@ -675,7 +771,9 @@ html, body {
   pointer-events: none;
   opacity: 0;
   transform: translateY(-6px);
-  transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out);
+  transition:
+    opacity 0.4s var(--ease-out),
+    transform 0.4s var(--ease-out);
 }
 
 #top-strip.strip--active {
@@ -712,7 +810,9 @@ html, body {
   font-weight: 600;
   letter-spacing: -0.015em;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .ts-home:hover {
@@ -773,14 +873,18 @@ html, body {
   transition: color 0.18s var(--ease-out);
 }
 
-.ts-mode-seg:hover { color: var(--text-muted); }
+.ts-mode-seg:hover {
+  color: var(--text-muted);
+}
 
 .ts-mode-seg.is-active {
   color: #fff;
   font-weight: 600;
 }
 
-.ts-mode-seg.is-active:hover { color: #fff; }
+.ts-mode-seg.is-active:hover {
+  color: #fff;
+}
 
 /* Icon color: dim when inactive, accent when active. The small hit of
    accent signals "you are in this mode" without coloring the whole thumb. */
@@ -789,10 +893,14 @@ html, body {
   align-items: center;
   color: currentColor;
   opacity: 0.75;
-  transition: color 0.18s var(--ease-out), opacity 0.18s var(--ease-out);
+  transition:
+    color 0.18s var(--ease-out),
+    opacity 0.18s var(--ease-out);
 }
 
-.ts-mode-seg:hover .ts-mode-icon { opacity: 0.95; }
+.ts-mode-seg:hover .ts-mode-icon {
+  opacity: 0.95;
+}
 
 .ts-mode-seg.is-active .ts-mode-icon {
   color: var(--accent);
@@ -811,18 +919,16 @@ html, body {
   left: 3px;
   width: calc(50% - 3px);
   border-radius: var(--r-pill);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.08)
-  );
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 -1px 0 rgba(0, 0, 0, 0.18),
     0 2px 6px rgba(0, 0, 0, 0.28);
   opacity: 0;
   pointer-events: none;
-  transition: transform 0.26s var(--ease-spring), opacity 0.18s var(--ease-out);
+  transition:
+    transform 0.26s var(--ease-spring),
+    opacity 0.18s var(--ease-out);
 }
 
 .ts-mode-switch[data-active="file"] .ts-mode-thumb {
@@ -837,7 +943,11 @@ html, body {
 
 /* Compact widths: shrink segment padding, still show both labels. */
 @media (max-width: 640px) {
-  .ts-mode-seg { min-width: 0; padding: 0 10px; font-size: 11.5px; }
+  .ts-mode-seg {
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
 }
 
 /* ─── Status display (center zone) — display-only, not interactive ─── */
@@ -861,16 +971,30 @@ html, body {
   height: 7px;
   border-radius: 50%;
   background: var(--text-dim);
-  transition: background 0.2s, box-shadow 0.2s;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
 }
 
-#top-strip[data-mode="live"]    .ts-status-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
-#top-strip[data-mode="file"]    .ts-status-dot { background: var(--accent); }
-#top-strip.strip--playing       .ts-status-dot { animation: dot-pulse 1.8s ease-in-out infinite; }
+#top-strip[data-mode="live"] .ts-status-dot {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+#top-strip[data-mode="file"] .ts-status-dot {
+  background: var(--accent);
+}
+#top-strip.strip--playing .ts-status-dot {
+  animation: dot-pulse 1.8s ease-in-out infinite;
+}
 
 @keyframes dot-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); }
-  50%       { box-shadow: 0 0 0 5px transparent; }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
 }
 
 .ts-status-main {
@@ -913,7 +1037,9 @@ html, body {
   flex-shrink: 0;
 }
 
-#top-strip.strip--playing:not(.strip--dim) .ts-bars { opacity: 0.75; }
+#top-strip.strip--playing:not(.strip--dim) .ts-bars {
+  opacity: 0.75;
+}
 
 .ts-bars span {
   display: block;
@@ -923,14 +1049,33 @@ html, body {
   animation: bar-bounce 1.2s ease-in-out infinite;
 }
 
-.ts-bars span:nth-child(1) { height: 6px;  animation-delay: 0.00s; }
-.ts-bars span:nth-child(2) { height: 11px; animation-delay: 0.22s; }
-.ts-bars span:nth-child(3) { height: 4px;  animation-delay: 0.10s; }
-.ts-bars span:nth-child(4) { height: 8px;  animation-delay: 0.38s; }
+.ts-bars span:nth-child(1) {
+  height: 6px;
+  animation-delay: 0s;
+}
+.ts-bars span:nth-child(2) {
+  height: 11px;
+  animation-delay: 0.22s;
+}
+.ts-bars span:nth-child(3) {
+  height: 4px;
+  animation-delay: 0.1s;
+}
+.ts-bars span:nth-child(4) {
+  height: 8px;
+  animation-delay: 0.38s;
+}
 
 @keyframes bar-bounce {
-  0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
-  50%       { transform: scaleY(1.0); opacity: 1.0; }
+  0%,
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 
 /* ─── Action pills (right cluster) ───────────────────────────────────── */
@@ -951,10 +1096,17 @@ html, body {
   letter-spacing: -0.005em;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.16s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.16s var(--ease-spring);
 }
 
-.ts-pill svg { color: currentColor; flex-shrink: 0; }
+.ts-pill svg {
+  color: currentColor;
+  flex-shrink: 0;
+}
 
 .ts-pill:hover {
   color: var(--text);
@@ -962,7 +1114,9 @@ html, body {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-.ts-pill:active { transform: scale(0.97); }
+.ts-pill:active {
+  transform: scale(0.97);
+}
 
 /* "On" state: used by Live toggle when in live mode, and MIDI when connected */
 .ts-pill--on {
@@ -979,7 +1133,9 @@ html, body {
 
 /* Hide File-only pills (Tracks) when no file is loaded. Handled via hidden
    class from Controls.ts, but also defensive CSS for robustness. */
-#top-strip[data-has-file="false"] .ts-pill--file { display: none; }
+#top-strip[data-has-file="false"] .ts-pill--file {
+  display: none;
+}
 
 /* Collapse MIDI pill label when unavailable — icon-only */
 #top-strip[data-midi-status="unavailable"] .ts-pill--midi {
@@ -1023,7 +1179,11 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.16s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.16s var(--ease-spring);
 }
 
 .ts-theme-btn:hover {
@@ -1033,7 +1193,9 @@ html, body {
   transform: translateY(-1px);
 }
 
-.ts-theme-btn:active { transform: translateY(0) scale(0.97); }
+.ts-theme-btn:active {
+  transform: translateY(0) scale(0.97);
+}
 
 .theme-label {
   font-size: 11px;
@@ -1049,7 +1211,9 @@ html, body {
   background: var(--accent);
   display: block;
   box-shadow: 0 0 8px var(--accent-glow);
-  transition: background 0.4s var(--ease-out), box-shadow 0.4s;
+  transition:
+    background 0.4s var(--ease-out),
+    box-shadow 0.4s;
 }
 
 .ts-particle-icon {
@@ -1075,7 +1239,11 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.2s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.2s;
 }
 
 .ts-record-btn:hover {
@@ -1084,7 +1252,9 @@ html, body {
   box-shadow: 0 0 12px var(--accent-glow);
 }
 
-.ts-record-btn:active { transform: scale(0.96); }
+.ts-record-btn:active {
+  transform: scale(0.96);
+}
 
 /* Record button turns red while export is running */
 #top-strip.strip--exporting .ts-record-btn {
@@ -1099,10 +1269,14 @@ html, body {
 }
 
 @keyframes record-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.2; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
 }
-
 
 /* ─────────────────────────────────────────
    BOTTOM HUD
@@ -1121,7 +1295,9 @@ html, body {
   pointer-events: none;
   opacity: 0;
   z-index: 15;
-  transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out);
+  transition:
+    opacity 0.4s var(--ease-out),
+    transform 0.4s var(--ease-out);
 }
 
 #hud.hud--active {
@@ -1140,7 +1316,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 56px;               /* fixed height — same in live and file modes */
+  height: 56px; /* fixed height — same in live and file modes */
   padding: 0 14px;
   background: rgba(7, 7, 15, 0.93);
   backdrop-filter: blur(48px) saturate(160%);
@@ -1153,12 +1329,20 @@ html, body {
     inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
-.hud-group { display: inline-flex; align-items: center; gap: 4px; }
+.hud-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* Hide transport controls (play/skip/scrub/speed) in live mode */
-#hud.hud--live .hud-group--transport { display: none; }
+#hud.hud--live .hud-group--transport {
+  display: none;
+}
 /* Instrument button shows in live mode only — that's where people pick a sound */
-#hud:not(.hud--live) .hud-group--instrument { display: none; }
+#hud:not(.hud--live) .hud-group--instrument {
+  display: none;
+}
 
 .hud-drag-handle {
   display: inline-flex;
@@ -1173,7 +1357,9 @@ html, body {
   cursor: grab;
   flex-shrink: 0;
   margin-right: -2px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .hud-drag-handle:hover {
@@ -1200,19 +1386,26 @@ html, body {
   color: var(--text-dim);
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 0.15s, background 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    transform 0.12s var(--ease-spring);
 }
 .hud-pin-btn:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
 }
-.hud-pin-btn:active { transform: scale(0.9); }
+.hud-pin-btn:active {
+  transform: scale(0.9);
+}
 .hud-pin-btn.hud-pin-btn--on {
   color: var(--accent);
   background: var(--accent-soft);
   transform: rotate(-18deg);
 }
-.hud-pin-btn.hud-pin-btn--on:hover { color: var(--accent); }
+.hud-pin-btn.hud-pin-btn--on:hover {
+  color: var(--accent);
+}
 
 /* Play button */
 .btn-play {
@@ -1227,7 +1420,10 @@ html, body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: filter 0.15s, transform 0.12s var(--ease-spring), box-shadow 0.2s;
+  transition:
+    filter 0.15s,
+    transform 0.12s var(--ease-spring),
+    box-shadow 0.2s;
   box-shadow: 0 4px 16px var(--accent-glow);
 }
 
@@ -1236,11 +1432,20 @@ html, body {
   box-shadow: 0 6px 24px var(--accent-glow);
 }
 
-.btn-play:active { transform: scale(0.9); }
+.btn-play:active {
+  transform: scale(0.9);
+}
 
 @keyframes playing-pulse {
-  0%, 100% { box-shadow: 0 4px 16px var(--accent-glow); }
-  50%       { box-shadow: 0 4px 28px var(--accent-glow), 0 0 0 5px var(--accent-soft); }
+  0%,
+  100% {
+    box-shadow: 0 4px 16px var(--accent-glow);
+  }
+  50% {
+    box-shadow:
+      0 4px 28px var(--accent-glow),
+      0 0 0 5px var(--accent-soft);
+  }
 }
 
 #hud.hud--playing .btn-play {
@@ -1251,13 +1456,15 @@ html, body {
    draw a spinning ring around the play button so users know "click play,
    nothing happens" = "about to happen, just wait" rather than "it broke". */
 @keyframes play-loading-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .btn-play--loading {
   position: relative;
 }
 .btn-play--loading::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: -4px;
   border-radius: 50%;
@@ -1280,7 +1487,9 @@ html, body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .btn-skip:hover {
@@ -1288,7 +1497,9 @@ html, body {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.btn-skip:active { transform: scale(0.88); }
+.btn-skip:active {
+  transform: scale(0.88);
+}
 
 /* Divider */
 .hud-divider {
@@ -1317,7 +1528,9 @@ html, body {
   letter-spacing: 0.02em;
 }
 
-.time-display.dim { color: var(--text-dim); }
+.time-display.dim {
+  color: var(--text-dim);
+}
 
 /* ─── Sliders (scrubber + mini-sliders) ────────────────────────────────
    Unified theme: accent fill for progress, white thumb with accent-soft
@@ -1330,22 +1543,25 @@ html, body {
   min-width: 0;
   -webkit-appearance: none;
   appearance: none;
-  background:
-    linear-gradient(
-      to right,
-      var(--accent) 0,
-      var(--accent) var(--pct, 0%),
-      rgba(255, 255, 255, 0.07) var(--pct, 0%),
-      rgba(255, 255, 255, 0.07) 100%
-    );
+  background: linear-gradient(
+    to right,
+    var(--accent) 0,
+    var(--accent) var(--pct, 0%),
+    rgba(255, 255, 255, 0.07) var(--pct, 0%),
+    rgba(255, 255, 255, 0.07) 100%
+  );
   border-radius: var(--r-pill);
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.35);
   outline: none;
   cursor: pointer;
-  transition: height 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+  transition:
+    height 0.15s var(--ease-out),
+    box-shadow 0.15s var(--ease-out);
 }
 
-.scrubber:hover { height: 6px; }
+.scrubber:hover {
+  height: 6px;
+}
 
 .scrubber:focus-visible {
   box-shadow:
@@ -1364,7 +1580,9 @@ html, body {
     0 0 0 2.5px var(--accent-soft),
     0 2px 6px rgba(0, 0, 0, 0.5);
   cursor: pointer;
-  transition: transform 0.14s var(--ease-spring), box-shadow 0.14s var(--ease-out);
+  transition:
+    transform 0.14s var(--ease-spring),
+    box-shadow 0.14s var(--ease-out);
 }
 
 .scrubber::-moz-range-thumb {
@@ -1399,7 +1617,9 @@ html, body {
   transform: scale(1.18);
 }
 .scrubber:active::-webkit-slider-thumb,
-.scrubber:active::-moz-range-thumb { transform: scale(1.08); }
+.scrubber:active::-moz-range-thumb {
+  transform: scale(1.08);
+}
 
 /* Volume / Speed / Zoom */
 .ctrl-group {
@@ -1421,22 +1641,25 @@ html, body {
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background:
-    linear-gradient(
-      to right,
-      var(--accent) 0,
-      var(--accent) var(--pct, 0%),
-      rgba(255, 255, 255, 0.06) var(--pct, 0%),
-      rgba(255, 255, 255, 0.06) 100%
-    );
+  background: linear-gradient(
+    to right,
+    var(--accent) 0,
+    var(--accent) var(--pct, 0%),
+    rgba(255, 255, 255, 0.06) var(--pct, 0%),
+    rgba(255, 255, 255, 0.06) 100%
+  );
   border-radius: var(--r-pill);
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.3);
   outline: none;
   cursor: pointer;
-  transition: height 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+  transition:
+    height 0.15s var(--ease-out),
+    box-shadow 0.15s var(--ease-out);
 }
 
-.mini-slider:hover { height: 5px; }
+.mini-slider:hover {
+  height: 5px;
+}
 
 .mini-slider:focus-visible {
   box-shadow:
@@ -1455,7 +1678,9 @@ html, body {
     0 0 0 2px var(--accent-soft),
     0 1px 4px rgba(0, 0, 0, 0.5);
   cursor: pointer;
-  transition: transform 0.14s var(--ease-spring), box-shadow 0.14s var(--ease-out);
+  transition:
+    transform 0.14s var(--ease-spring),
+    box-shadow 0.14s var(--ease-out);
 }
 
 .mini-slider::-moz-range-thumb {
@@ -1490,9 +1715,13 @@ html, body {
   transform: scale(1.2);
 }
 .mini-slider:active::-webkit-slider-thumb,
-.mini-slider:active::-moz-range-thumb { transform: scale(1.08); }
+.mini-slider:active::-moz-range-thumb {
+  transform: scale(1.08);
+}
 
-.mini-slider--zoom { width: 64px; }
+.mini-slider--zoom {
+  width: 64px;
+}
 
 /* Instrument cycle button (live mode) — sized to match the other HUD pills */
 .hud-instr-btn {
@@ -1510,7 +1739,11 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.12s var(--ease-spring);
 }
 
 .hud-instr-btn:hover {
@@ -1518,12 +1751,19 @@ html, body {
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-.hud-instr-btn:active { transform: scale(0.97); }
+.hud-instr-btn:active {
+  transform: scale(0.97);
+}
 
-.hud-instr-icon { color: var(--accent); display: inline-flex; }
+.hud-instr-icon {
+  color: var(--accent);
+  display: inline-flex;
+}
 
 /* Metronome + Looper + Session Record — live-mode only. */
-#hud:not(.hud--live) .hud-group--live { display: none; }
+#hud:not(.hud--live) .hud-group--live {
+  display: none;
+}
 
 /* Session record — prominent red when capturing, with an mm:ss timer where
    the "Record" label usually sits. */
@@ -1542,13 +1782,19 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.12s var(--ease-spring);
 }
 .hud-session-btn:hover {
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(255, 255, 255, 0.14);
 }
-.hud-session-btn:active { transform: scale(0.97); }
+.hud-session-btn:active {
+  transform: scale(0.97);
+}
 
 .hud-session-dot {
   width: 9px;
@@ -1575,10 +1821,14 @@ html, body {
 }
 
 @keyframes session-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
-  50%      { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
+  }
 }
-
 
 /* Metronome compound widget: icon toggle + BPM with ± steppers. Shares one
    rounded shell so the three controls read as a single object. */
@@ -1591,9 +1841,13 @@ html, body {
   border-radius: var(--r-pill);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
-.hud-metro:hover { border-color: rgba(255, 255, 255, 0.14); }
+.hud-metro:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
 
 .hud-metro.hud-metro--on {
   border-color: var(--accent);
@@ -1612,43 +1866,81 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    background 0.15s,
+    transform 0.12s var(--ease-spring);
 }
-.hud-metro-toggle:hover { background: rgba(255, 255, 255, 0.08); }
-.hud-metro-toggle:active { transform: scale(0.92); }
+.hud-metro-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.hud-metro-toggle:active {
+  transform: scale(0.92);
+}
 
 .hud-metro-toggle--on {
   background: var(--accent);
   color: #fff;
   box-shadow: 0 2px 8px var(--accent-glow);
 }
-.hud-metro-toggle--on:hover { background: var(--accent); filter: brightness(1.08); }
+.hud-metro-toggle--on:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
 
-.hud-metro-icon { display: inline-flex; }
+.hud-metro-icon {
+  display: inline-flex;
+}
 
 /* Beat indicator — a tiny dot overlaying the icon that flashes on each click. */
 .hud-metro-beat {
   position: absolute;
-  top: 2px; right: 2px;
-  width: 6px; height: 6px;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--accent);
   opacity: 0;
   pointer-events: none;
 }
-.hud-metro-beat--tick { animation: metro-tick 180ms ease-out; }
-.hud-metro-beat--down { animation: metro-tick-down 240ms ease-out; background: #fff; }
-.hud-metro-toggle--on .hud-metro-beat { background: #fff; }
+.hud-metro-beat--tick {
+  animation: metro-tick 180ms ease-out;
+}
+.hud-metro-beat--down {
+  animation: metro-tick-down 240ms ease-out;
+  background: #fff;
+}
+.hud-metro-toggle--on .hud-metro-beat {
+  background: #fff;
+}
 
 @keyframes metro-tick {
-  0%   { opacity: 0;    transform: scale(0.7); }
-  15%  { opacity: 1;    transform: scale(1); }
-  100% { opacity: 0;    transform: scale(1.2); }
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
 }
 @keyframes metro-tick-down {
-  0%   { opacity: 0;    transform: scale(0.7); }
-  10%  { opacity: 1;    transform: scale(1.3); }
-  100% { opacity: 0;    transform: scale(1.6); }
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
 }
 
 .hud-metro-step {
@@ -1663,10 +1955,18 @@ html, body {
   line-height: 1;
   cursor: pointer;
   border-radius: 6px;
-  transition: color 0.12s, background 0.12s, transform 0.1s var(--ease-spring);
+  transition:
+    color 0.12s,
+    background 0.12s,
+    transform 0.1s var(--ease-spring);
 }
-.hud-metro-step:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
-.hud-metro-step:active { transform: scale(0.9); }
+.hud-metro-step:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+.hud-metro-step:active {
+  transform: scale(0.9);
+}
 
 .hud-metro-bpm {
   min-width: 28px;
@@ -1678,7 +1978,6 @@ html, body {
   padding: 0 2px;
   user-select: none;
 }
-
 
 .hud-loop-btn {
   --loop-progress: 0deg;
@@ -1697,20 +1996,28 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.12s var(--ease-spring);
 }
 
 /* Loop cycle progress — a thin conic ring that fills as the loop plays. Only
    visible during 'playing' state so it doesn't distract at rest. */
 .hud-loop-btn[data-loop-state="playing"]::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -3px;
   border-radius: calc(var(--r-pill) + 3px);
   padding: 2px;
   background: conic-gradient(#fff var(--loop-progress), rgba(255, 255, 255, 0.18) 0deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
@@ -1722,16 +2029,23 @@ html, body {
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-.hud-loop-btn:active { transform: scale(0.97); }
+.hud-loop-btn:active {
+  transform: scale(0.97);
+}
 
-.hud-loop-icon { color: var(--accent); display: inline-flex; }
+.hud-loop-icon {
+  color: var(--accent);
+  display: inline-flex;
+}
 
 .hud-loop-btn[data-loop-state="armed"] {
   border-color: var(--accent);
   color: var(--accent);
   animation: loop-pulse 1.1s ease-in-out infinite;
 }
-.hud-loop-btn[data-loop-state="armed"] .hud-loop-icon { color: var(--accent); }
+.hud-loop-btn[data-loop-state="armed"] .hud-loop-icon {
+  color: var(--accent);
+}
 
 .hud-loop-btn[data-loop-state="recording"] {
   background: #e2384a;
@@ -1740,7 +2054,9 @@ html, body {
   box-shadow: 0 2px 12px rgba(226, 56, 74, 0.45);
   animation: loop-pulse 0.9s ease-in-out infinite;
 }
-.hud-loop-btn[data-loop-state="recording"] .hud-loop-icon { color: #fff; }
+.hud-loop-btn[data-loop-state="recording"] .hud-loop-icon {
+  color: #fff;
+}
 
 .hud-loop-btn[data-loop-state="playing"] {
   background: var(--accent);
@@ -1748,7 +2064,9 @@ html, body {
   color: #fff;
   box-shadow: 0 2px 10px var(--accent-glow);
 }
-.hud-loop-btn[data-loop-state="playing"] .hud-loop-icon { color: #fff; }
+.hud-loop-btn[data-loop-state="playing"] .hud-loop-icon {
+  color: #fff;
+}
 
 .hud-loop-btn[data-loop-state="overdubbing"] {
   background: #f59e0b;
@@ -1757,16 +2075,22 @@ html, body {
   box-shadow: 0 2px 12px rgba(245, 158, 11, 0.45);
   animation: loop-pulse 0.9s ease-in-out infinite;
 }
-.hud-loop-btn[data-loop-state="overdubbing"] .hud-loop-icon { color: #fff; }
+.hud-loop-btn[data-loop-state="overdubbing"] .hud-loop-icon {
+  color: #fff;
+}
 .hud-loop-btn[data-loop-state="overdubbing"]::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -3px;
   border-radius: calc(var(--r-pill) + 3px);
   padding: 2px;
   background: conic-gradient(#fff var(--loop-progress), rgba(255, 255, 255, 0.18) 0deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
@@ -1774,8 +2098,15 @@ html, body {
 }
 
 @keyframes loop-pulse {
-  0%, 100% { opacity: 1;     transform: scale(1); }
-  50%      { opacity: 0.72;  transform: scale(0.98); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(0.98);
+  }
 }
 
 .hud-loop-clear,
@@ -1791,18 +2122,31 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    transform 0.12s var(--ease-spring);
 }
 
 .hud-loop-clear:hover,
 .hud-loop-save:hover,
-.hud-loop-undo:hover { color: var(--text); background: rgba(255, 255, 255, 0.09); }
+.hud-loop-undo:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.09);
+}
 .hud-loop-clear:active,
 .hud-loop-save:active,
-.hud-loop-undo:active { transform: scale(0.94); }
+.hud-loop-undo:active {
+  transform: scale(0.94);
+}
 
-.hud-loop-save { color: var(--accent); }
-.hud-loop-save:hover { color: var(--accent); background: var(--accent-soft); }
+.hud-loop-save {
+  color: var(--accent);
+}
+.hud-loop-save:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
 
 .speed-val {
   font-family: var(--font-mono);
@@ -1823,7 +2167,6 @@ html, body {
   pointer-events: none;
 }
 
-
 /* ─────────────────────────────────────────
    KEY HINT (live mode — typing keyboard reference)
 ───────────────────────────────────────── */
@@ -1836,7 +2179,9 @@ html, body {
   pointer-events: none;
   opacity: 0;
   transform: translateY(6px);
-  transition: opacity 0.35s var(--ease-out), transform 0.35s var(--ease-out);
+  transition:
+    opacity 0.35s var(--ease-out),
+    transform 0.35s var(--ease-out);
 }
 
 #key-hint.kh--visible {
@@ -1910,7 +2255,9 @@ html, body {
   letter-spacing: 0.02em;
 }
 
-.kh-row--shortcuts { margin-top: 2px; }
+.kh-row--shortcuts {
+  margin-top: 2px;
+}
 
 .kh-map kbd {
   display: inline-flex;
@@ -1924,7 +2271,7 @@ html, body {
   font-weight: 500;
   color: var(--text);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-bottom-width: 2px;
   border-radius: 5px;
   letter-spacing: 0.04em;
@@ -1956,16 +2303,18 @@ html, body {
 }
 
 @media (max-width: 640px) {
-  #key-hint { display: none; }
+  #key-hint {
+    display: none;
+  }
 }
-
 
 /* ─────────────────────────────────────────
    PIANO ROLL CANVAS — interactive keyboard
 ───────────────────────────────────────── */
 
-#pianoroll { cursor: default; }
-
+#pianoroll {
+  cursor: default;
+}
 
 /* ─────────────────────────────────────────
    KEYBOARD RESIZER (drag seam)
@@ -1990,13 +2339,17 @@ html, body {
 /* Touch devices: hide the resizer seam — dragging a 10px slice on a
    finger device is fiddly and bumps into the keyboard hit targets. */
 @media (pointer: coarse) {
-  #kbd-resizer { display: none; }
+  #kbd-resizer {
+    display: none;
+  }
 }
 
-body.is-touch #kbd-resizer { display: none; }
+body.is-touch #kbd-resizer {
+  display: none;
+}
 
 #kbd-resizer::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   right: 0;
@@ -2017,7 +2370,9 @@ body.is-touch #kbd-resizer { display: none; }
   height: 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  transition: background 0.18s, transform 0.18s;
+  transition:
+    background 0.18s,
+    transform 0.18s;
 }
 
 #kbd-resizer:hover .kbd-resizer-grip {
@@ -2029,7 +2384,6 @@ body.is-touch #kbd-resizer { display: none; }
   background: var(--accent);
   box-shadow: 0 0 10px var(--accent-glow);
 }
-
 
 /* ─────────────────────────────────────────
    TRACK PANEL
@@ -2056,7 +2410,9 @@ body.is-touch #kbd-resizer { display: none; }
   opacity: 0;
   transform: translateY(-6px);
   pointer-events: none;
-  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+  transition:
+    opacity 0.18s var(--ease-out),
+    transform 0.18s var(--ease-out);
 }
 
 .ts-popover.ts-popover--open {
@@ -2065,7 +2421,9 @@ body.is-touch #kbd-resizer { display: none; }
   pointer-events: auto;
 }
 
-#track-panel.ts-popover { width: 300px; }
+#track-panel.ts-popover {
+  width: 300px;
+}
 
 .panel-header {
   display: flex;
@@ -2095,7 +2453,9 @@ body.is-touch #kbd-resizer { display: none; }
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .panel-close-btn:hover {
@@ -2131,7 +2491,10 @@ body.is-touch #kbd-resizer { display: none; }
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .panel-load-btn:hover {
@@ -2176,10 +2539,14 @@ body.is-touch #kbd-resizer { display: none; }
   border-top-color: var(--accent);
   opacity: 0;
   transform: scale(0.75);
-  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+  transition:
+    opacity 0.18s var(--ease-out),
+    transform 0.18s var(--ease-out);
 }
 
-.ts-pill--loading .ts-instrument-icon-slot > svg { opacity: 0; }
+.ts-pill--loading .ts-instrument-icon-slot > svg {
+  opacity: 0;
+}
 .ts-pill--loading .ts-instrument-spinner {
   opacity: 1;
   transform: scale(1);
@@ -2191,7 +2558,9 @@ body.is-touch #kbd-resizer { display: none; }
 }
 
 @keyframes ts-instrument-spin {
-  to { transform: scale(1) rotate(360deg); }
+  to {
+    transform: scale(1) rotate(360deg);
+  }
 }
 
 .ts-pill--open {
@@ -2200,7 +2569,9 @@ body.is-touch #kbd-resizer { display: none; }
   color: var(--text);
 }
 
-.ts-instrument-menu { width: 260px; }
+.ts-instrument-menu {
+  width: 260px;
+}
 
 .instrument-items {
   display: flex;
@@ -2222,10 +2593,14 @@ body.is-touch #kbd-resizer { display: none; }
   font-family: var(--font);
   cursor: pointer;
   text-align: left;
-  transition: background 0.14s, color 0.14s;
+  transition:
+    background 0.14s,
+    color 0.14s;
 }
 
-.instrument-item:hover { background: rgba(255, 255, 255, 0.05); }
+.instrument-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
 
 .instrument-item-dot {
   width: 8px;
@@ -2236,7 +2611,10 @@ body.is-touch #kbd-resizer { display: none; }
   transition: background 0.15s;
 }
 
-.instrument-item--on .instrument-item-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.instrument-item--on .instrument-item-dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
 
 .instrument-item-body {
   display: flex;
@@ -2265,7 +2643,9 @@ body.is-touch #kbd-resizer { display: none; }
   flex-shrink: 0;
 }
 
-.instrument-item--on .instrument-item-check { opacity: 1; }
+.instrument-item--on .instrument-item-check {
+  opacity: 1;
+}
 
 /* Loading row: swap the left status dot for a spinner and dim the subtitle
    to "Loading samples…" via CSS only. The click still works — if the user
@@ -2287,7 +2667,7 @@ body.is-touch #kbd-resizer { display: none; }
 }
 
 .instrument-item--loading .instrument-item-sub::after {
-  content: ' · loading samples';
+  content: " · loading samples";
 }
 
 /* Track items (shared with panel) */
@@ -2300,7 +2680,9 @@ body.is-touch #kbd-resizer { display: none; }
   transition: background 0.12s;
 }
 
-.track-item:hover { background: rgba(255, 255, 255, 0.03); }
+.track-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
 
 .track-swatch {
   width: 3px;
@@ -2310,7 +2692,10 @@ body.is-touch #kbd-resizer { display: none; }
   opacity: 0.9;
 }
 
-.track-info { flex: 1; min-width: 0; }
+.track-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .track-name {
   display: block;
@@ -2359,7 +2744,7 @@ body.is-touch #kbd-resizer { display: none; }
 }
 
 .toggle-track::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 2px;
   top: 2px;
@@ -2367,7 +2752,9 @@ body.is-touch #kbd-resizer { display: none; }
   height: 10px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.28);
-  transition: transform 0.2s var(--ease-spring), background 0.2s;
+  transition:
+    transform 0.2s var(--ease-spring),
+    background 0.2s;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
@@ -2385,7 +2772,6 @@ body.is-touch #kbd-resizer { display: none; }
   opacity: 0.35;
 }
 
-
 /* ─────────────────────────────────────────
    EXPORT MODAL
 ───────────────────────────────────────── */
@@ -2399,11 +2785,13 @@ body.is-touch #kbd-resizer { display: none; }
   z-index: 80;
   background: transparent;
   pointer-events: none;
-  transition: background 0.28s, backdrop-filter 0.28s;
+  transition:
+    background 0.28s,
+    backdrop-filter 0.28s;
 }
 
 #export-modal.open {
-  background: rgba(4, 4, 10, 0.70);
+  background: rgba(4, 4, 10, 0.7);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   pointer-events: auto;
@@ -2420,7 +2808,9 @@ body.is-touch #kbd-resizer { display: none; }
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   opacity: 0;
   transform: scale(0.94) translateY(8px);
-  transition: opacity 0.28s var(--ease-out), transform 0.28s var(--ease-out);
+  transition:
+    opacity 0.28s var(--ease-out),
+    transform 0.28s var(--ease-out);
 }
 
 #export-modal.open .export-card {
@@ -2436,7 +2826,10 @@ body.is-touch #kbd-resizer { display: none; }
   margin-bottom: 22px;
 }
 
-.export-header-text { flex: 1; min-width: 0; }
+.export-header-text {
+  flex: 1;
+  min-width: 0;
+}
 
 .export-card-icon {
   color: var(--accent);
@@ -2479,14 +2872,21 @@ body.is-touch #kbd-resizer { display: none; }
   opacity: 0.35;
   pointer-events: none;
   filter: saturate(0.2);
-  transition: opacity 0.2s, filter 0.2s;
+  transition:
+    opacity 0.2s,
+    filter 0.2s;
 }
 
 /* Segmented controls inside the export modal span full width with equal-sized
    cells, so Output and Frame rate sit at the same visual weight under their
    shared section-label style. */
-.export-section .fps-group { width: 100%; }
-.export-section .fps-btn { flex: 1; padding: 6px 10px; }
+.export-section .fps-group {
+  width: 100%;
+}
+.export-section .fps-btn {
+  flex: 1;
+  padding: 6px 10px;
+}
 
 /* Resolution card grid — 3 columns × 2 rows, last row left-aligned. Each card
    shows a tiny preview rectangle at the format's actual aspect ratio so the
@@ -2508,7 +2908,11 @@ body.is-touch #kbd-resizer { display: none; }
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.12s var(--ease-spring);
 }
 
 .res-card:hover {
@@ -2517,7 +2921,9 @@ body.is-touch #kbd-resizer { display: none; }
   border-color: var(--border-hi);
 }
 
-.res-card:active { transform: scale(0.97); }
+.res-card:active {
+  transform: scale(0.97);
+}
 
 .res-card.res-card--on {
   border-color: var(--accent);
@@ -2541,7 +2947,10 @@ body.is-touch #kbd-resizer { display: none; }
   letter-spacing: 0.02em;
 }
 
-.res-card--on .res-card-dim { color: var(--text); opacity: 0.7; }
+.res-card--on .res-card-dim {
+  color: var(--text);
+  opacity: 0.7;
+}
 
 /* Aspect-ratio preview rectangles. Each is centered in a 44×32 slot and sized
    proportional to the target format — user scans the shape before reading. */
@@ -2555,12 +2964,14 @@ body.is-touch #kbd-resizer { display: none; }
 }
 
 .res-preview::before {
-  content: '';
+  content: "";
   display: block;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02));
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 3px;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .res-card--on .res-preview::before {
@@ -2568,16 +2979,27 @@ body.is-touch #kbd-resizer { display: none; }
   border-color: var(--accent);
 }
 
-.res-preview--landscape::before { width: 50px; height: 28px; }
-.res-preview--vertical::before  { width: 16px; height: 28px; }
-.res-preview--square::before    { width: 28px; height: 28px; }
+.res-preview--landscape::before {
+  width: 50px;
+  height: 28px;
+}
+.res-preview--vertical::before {
+  width: 16px;
+  height: 28px;
+}
+.res-preview--square::before {
+  width: 28px;
+  height: 28px;
+}
 .res-preview--match::before {
   width: 42px;
   height: 28px;
   border-style: dashed;
   background: transparent;
 }
-.res-card--on .res-preview--match::before { background: transparent; }
+.res-card--on .res-preview--match::before {
+  background: transparent;
+}
 
 /* FPS segmented control */
 .fps-group {
@@ -2604,11 +3026,16 @@ body.is-touch #kbd-resizer { display: none; }
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
   white-space: nowrap;
 }
 
-.fps-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.fps-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
 
 .fps-btn.fps-btn--on {
   background: var(--accent);
@@ -2616,7 +3043,10 @@ body.is-touch #kbd-resizer { display: none; }
   box-shadow: 0 2px 8px var(--accent-glow);
 }
 
-.fps-btn.fps-btn--on:hover { background: var(--accent); filter: brightness(1.1); }
+.fps-btn.fps-btn--on:hover {
+  background: var(--accent);
+  filter: brightness(1.1);
+}
 
 /* Modal action buttons */
 .export-actions {
@@ -2638,7 +3068,10 @@ body.is-touch #kbd-resizer { display: none; }
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
   white-space: nowrap;
 }
 
@@ -2702,9 +3135,11 @@ body.is-touch #kbd-resizer { display: none; }
   position: relative;
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg,
+  background: linear-gradient(
+    90deg,
     color-mix(in srgb, var(--accent) 80%, transparent),
-    var(--accent));
+    var(--accent)
+  );
   border-radius: var(--r-pill);
   transition: width 0.25s var(--ease-out);
   box-shadow: 0 0 8px var(--accent-glow);
@@ -2714,38 +3149,45 @@ body.is-touch #kbd-resizer { display: none; }
 /* Subtle shimmer across the filled portion — feels alive even when the bar
    is momentarily stationary between progress ticks. */
 .export-progress-bar::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg,
+  background: linear-gradient(
+    90deg,
     transparent 0%,
     rgba(255, 255, 255, 0.25) 50%,
-    transparent 100%);
+    transparent 100%
+  );
   transform: translateX(-100%);
   animation: export-bar-shimmer 2.2s linear infinite;
 }
 
 @keyframes export-bar-shimmer {
-  to { transform: translateX(100%); }
+  to {
+    transform: translateX(100%);
+  }
 }
 
 /* Indeterminate mode — used while rendering audio (no real progress signal).
    A slim moving segment slides across instead of showing a fake percent. */
 .export-phase.indeterminate .export-progress-bar {
   width: 40%;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    var(--accent) 50%,
-    transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
   box-shadow: none;
   animation: export-bar-indeterminate 1.4s var(--ease-out) infinite;
 }
 
-.export-phase.indeterminate .export-progress-bar::after { display: none; }
+.export-phase.indeterminate .export-progress-bar::after {
+  display: none;
+}
 
 @keyframes export-bar-indeterminate {
-  0%   { transform: translateX(-150%); }
-  100% { transform: translateX(350%); }
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
 }
 
 .export-pct {
@@ -2755,7 +3197,6 @@ body.is-touch #kbd-resizer { display: none; }
   letter-spacing: 0.04em;
   min-height: 1em;
 }
-
 
 /* ─────────────────────────────────────────
    POST-SESSION MODAL (live-mode → next step)
@@ -2770,11 +3211,13 @@ body.is-touch #kbd-resizer { display: none; }
   z-index: 80;
   background: transparent;
   pointer-events: none;
-  transition: background 0.28s, backdrop-filter 0.28s;
+  transition:
+    background 0.28s,
+    backdrop-filter 0.28s;
 }
 
 #post-session-modal.open {
-  background: rgba(4, 4, 10, 0.70);
+  background: rgba(4, 4, 10, 0.7);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   pointer-events: auto;
@@ -2791,7 +3234,9 @@ body.is-touch #kbd-resizer { display: none; }
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   opacity: 0;
   transform: scale(0.94) translateY(8px);
-  transition: opacity 0.28s var(--ease-out), transform 0.28s var(--ease-out);
+  transition:
+    opacity 0.28s var(--ease-out),
+    transform 0.28s var(--ease-out);
 }
 
 #post-session-modal.open .post-session-card {
@@ -2817,7 +3262,10 @@ body.is-touch #kbd-resizer { display: none; }
   text-align: left;
   cursor: pointer;
   font-family: var(--font);
-  transition: background 0.15s, border-color 0.15s, transform 0.12s var(--ease-spring);
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.12s var(--ease-spring);
 }
 
 .post-session-option:hover {
@@ -2825,7 +3273,9 @@ body.is-touch #kbd-resizer { display: none; }
   border-color: var(--border-hi);
 }
 
-.post-session-option:active { transform: scale(0.985); }
+.post-session-option:active {
+  transform: scale(0.985);
+}
 
 .post-session-option--primary {
   border-color: var(--accent);
@@ -2838,7 +3288,9 @@ body.is-touch #kbd-resizer { display: none; }
   filter: brightness(1.08);
 }
 
-.post-session-option--muted { color: var(--text-muted); }
+.post-session-option--muted {
+  color: var(--text-muted);
+}
 
 .post-session-option-icon {
   flex: 0 0 auto;
@@ -2857,7 +3309,9 @@ body.is-touch #kbd-resizer { display: none; }
   color: #fff;
 }
 
-.post-session-option--muted .post-session-option-icon { color: var(--text-muted); }
+.post-session-option--muted .post-session-option-icon {
+  color: var(--text-muted);
+}
 
 .post-session-option-body {
   display: flex;
@@ -2927,7 +3381,6 @@ body.is-touch #kbd-resizer { display: none; }
   letter-spacing: -0.01em;
 }
 
-
 /* ─────────────────────────────────────────
    TOAST
 ───────────────────────────────────────── */
@@ -2947,7 +3400,9 @@ body.is-touch #kbd-resizer { display: none; }
   backdrop-filter: blur(24px) saturate(150%);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
   border-radius: 12px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
   font-size: 12.5px;
   font-weight: 500;
   line-height: 1.35;
@@ -2962,7 +3417,7 @@ body.is-touch #kbd-resizer { display: none; }
 }
 
 .toast::before {
-  content: '';
+  content: "";
   display: inline-block;
   flex-shrink: 0;
   width: 7px;
@@ -2974,18 +3429,33 @@ body.is-touch #kbd-resizer { display: none; }
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(8px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
-
 
 /* ─────────────────────────────────────────
    KEYFRAMES
 ───────────────────────────────────────── */
 
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes spin     { to   { transform: rotate(360deg); } }
-
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* ─────────────────────────────────────────
    REDUCED MOTION
@@ -3025,7 +3495,6 @@ body.is-touch #kbd-resizer { display: none; }
   }
 }
 
-
 /* ─────────────────────────────────────────
    MOBILE / TOUCH (quick-wins)
    — coarse pointers and narrow viewports.
@@ -3052,8 +3521,13 @@ body.is-touch #kbd-resizer { display: none; }
   }
 
   /* Hide the mode-switch *labels* but keep the segmented icons. */
-  .ts-mode-seg .ts-mode-label { display: none; }
-  .ts-mode-seg { padding: 0 8px; min-width: 32px; }
+  .ts-mode-seg .ts-mode-label {
+    display: none;
+  }
+  .ts-mode-seg {
+    padding: 0 8px;
+    min-width: 32px;
+  }
 
   /* MIDI + theme + particle are secondary on mobile — hide until
      the overflow-menu popover ships. Keep the instrument slot (it's a
@@ -3061,17 +3535,24 @@ body.is-touch #kbd-resizer { display: none; }
   #top-strip .ts-pill--midi,
   #top-strip .ts-theme-btn,
   #top-strip .ts-particle-btn,
-  #top-strip .ts-sep { display: none; }
+  #top-strip .ts-sep {
+    display: none;
+  }
 
   /* Status area already collapses at 680px. Free the row. */
-  .ts-status { display: none; }
+  .ts-status {
+    display: none;
+  }
 
   /* HUD: scale down so it still fits. The .hud-bar wrap rule above
      keeps transport + scrubber readable. */
   #hud {
     max-width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right));
   }
-  .hud-bar { padding: 0 10px; gap: 6px; }
+  .hud-bar {
+    padding: 0 10px;
+    gap: 6px;
+  }
 }
 
 /* ─── Mobile portrait: the desktop HUD shadow is a 24px-offset 75%-opacity
@@ -3233,7 +3714,9 @@ body.is-touch #kbd-resizer { display: none; }
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
   z-index: 60;
 }
 [data-tip]:hover::after,
@@ -3273,8 +3756,7 @@ body.is-touch #kbd-resizer { display: none; }
    little, shadow softens, radius drops a notch — still recognizably the
    same control design, just sized for the available room. The keyboard
    re-clamps automatically via the renderer's rotation handler. */
-@media (max-width: 900px) and (orientation: landscape),
-       (max-height: 500px) {
+@media (max-width: 900px) and (orientation: landscape), (max-height: 500px) {
   :root {
     /* Generous gap so the HUD has real daylight above the keys — the
        short landscape viewport makes even a small overlap read as
@@ -3302,10 +3784,14 @@ body.is-touch #kbd-resizer { display: none; }
 @media (max-width: 380px) {
   /* Tracks hides — users can still open via the instrument popover or
      by loading a file. */
-  #top-strip .ts-pill--file { display: none; }
+  #top-strip .ts-pill--file {
+    display: none;
+  }
   /* Make the open-midi pill icon-only (its label is already hidden by
      the 900px tier). Nothing to change here. */
-  #top-strip { gap: 4px; }
+  #top-strip {
+    gap: 4px;
+  }
 }
 
 /* ─── Hit-target pass (coarse pointers) ──────────────────────────── */
@@ -3339,26 +3825,41 @@ body.is-touch #kbd-resizer { display: none; }
   }
 
   /* Range inputs — widen the track and thumb for reliable drags. */
-  .scrubber { height: 6px; }
+  .scrubber {
+    height: 6px;
+  }
   .scrubber::-webkit-slider-thumb,
   .scrubber::-moz-range-thumb {
     width: 22px;
     height: 22px;
   }
-  .scrubber:hover { height: 6px; }
+  .scrubber:hover {
+    height: 6px;
+  }
 
-  .mini-slider { height: 6px; }
+  .mini-slider {
+    height: 6px;
+  }
   .mini-slider::-webkit-slider-thumb,
   .mini-slider::-moz-range-thumb {
     width: 20px;
     height: 20px;
   }
-  .mini-slider:hover { height: 6px; }
+  .mini-slider:hover {
+    height: 6px;
+  }
 
   /* Expand metronome sub-controls so the ± keys are thumbable. */
-  .hud-metro { height: 40px; }
-  .hud-metro-toggle { width: 34px; height: 34px; }
-  .hud-metro-step { min-width: 32px; }
+  .hud-metro {
+    height: 40px;
+  }
+  .hud-metro-toggle {
+    width: 34px;
+    height: 34px;
+  }
+  .hud-metro-step {
+    min-width: 32px;
+  }
 
   /* Small icon-only hud buttons — widen so a fingertip can land. */
   .hud-pin-btn,
@@ -3372,8 +3873,12 @@ body.is-touch #kbd-resizer { display: none; }
 /* When this class is on the root dropzone element, the drag-drop copy
    is irrelevant (no files to drag on a phone). We hide it and let the
    tap-to-pick button stand alone as the primary CTA. */
-#dropzone.dropzone--touch .home-drop-hint { display: none; }
-#dropzone.dropzone--touch .home-kicker { font-size: 10px; }
+#dropzone.dropzone--touch .home-drop-hint {
+  display: none;
+}
+#dropzone.dropzone--touch .home-kicker {
+  font-size: 10px;
+}
 #dropzone.dropzone--touch .home-primary-btn {
   /* Make the "Open MIDI" button feel like the one-true-CTA. */
   min-height: 52px;
@@ -3384,7 +3889,9 @@ body.is-touch #kbd-resizer { display: none; }
   min-height: 48px;
 }
 /* Tighten the footnote row so only the MIDI-status pill shows. */
-#dropzone.dropzone--touch .home-footnotes { gap: 6px; }
+#dropzone.dropzone--touch .home-footnotes {
+  gap: 6px;
+}
 
 /* ─── .popover--sheet — bottom-sheet on narrow screens ───────────── */
 /* The TS side toggles `.popover--sheet` on menu/panel popovers when the
@@ -3414,7 +3921,9 @@ body.is-touch #kbd-resizer { display: none; }
     0 0 0 100vmax rgba(0, 0, 0, 0.5);
   /* Slide-in animation: starts off-screen, settles at translateY(0). */
   transform: translateY(100%) !important;
-  transition: transform 0.28s var(--ease-out), opacity 0.2s var(--ease-out) !important;
+  transition:
+    transform 0.28s var(--ease-out),
+    opacity 0.2s var(--ease-out) !important;
   opacity: 1 !important;
 }
 
@@ -3430,7 +3939,7 @@ body.is-touch #kbd-resizer { display: none; }
 /* Drag handle pill centered at the top of the sheet — a visual affordance
    for "you can pull this down". No JS hookup required for the visual. */
 .popover--sheet::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 8px;
   left: 50%;

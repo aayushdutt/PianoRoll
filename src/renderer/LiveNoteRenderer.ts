@@ -23,8 +23,8 @@ export class LiveNoteRenderer {
 
   private baseGraphics: Graphics
   private glowContainer: Container
-  private glowGraphics:  Graphics
-  private glowFilter:    GlowFilter
+  private glowGraphics: Graphics
+  private glowFilter: GlowFilter
 
   constructor(private theme: Theme) {
     this.container = new Container()
@@ -37,11 +37,11 @@ export class LiveNoteRenderer {
     this.glowContainer.label = 'live-notes-glow'
 
     this.glowFilter = new GlowFilter({
-      distance:     theme.noteGlowDistance,
+      distance: theme.noteGlowDistance,
       outerStrength: theme.noteGlowStrength,
       innerStrength: 0,
-      color:         0xffffff,
-      quality:       0.3,
+      color: 0xffffff,
+      quality: 0.3,
     })
     this.glowContainer.filters = [this.glowFilter]
 
@@ -62,7 +62,8 @@ export class LiveNoteRenderer {
     this.glowGraphics.clear()
 
     const primaryEmpty = primary.releasedNotes.length === 0 && primary.heldNotes.size === 0
-    const loopEmpty = loop === null || (loop.releasedNotes.length === 0 && loop.heldNotes.size === 0)
+    const loopEmpty =
+      loop === null || (loop.releasedNotes.length === 0 && loop.heldNotes.size === 0)
     if (primaryEmpty && loopEmpty) {
       this.glowContainer.visible = false
       return
@@ -76,12 +77,34 @@ export class LiveNoteRenderer {
 
     // Ghosts draw first so live notes layer on top.
     if (loop !== null) {
-      for (const note of loop.releasedNotes) this.drawOne(note, currentTime, pixelsPerSecond, nowY, viewport, color, false, GHOST_ALPHA_SCALE)
-      for (const note of loop.heldNotes.values()) this.drawOne(note, currentTime, pixelsPerSecond, nowY, viewport, color, false, GHOST_ALPHA_SCALE)
+      for (const note of loop.releasedNotes)
+        this.drawOne(
+          note,
+          currentTime,
+          pixelsPerSecond,
+          nowY,
+          viewport,
+          color,
+          false,
+          GHOST_ALPHA_SCALE,
+        )
+      for (const note of loop.heldNotes.values())
+        this.drawOne(
+          note,
+          currentTime,
+          pixelsPerSecond,
+          nowY,
+          viewport,
+          color,
+          false,
+          GHOST_ALPHA_SCALE,
+        )
     }
 
-    for (const note of primary.releasedNotes) this.drawOne(note, currentTime, pixelsPerSecond, nowY, viewport, color, false, 1)
-    for (const note of primary.heldNotes.values()) this.drawOne(note, currentTime, pixelsPerSecond, nowY, viewport, color, true, 1)
+    for (const note of primary.releasedNotes)
+      this.drawOne(note, currentTime, pixelsPerSecond, nowY, viewport, color, false, 1)
+    for (const note of primary.heldNotes.values())
+      this.drawOne(note, currentTime, pixelsPerSecond, nowY, viewport, color, true, 1)
 
     this.glowFilter.color = color
     this.glowContainer.visible = primary.heldNotes.size > 0
@@ -119,7 +142,7 @@ export class LiveNoteRenderer {
 
   updateTheme(theme: Theme): void {
     this.theme = theme
-    this.glowFilter.distance     = theme.noteGlowDistance
+    this.glowFilter.distance = theme.noteGlowDistance
     this.glowFilter.outerStrength = theme.noteGlowStrength
   }
 

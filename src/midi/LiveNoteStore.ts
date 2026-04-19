@@ -1,14 +1,14 @@
 export interface LiveNote {
   pitch: number
-  startTime: number   // MasterClock.currentTime when key was pressed
+  startTime: number // MasterClock.currentTime when key was pressed
   endTime: number | null
-  velocity: number    // 0–1
+  velocity: number // 0–1
 }
 
 // Tracks held keys plus released note trails that should keep scrolling upward
 // until they leave the visible roll.
 export class LiveNoteStore {
-  private _held = new Map<number, LiveNote>()   // pitch → note
+  private _held = new Map<number, LiveNote>() // pitch → note
   private _released: LiveNote[] = []
 
   get heldNotes(): ReadonlyMap<number, LiveNote> {

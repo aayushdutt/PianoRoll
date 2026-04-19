@@ -40,7 +40,7 @@ export class NoteRenderer {
   // Call once when tracks are loaded — sets up one Graphics per track
   setTracks(tracks: MidiTrack[]): void {
     // Remove stale graphics
-    const incomingIds = new Set(tracks.map(t => t.id))
+    const incomingIds = new Set(tracks.map((t) => t.id))
     for (const [id, g] of this.trackGraphics) {
       if (!incomingIds.has(id)) {
         this.container.removeChild(g)
@@ -74,7 +74,9 @@ export class NoteRenderer {
     this.glowGraphics.clear()
 
     let activeCount = 0
-    let sumR = 0, sumG = 0, sumB = 0
+    let sumR = 0,
+      sumG = 0,
+      sumB = 0
 
     for (const track of tracks) {
       const g = this.trackGraphics.get(track.id)
@@ -137,7 +139,9 @@ export class NoteRenderer {
   }
 
   clear(): void {
-    this.trackGraphics.forEach(g => g.clear())
+    this.trackGraphics.forEach((g) => {
+      g.clear()
+    })
     this.glowGraphics.clear()
     this.glowContainer.visible = false
   }

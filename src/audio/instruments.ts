@@ -20,25 +20,25 @@ export type InstrumentId =
 
 export interface InstrumentInfo {
   id: InstrumentId
-  name: string       // display name
-  description: string   // short character-of-voice hint
-  sampled: boolean   // whether loading requires a network fetch
+  name: string // display name
+  description: string // short character-of-voice hint
+  sampled: boolean // whether loading requires a network fetch
 }
 
 export const INSTRUMENTS: readonly InstrumentInfo[] = [
-  { id: 'piano',   name: 'Piano',   description: 'Warm acoustic grand',    sampled: true  },
-  { id: 'upright', name: 'Upright', description: 'Intimate upright · HD',  sampled: true  },
-  { id: 'digital', name: 'Digital', description: 'Clean stage piano',      sampled: false },
-  { id: 'rhodes',  name: 'Rhodes',  description: 'Mellow electric piano',  sampled: false },
-  { id: 'guitar',  name: 'Guitar',  description: 'Acoustic nylon · HD',    sampled: true  },
-  { id: 'violin',  name: 'Violin',  description: 'Bowed strings · HD',     sampled: true  },
-  { id: 'flute',   name: 'Flute',   description: 'Breathy wind · HD',      sampled: true  },
-  { id: 'marimba', name: 'Marimba', description: 'Woody mallet',           sampled: false },
-  { id: 'bells',   name: 'Bells',   description: 'Crystalline chimes',     sampled: false },
-  { id: 'strings', name: 'Strings', description: 'Swelling ensemble',      sampled: false },
-  { id: 'pad',     name: 'Pad',     description: 'Airy sustained pad',     sampled: false },
-  { id: 'pluck',   name: 'Pluck',   description: 'Bright percussive',      sampled: false },
-  { id: 'bass',    name: 'Bass',    description: 'Round low sustain',      sampled: false },
+  { id: 'piano', name: 'Piano', description: 'Warm acoustic grand', sampled: true },
+  { id: 'upright', name: 'Upright', description: 'Intimate upright · HD', sampled: true },
+  { id: 'digital', name: 'Digital', description: 'Clean stage piano', sampled: false },
+  { id: 'rhodes', name: 'Rhodes', description: 'Mellow electric piano', sampled: false },
+  { id: 'guitar', name: 'Guitar', description: 'Acoustic nylon · HD', sampled: true },
+  { id: 'violin', name: 'Violin', description: 'Bowed strings · HD', sampled: true },
+  { id: 'flute', name: 'Flute', description: 'Breathy wind · HD', sampled: true },
+  { id: 'marimba', name: 'Marimba', description: 'Woody mallet', sampled: false },
+  { id: 'bells', name: 'Bells', description: 'Crystalline chimes', sampled: false },
+  { id: 'strings', name: 'Strings', description: 'Swelling ensemble', sampled: false },
+  { id: 'pad', name: 'Pad', description: 'Airy sustained pad', sampled: false },
+  { id: 'pluck', name: 'Pluck', description: 'Bright percussive', sampled: false },
+  { id: 'bass', name: 'Bass', description: 'Round low sustain', sampled: false },
 ]
 
 export interface InstrumentRuntime {
@@ -54,26 +54,39 @@ let pianoModule: PianoModule | null = null
 
 async function getPianoModule(): Promise<PianoModule> {
   if (!pianoModule) {
-    pianoModule = await import('@tonejs/piano') as unknown as PianoModule
+    pianoModule = (await import('@tonejs/piano')) as unknown as PianoModule
   }
   return pianoModule
 }
 
 export async function createInstrument(id: InstrumentId): Promise<InstrumentRuntime> {
   switch (id) {
-    case 'piano':   return await createPiano()
-    case 'upright': return await createUpright()
-    case 'digital': return createDigitalPiano()
-    case 'rhodes':  return createRhodes()
-    case 'pad':     return createPad()
-    case 'pluck':   return createPluck()
-    case 'marimba': return createMarimba()
-    case 'bells':   return createBells()
-    case 'strings': return createStrings()
-    case 'bass':    return createBass()
-    case 'violin':  return await createViolin()
-    case 'flute':   return await createFlute()
-    case 'guitar':  return await createGuitar()
+    case 'piano':
+      return await createPiano()
+    case 'upright':
+      return await createUpright()
+    case 'digital':
+      return createDigitalPiano()
+    case 'rhodes':
+      return createRhodes()
+    case 'pad':
+      return createPad()
+    case 'pluck':
+      return createPluck()
+    case 'marimba':
+      return createMarimba()
+    case 'bells':
+      return createBells()
+    case 'strings':
+      return createStrings()
+    case 'bass':
+      return createBass()
+    case 'violin':
+      return await createViolin()
+    case 'flute':
+      return await createFlute()
+    case 'guitar':
+      return await createGuitar()
   }
 }
 
@@ -109,7 +122,7 @@ function createRhodes(): InstrumentRuntime {
     harmonicity: 3.2,
     modulationIndex: 6,
     oscillator: { type: 'sine' },
-    envelope:   { attack: 0.002, decay: 0.9, sustain: 0.12, release: 1.0 },
+    envelope: { attack: 0.002, decay: 0.9, sustain: 0.12, release: 1.0 },
     modulation: { type: 'sine' },
     modulationEnvelope: { attack: 0.004, decay: 0.6, sustain: 0.05, release: 0.4 },
   })
@@ -121,7 +134,7 @@ function createRhodes(): InstrumentRuntime {
 function createPad(): InstrumentRuntime {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'fatsawtooth', count: 3, spread: 24 },
-    envelope:   { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6 },
+    envelope: { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6 },
   })
   synth.volume.value = -10
   const filter = new Tone.Filter({ frequency: 1600, type: 'lowpass', rolloff: -12 })
@@ -133,7 +146,7 @@ function createPad(): InstrumentRuntime {
 function createPluck(): InstrumentRuntime {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sawtooth' },
-    envelope:   { attack: 0.002, decay: 0.18, sustain: 0, release: 0.9 },
+    envelope: { attack: 0.002, decay: 0.18, sustain: 0, release: 0.9 },
   })
   synth.volume.value = -6
   const filter = new Tone.Filter({ frequency: 3800, type: 'highpass', rolloff: -12, Q: 0.5 })
@@ -149,7 +162,7 @@ function createMarimba(): InstrumentRuntime {
     harmonicity: 4.2,
     modulationIndex: 12,
     oscillator: { type: 'sine' },
-    envelope:   { attack: 0.001, decay: 0.18, sustain: 0, release: 0.25 },
+    envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.25 },
     modulation: { type: 'triangle' },
     modulationEnvelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.08 },
   })
@@ -167,7 +180,7 @@ function createBells(): InstrumentRuntime {
     harmonicity: 3.01,
     modulationIndex: 8,
     oscillator: { type: 'sine' },
-    envelope:   { attack: 0.002, decay: 2.4, sustain: 0, release: 2.8 },
+    envelope: { attack: 0.002, decay: 2.4, sustain: 0, release: 2.8 },
     modulation: { type: 'sine' },
     modulationEnvelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 1.8 },
   })
@@ -182,7 +195,7 @@ function createStrings(): InstrumentRuntime {
   // of bowed strings. Detune + spread gives the "many players" feel.
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'fatsawtooth', count: 5, spread: 40 },
-    envelope:   { attack: 0.35, decay: 0.25, sustain: 0.85, release: 1.4 },
+    envelope: { attack: 0.35, decay: 0.25, sustain: 0.85, release: 1.4 },
   })
   synth.volume.value = -12
   const filter = new Tone.Filter({ frequency: 2400, type: 'lowpass', rolloff: -12 })
@@ -196,7 +209,7 @@ function createBass(): InstrumentRuntime {
   // played in the middle register. Shorter release keeps fast bass lines tight.
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'triangle' },
-    envelope:   { attack: 0.005, decay: 0.3, sustain: 0.75, release: 0.35 },
+    envelope: { attack: 0.005, decay: 0.3, sustain: 0.75, release: 0.35 },
   })
   synth.volume.value = -4
   const filter = new Tone.Filter({ frequency: 1200, type: 'lowpass', rolloff: -24, Q: 0.8 })
@@ -217,8 +230,8 @@ const SAMPLE_BASE = `${import.meta.env.BASE_URL}instrument-samples/`
 const SAMPLE_LOAD_TIMEOUT_MS = 15_000
 
 interface SampleSpec {
-  folder: string              // under SAMPLE_BASE, trailing slash omitted
-  files: readonly string[]    // raw filenames like ['A4.mp3', 'As3.mp3']
+  folder: string // under SAMPLE_BASE, trailing slash omitted
+  files: readonly string[] // raw filenames like ['A4.mp3', 'As3.mp3']
   release?: number
   attack?: number
   volumeDb?: number
@@ -257,7 +270,10 @@ async function createSampled(
   await Promise.race([
     Tone.loaded(),
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`Sample load timeout: ${spec.folder}`)), SAMPLE_LOAD_TIMEOUT_MS),
+      setTimeout(
+        () => reject(new Error(`Sample load timeout: ${spec.folder}`)),
+        SAMPLE_LOAD_TIMEOUT_MS,
+      ),
     ),
   ])
 
@@ -275,10 +291,21 @@ async function createViolin(): Promise<InstrumentRuntime> {
       {
         folder: 'violin',
         files: [
-          'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3',
-          'C4.mp3', 'C5.mp3', 'C6.mp3', 'C7.mp3',
-          'E4.mp3', 'E5.mp3', 'E6.mp3',
-          'G3.mp3', 'G4.mp3', 'G5.mp3', 'G6.mp3',
+          'A3.mp3',
+          'A4.mp3',
+          'A5.mp3',
+          'A6.mp3',
+          'C4.mp3',
+          'C5.mp3',
+          'C6.mp3',
+          'C7.mp3',
+          'E4.mp3',
+          'E5.mp3',
+          'E6.mp3',
+          'G3.mp3',
+          'G4.mp3',
+          'G5.mp3',
+          'G6.mp3',
         ],
         release: 1.4,
         volumeDb: -4,
@@ -300,9 +327,16 @@ async function createFlute(): Promise<InstrumentRuntime> {
       {
         folder: 'flute',
         files: [
-          'A4.mp3', 'A5.mp3', 'A6.mp3',
-          'C4.mp3', 'C5.mp3', 'C6.mp3', 'C7.mp3',
-          'E4.mp3', 'E5.mp3', 'E6.mp3',
+          'A4.mp3',
+          'A5.mp3',
+          'A6.mp3',
+          'C4.mp3',
+          'C5.mp3',
+          'C6.mp3',
+          'C7.mp3',
+          'E4.mp3',
+          'E5.mp3',
+          'E6.mp3',
         ],
         release: 0.9,
         volumeDb: -6,
@@ -328,10 +362,7 @@ async function createUpright(): Promise<InstrumentRuntime> {
     return await createSampled(
       {
         folder: 'piano',
-        files: [
-          'A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3',
-          'A5.mp3', 'A6.mp3', 'A7.mp3', 'C8.mp3',
-        ],
+        files: ['A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3', 'A7.mp3', 'C8.mp3'],
         release: 1.1,
         volumeDb: -3,
       },
@@ -356,7 +387,7 @@ function createDigitalPiano(): InstrumentRuntime {
     harmonicity: 1.0,
     modulationIndex: 2.6,
     oscillator: { type: 'sine' },
-    envelope:   { attack: 0.003, decay: 0.9, sustain: 0.25, release: 0.85 },
+    envelope: { attack: 0.003, decay: 0.9, sustain: 0.25, release: 0.85 },
     modulation: { type: 'sine' },
     modulationEnvelope: { attack: 0.003, decay: 0.35, sustain: 0, release: 0.3 },
   })
@@ -375,18 +406,43 @@ async function createGuitar(): Promise<InstrumentRuntime> {
       {
         folder: 'guitar-acoustic',
         files: [
-          'A2.mp3', 'A3.mp3', 'A4.mp3',
-          'As2.mp3', 'As3.mp3', 'As4.mp3',
-          'B2.mp3', 'B3.mp3', 'B4.mp3',
-          'C3.mp3', 'C4.mp3', 'C5.mp3',
-          'Cs3.mp3', 'Cs4.mp3', 'Cs5.mp3',
-          'D2.mp3', 'D3.mp3', 'D4.mp3', 'D5.mp3',
-          'Ds2.mp3', 'Ds3.mp3', 'Ds4.mp3',
-          'E2.mp3', 'E3.mp3', 'E4.mp3',
-          'F2.mp3', 'F3.mp3', 'F4.mp3',
-          'Fs2.mp3', 'Fs3.mp3', 'Fs4.mp3',
-          'G2.mp3', 'G3.mp3', 'G4.mp3',
-          'Gs2.mp3', 'Gs3.mp3', 'Gs4.mp3',
+          'A2.mp3',
+          'A3.mp3',
+          'A4.mp3',
+          'As2.mp3',
+          'As3.mp3',
+          'As4.mp3',
+          'B2.mp3',
+          'B3.mp3',
+          'B4.mp3',
+          'C3.mp3',
+          'C4.mp3',
+          'C5.mp3',
+          'Cs3.mp3',
+          'Cs4.mp3',
+          'Cs5.mp3',
+          'D2.mp3',
+          'D3.mp3',
+          'D4.mp3',
+          'D5.mp3',
+          'Ds2.mp3',
+          'Ds3.mp3',
+          'Ds4.mp3',
+          'E2.mp3',
+          'E3.mp3',
+          'E4.mp3',
+          'F2.mp3',
+          'F3.mp3',
+          'F4.mp3',
+          'Fs2.mp3',
+          'Fs3.mp3',
+          'Fs4.mp3',
+          'G2.mp3',
+          'G3.mp3',
+          'G4.mp3',
+          'Gs2.mp3',
+          'Gs3.mp3',
+          'Gs4.mp3',
         ],
         release: 0.8,
         volumeDb: -2,

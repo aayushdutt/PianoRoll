@@ -3,47 +3,47 @@
 // in the accompanying README. All three are Creative Commons (public domain
 // for Bach; CC BY-SA for Satie + Chopin) sourced from the Mutopia Project.
 
-import type { MidiFile } from './midi/types'
 import { parseMidiFile } from './midi/parser'
+import type { MidiFile } from './midi/types'
 
 export interface Sample {
   id: string
   title: string
   composer: string
-  accent: string    // CSS color — poster gradient + sparkline
-  url: string       // served from public/samples
-  displayName: string   // used as the MidiFile.name after parse
+  accent: string // CSS color — poster gradient + sparkline
+  url: string // served from public/samples
+  displayName: string // used as the MidiFile.name after parse
 }
 
 export const SAMPLES: readonly Sample[] = [
   {
-    id:          'chopin-nocturne-op9-2',
-    title:       'Nocturne Op. 9 No. 2',
-    composer:    'Chopin',
-    accent:      '#06b6d4',
-    url:         `${import.meta.env.BASE_URL}samples/chopin-nocturne-op9-2.mid`,
+    id: 'chopin-nocturne-op9-2',
+    title: 'Nocturne Op. 9 No. 2',
+    composer: 'Chopin',
+    accent: '#06b6d4',
+    url: `${import.meta.env.BASE_URL}samples/chopin-nocturne-op9-2.mid`,
     displayName: 'Chopin — Nocturne Op. 9 No. 2',
   },
   {
-    id:          'bach-prelude-c',
-    title:       'Prelude in C',
-    composer:    'J.S. Bach',
-    accent:      '#f97316',
-    url:         `${import.meta.env.BASE_URL}samples/bach-prelude-in-c.mid`,
+    id: 'bach-prelude-c',
+    title: 'Prelude in C',
+    composer: 'J.S. Bach',
+    accent: '#f97316',
+    url: `${import.meta.env.BASE_URL}samples/bach-prelude-in-c.mid`,
     displayName: 'Bach — Prelude in C (BWV 846)',
   },
   {
-    id:          'satie-gnossienne-1',
-    title:       'Gnossienne No. 1',
-    composer:    'Satie',
-    accent:      '#a78bfa',
-    url:         `${import.meta.env.BASE_URL}samples/satie-gnossienne-1.mid`,
+    id: 'satie-gnossienne-1',
+    title: 'Gnossienne No. 1',
+    composer: 'Satie',
+    accent: '#a78bfa',
+    url: `${import.meta.env.BASE_URL}samples/satie-gnossienne-1.mid`,
     displayName: 'Satie — Gnossienne No. 1',
   },
 ]
 
 export function getSample(id: string): Sample | undefined {
-  return SAMPLES.find(s => s.id === id)
+  return SAMPLES.find((s) => s.id === id)
 }
 
 // Per-sample parsed cache. Parsing is tiny (<2 ms) but caching saves the
@@ -74,5 +74,5 @@ export function computeSparkline(midi: MidiFile, bins = 32): number[] {
     }
   }
   const peak = Math.max(1, ...counts)
-  return counts.map(c => c / peak)
+  return counts.map((c) => c / peak)
 }

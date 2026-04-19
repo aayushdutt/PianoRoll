@@ -5,7 +5,7 @@ export interface AudioEngine {
   play(fromTime: number): Promise<void>
   pause(): void
   seek(time: number): void
-  setVolume(v: number): void  // 0–1
-  setSpeed(s: number): void   // 0.25–2
+  setVolume(v: number): void // 0–1
+  setSpeed(s: number): void // 0.25–2
   dispose(): void
 }

@@ -1,6 +1,6 @@
-import { Container, Graphics, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
 import type { Application } from 'pixi.js'
-import { MIDI_MIN, MIDI_MAX, isBlackKey } from '../core/midi/types'
+import { Container, Graphics, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
+import { isBlackKey, MIDI_MAX, MIDI_MIN } from '../core/midi/types'
 import type { Theme } from './theme'
 import type { Viewport } from './viewport'
 
@@ -33,7 +33,7 @@ function getIvoryNoiseCanvas(): HTMLCanvasElement {
     // Bias brightness high so the grain reads as "ivory", not "static".
     // Alpha is ~8% — subtle but visible on close look.
     const v = 200 + Math.random() * 55
-    img.data[i]     = v
+    img.data[i] = v
     img.data[i + 1] = v
     img.data[i + 2] = v
     img.data[i + 3] = 20
@@ -127,22 +127,18 @@ export class KeyboardRenderer {
       // Top highlight — 4px, stacked rects simulate a soft gradient. Inset
       // by the corner radius so the highlight respects the key's rounded
       // corners and doesn't bleed into the seam between keys.
-      whiteLayer.rect(x + wRadius, y, w - wRadius * 2, 1)
-        .fill({ color: 0xffffff, alpha: 0.35 })
-      whiteLayer.rect(x + 1, y + 1, w - 2, 2)
-        .fill({ color: 0xffffff, alpha: 0.18 })
-      whiteLayer.rect(x + 1, y + 3, w - 2, 2)
-        .fill({ color: 0xffffff, alpha: 0.08 })
+      whiteLayer.rect(x + wRadius, y, w - wRadius * 2, 1).fill({ color: 0xffffff, alpha: 0.35 })
+      whiteLayer.rect(x + 1, y + 1, w - 2, 2).fill({ color: 0xffffff, alpha: 0.18 })
+      whiteLayer.rect(x + 1, y + 3, w - 2, 2).fill({ color: 0xffffff, alpha: 0.08 })
 
       // Bottom shadow — 5px, three stacked rects fading into a strong 1px
       // edge line. Gives each key the "slightly dipped at the player's
       // edge" read you'd see on a real piano under stage lighting.
-      whiteLayer.rect(x + 1, y + h - 5, w - 2, 3)
-        .fill({ color: 0x000000, alpha: 0.07 })
-      whiteLayer.rect(x + 1, y + h - 2, w - 2, 1)
-        .fill({ color: 0x000000, alpha: 0.18 })
-      whiteLayer.rect(x + wRadius, y + h - 1, w - wRadius * 2, 1)
-        .fill({ color: 0x000000, alpha: 0.30 })
+      whiteLayer.rect(x + 1, y + h - 5, w - 2, 3).fill({ color: 0x000000, alpha: 0.07 })
+      whiteLayer.rect(x + 1, y + h - 2, w - 2, 1).fill({ color: 0x000000, alpha: 0.18 })
+      whiteLayer
+        .rect(x + wRadius, y + h - 1, w - wRadius * 2, 1)
+        .fill({ color: 0x000000, alpha: 0.3 })
     }
     whiteBake.addChild(whiteLayer)
 
@@ -182,16 +178,14 @@ export class KeyboardRenderer {
       blackLayer.roundRect(x, y, w, h, bRadius).fill({ color: this.theme.blackKey })
 
       // Top bevel — hints at the rounded physical top of a real black key.
-      blackLayer.rect(x + bRadius, y, w - bRadius * 2, 1)
-        .fill({ color: 0xffffff, alpha: 0.28 })
-      blackLayer.rect(x + 1, y + 1, w - 2, 2)
-        .fill({ color: 0xffffff, alpha: 0.12 })
+      blackLayer.rect(x + bRadius, y, w - bRadius * 2, 1).fill({ color: 0xffffff, alpha: 0.28 })
+      blackLayer.rect(x + 1, y + 1, w - 2, 2).fill({ color: 0xffffff, alpha: 0.12 })
 
       // Bottom lip — where the finger rests on a physical piano. A thin
       // bright edge catches light and sells the 3D form cheaply.
-      blackLayer.rect(x + 1, y + h - 3, w - 2, 2)
-        .fill({ color: 0xffffff, alpha: 0.10 })
-      blackLayer.rect(x + bRadius, y + h - 1, w - bRadius * 2, 1)
+      blackLayer.rect(x + 1, y + h - 3, w - 2, 2).fill({ color: 0xffffff, alpha: 0.1 })
+      blackLayer
+        .rect(x + bRadius, y + h - 1, w - bRadius * 2, 1)
         .fill({ color: 0xffffff, alpha: 0.22 })
 
       // Side-edge rails — reflective highlights along the left and right
@@ -200,8 +194,8 @@ export class KeyboardRenderer {
       const railY = y + bRadius
       const railH = h - bRadius * 2
       // Left rail (toward the light source)
-      blackLayer.rect(x,     railY, 1, railH).fill({ color: 0xffffff, alpha: 0.44 })
-      blackLayer.rect(x + 1, railY, 1, railH).fill({ color: 0xffffff, alpha: 0.20 })
+      blackLayer.rect(x, railY, 1, railH).fill({ color: 0xffffff, alpha: 0.44 })
+      blackLayer.rect(x + 1, railY, 1, railH).fill({ color: 0xffffff, alpha: 0.2 })
       // Right rail (opposite side, dimmer)
       blackLayer.rect(x + w - 1, railY, 1, railH).fill({ color: 0xffffff, alpha: 0.28 })
       blackLayer.rect(x + w - 2, railY, 1, railH).fill({ color: 0xffffff, alpha: 0.12 })
@@ -250,7 +244,11 @@ export class KeyboardRenderer {
     const fallback = this.theme.trackColors[0] ?? this.theme.nowLine
 
     // Halos drawn first (so the solid body sits on top).
-    const halos: readonly [number, number][] = [[10, 0.05], [6, 0.10], [3, 0.18]]
+    const halos: readonly [number, number][] = [
+      [10, 0.05],
+      [6, 0.1],
+      [3, 0.18],
+    ]
     for (const [pitch, color] of activeByPitch) {
       const pos = positions.get(pitch)
       if (!pos) continue

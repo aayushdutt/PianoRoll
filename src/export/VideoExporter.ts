@@ -3,7 +3,7 @@
 // muxer interleaves by timestamp, so audio is encoded up front before the
 // video loop — simpler than coordinating two parallel encoders.
 
-import { Muxer, ArrayBufferTarget } from 'mp4-muxer'
+import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
 
 export type ExportStage =
   | 'Rendering audio'
@@ -29,7 +29,7 @@ export interface ExportOptions {
 }
 
 interface CodecPlan {
-  codecString: string                          // e.g. 'avc1.640028'
+  codecString: string // e.g. 'avc1.640028'
   muxerCodec: 'avc' | 'hevc' | 'vp9' | 'av1'
   label: string
 }
@@ -37,12 +37,12 @@ interface CodecPlan {
 const DEFAULT_FPS = 30
 const DEFAULT_BITRATE = 8_000_000
 const KEYFRAME_INTERVAL_SEC = 2
-const MAX_ENCODE_QUEUE = 20        // backpressure: yield when queue exceeds this
+const MAX_ENCODE_QUEUE = 20 // backpressure: yield when queue exceeds this
 const PROGRESS_UPDATE_EVERY_N_FRAMES = 3
 
-const AUDIO_CODEC_STRING = 'mp4a.40.2'   // AAC-LC
+const AUDIO_CODEC_STRING = 'mp4a.40.2' // AAC-LC
 const AUDIO_BITRATE = 192_000
-const AUDIO_CHUNK_FRAMES = 4096          // ~85 ms at 48kHz — good encoder cadence
+const AUDIO_CHUNK_FRAMES = 4096 // ~85 ms at 48kHz — good encoder cadence
 // Video progress is mapped into this slice of the overall [0,1] progress bar.
 // Any pre-video stages (audio encode) occupy [0, VIDEO_PROGRESS_START).
 const VIDEO_PROGRESS_START = 0.05
@@ -127,13 +127,16 @@ export class VideoExporter {
     let encoderError: Error | null = null
     const encoder = new VideoEncoder({
       output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-      error: (e) => { encoderError ??= e as Error },
+      error: (e) => {
+        encoderError ??= e as Error
+      },
     })
     this.encoder = encoder
 
     encoder.configure({
       codec: plan.codecString,
-      width, height,
+      width,
+      height,
       bitrate,
       framerate: fps,
       hardwareAcceleration: 'prefer-hardware',
@@ -252,7 +255,9 @@ export class VideoExporter {
     let encoderError: Error | null = null
     const encoder = new AudioEncoder({
       output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-      error: (e) => { encoderError ??= e as Error },
+      error: (e) => {
+        encoderError ??= e as Error
+      },
     })
     this.audioEncoder = encoder
 
@@ -341,7 +346,8 @@ async function pickCodec(
   for (const c of candidates) {
     const res = await VideoEncoder.isConfigSupported({
       codec: c.codecString,
-      width, height,
+      width,
+      height,
       bitrate,
       framerate: fps,
       hardwareAcceleration: 'prefer-hardware',
@@ -356,7 +362,7 @@ async function pickCodec(
 }
 
 function yieldTask(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, 0))
+  return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 function triggerDownload(url: string, filename: string): void {

@@ -5,8 +5,8 @@ type ClockListener = (time: number) => void
 
 export class MasterClock {
   private context: AudioContext
-  private _startContextTime = 0   // AudioContext.currentTime when play() was called
-  private _startOffset = 0        // where in the track we started from
+  private _startContextTime = 0 // AudioContext.currentTime when play() was called
+  private _startOffset = 0 // where in the track we started from
   private _playing = false
   private _speed = 1
   private listeners = new Set<ClockListener>()
@@ -90,7 +90,9 @@ export class MasterClock {
 
   private emit(): void {
     const t = this.currentTime
-    this.listeners.forEach(l => l(t))
+    this.listeners.forEach((l) => {
+      l(t)
+    })
   }
 
   dispose(): void {

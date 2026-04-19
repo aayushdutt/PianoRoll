@@ -1,4 +1,6 @@
 import type { ExportStage } from '../export/VideoExporter'
+import { icons } from './icons'
+import { Modal } from './primitives/Modal'
 
 // Supported export resolution presets. `match` keeps the current canvas size
 // (whatever the user's window is) — useful for already-well-sized displays or
@@ -29,15 +31,24 @@ interface PresetCard {
 // Ordered so the default (1080p) is first and the social formats cluster
 // together — matches how users scan the card grid.
 const PRESETS: readonly PresetCard[] = [
-  { id: '1080p',    label: '1080p',    dim: '1920 × 1080', aspect: 'landscape' },
-  { id: '720p',     label: '720p',     dim: '1280 × 720',  aspect: 'landscape' },
-  { id: 'vertical', label: 'Vertical', dim: '1080 × 1920', aspect: 'vertical', hint: 'TikTok / Reels / Shorts' },
-  { id: 'square',   label: 'Square',   dim: '1080 × 1080', aspect: 'square',   hint: 'Instagram feed' },
-  { id: 'match',    label: 'Match',    dim: 'Current size', aspect: 'match' },
+  { id: '1080p', label: '1080p', dim: '1920 × 1080', aspect: 'landscape' },
+  { id: '720p', label: '720p', dim: '1280 × 720', aspect: 'landscape' },
+  {
+    id: 'vertical',
+    label: 'Vertical',
+    dim: '1080 × 1920',
+    aspect: 'vertical',
+    hint: 'TikTok / Reels / Shorts',
+  },
+  { id: 'square', label: 'Square', dim: '1080 × 1080', aspect: 'square', hint: 'Instagram feed' },
+  { id: 'match', label: 'Match', dim: 'Current size', aspect: 'match' },
 ]
 
 export class ExportModal {
-  private el: HTMLElement
+  private modal: Modal
+  private get el(): HTMLElement {
+    return this.modal.el
+  }
   private settingsPhase!: HTMLElement
   private progressPhase!: HTMLElement
   private progressBar!: HTMLElement
@@ -54,14 +65,12 @@ export class ExportModal {
   onCancel?: () => void
 
   constructor(container: HTMLElement) {
-    this.el = document.createElement('div')
-    this.el.id = 'export-modal'
-    this.el.innerHTML = `
+    const innerHTML = `
       <div class="export-card">
 
         <div class="export-phase" id="ep-settings">
           <header class="export-header">
-            <div class="export-card-icon">${ICON_FILM}</div>
+            <div class="export-card-icon">${icons.film()}</div>
             <div class="export-header-text">
               <h2 class="export-card-title">Export MP4</h2>
               <p class="export-card-sub">Frame-accurate · audio baked in · fully offline</p>
@@ -81,7 +90,8 @@ export class ExportModal {
           <section class="export-section" id="res-section">
             <span class="export-section-label">Resolution</span>
             <div class="res-grid" id="res-group">
-              ${PRESETS.map(p => `
+              ${PRESETS.map(
+                (p) => `
                 <button class="res-card${p.id === '1080p' ? ' res-card--on' : ''}"
                         data-res="${p.id}"
                         ${p.hint ? `title="${p.hint}"` : ''}>
@@ -89,7 +99,8 @@ export class ExportModal {
                   <div class="res-card-label">${p.label}</div>
                   <div class="res-card-dim">${p.dim}</div>
                 </button>
-              `).join('')}
+              `,
+              ).join('')}
             </div>
           </section>
 
@@ -122,7 +133,7 @@ export class ExportModal {
           <div class="export-actions">
             <button class="modal-btn" id="ep-cancel-settings">Cancel</button>
             <button class="modal-btn modal-btn--accent" id="ep-start">
-              ${ICON_EXPORT_ARROW}
+              ${icons.exportArrow()}
               <span>Export</span>
             </button>
           </div>
@@ -140,28 +151,38 @@ export class ExportModal {
 
       </div>
     `
-    container.appendChild(this.el)
+    // Escape / backdrop only dismiss during settings — mid-export use the
+    // Cancel button so users don't lose work from a stray keystroke.
+    this.modal = new Modal(container, 'export-modal', innerHTML, {
+      onDismiss: () => {
+        if (this.phase === 'settings') this.close()
+      },
+    })
     this.bindEvents()
   }
 
   private bindEvents(): void {
     this.settingsPhase = this.el.querySelector('#ep-settings')!
     this.progressPhase = this.el.querySelector('#ep-progress')!
-    this.progressBar   = this.el.querySelector('#ep-bar')!
-    this.stageEl       = this.el.querySelector('#ep-stage')!
-    this.pctEl         = this.el.querySelector('#ep-pct')!
+    this.progressBar = this.el.querySelector('#ep-bar')!
+    this.stageEl = this.el.querySelector('#ep-stage')!
+    this.pctEl = this.el.querySelector('#ep-pct')!
 
-    this.el.querySelectorAll<HTMLButtonElement>('#fps-group .fps-btn').forEach(btn => {
+    this.el.querySelectorAll<HTMLButtonElement>('#fps-group .fps-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.el.querySelectorAll('#fps-group .fps-btn').forEach(b => b.classList.remove('fps-btn--on'))
+        this.el.querySelectorAll('#fps-group .fps-btn').forEach((b) => {
+          b.classList.remove('fps-btn--on')
+        })
         btn.classList.add('fps-btn--on')
         this.selectedFps = parseInt(btn.dataset['fps']!, 10)
       })
     })
 
-    this.el.querySelectorAll<HTMLButtonElement>('#res-group .res-card').forEach(btn => {
+    this.el.querySelectorAll<HTMLButtonElement>('#res-group .res-card').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.el.querySelectorAll('#res-group .res-card').forEach(b => b.classList.remove('res-card--on'))
+        this.el.querySelectorAll('#res-group .res-card').forEach((b) => {
+          b.classList.remove('res-card--on')
+        })
         btn.classList.add('res-card--on')
         this.selectedResolution = btn.dataset['res'] as ExportResolution
         this.applyResolutionDefaults()
@@ -169,26 +190,32 @@ export class ExportModal {
     })
 
     // Output selector — disables resolution + frame rate when audio-only.
-    this.el.querySelectorAll<HTMLButtonElement>('#out-group .fps-btn').forEach(btn => {
+    this.el.querySelectorAll<HTMLButtonElement>('#out-group .fps-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.el.querySelectorAll('#out-group .fps-btn').forEach(b => b.classList.remove('fps-btn--on'))
+        this.el.querySelectorAll('#out-group .fps-btn').forEach((b) => {
+          b.classList.remove('fps-btn--on')
+        })
         btn.classList.add('fps-btn--on')
         this.selectedOutput = btn.dataset['out'] as ExportOutput
         this.applyOutputMode()
       })
     })
 
-    this.el.querySelectorAll<HTMLButtonElement>('#focus-group .fps-btn').forEach(btn => {
+    this.el.querySelectorAll<HTMLButtonElement>('#focus-group .fps-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.el.querySelectorAll('#focus-group .fps-btn').forEach(b => b.classList.remove('fps-btn--on'))
+        this.el.querySelectorAll('#focus-group .fps-btn').forEach((b) => {
+          b.classList.remove('fps-btn--on')
+        })
         btn.classList.add('fps-btn--on')
         this.selectedFocus = btn.dataset['focus'] as ExportFocus
       })
     })
 
-    this.el.querySelectorAll<HTMLButtonElement>('#speed-group .fps-btn').forEach(btn => {
+    this.el.querySelectorAll<HTMLButtonElement>('#speed-group .fps-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.el.querySelectorAll('#speed-group .fps-btn').forEach(b => b.classList.remove('fps-btn--on'))
+        this.el.querySelectorAll('#speed-group .fps-btn').forEach((b) => {
+          b.classList.remove('fps-btn--on')
+        })
         btn.classList.add('fps-btn--on')
         this.selectedSpeed = btn.dataset['speed'] as ExportSpeed
       })
@@ -208,23 +235,8 @@ export class ExportModal {
     this.el.querySelector('#ep-cancel-settings')!.addEventListener('click', () => this.close())
     this.el.querySelector('#ep-cancel-progress')!.addEventListener('click', () => this.onCancel?.())
 
-    // Click backdrop (settings phase only) → close
-    this.el.addEventListener('click', (e) => {
-      if (e.target === this.el && this.phase === 'settings') this.close()
-    })
-
     // Initial visibility — default 1080p hides Focus/Speed rows.
     this.applyResolutionDefaults()
-
-    // Escape dismisses the settings phase. We intentionally don't let it
-    // cancel during an in-flight export — the existing Cancel button is the
-    // deliberate action for that.
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return
-      if (!this.el.classList.contains('open')) return
-      if (this.phase !== 'settings') return
-      this.close()
-    })
   }
 
   open(): void {
@@ -232,11 +244,15 @@ export class ExportModal {
     this.progressBar.style.width = '0%'
     this.pctEl.textContent = '0%'
     this.stageEl.textContent = 'Preparing…'
-    this.el.classList.add('open')
+    this.modal.open()
   }
 
   close(): void {
-    this.el.classList.remove('open')
+    this.modal.close()
+  }
+
+  dispose(): void {
+    this.modal.dispose()
   }
 
   updateProgress(stage: ExportStage, pct: number): void {
@@ -274,7 +290,8 @@ export class ExportModal {
   // Hide them for landscape / match / audio / midi to keep the modal clean.
   private applyResolutionDefaults(): void {
     const noVideo = this.selectedOutput === 'audio-only' || this.selectedOutput === 'midi'
-    const isSocial = !noVideo && (this.selectedResolution === 'vertical' || this.selectedResolution === 'square')
+    const isSocial =
+      !noVideo && (this.selectedResolution === 'vertical' || this.selectedResolution === 'square')
     this.el.querySelector('#focus-section')?.classList.toggle('hidden', !isSocial)
     this.el.querySelector('#speed-section')?.classList.toggle('hidden', !isSocial)
 
@@ -282,29 +299,16 @@ export class ExportModal {
     // Only flip when the user hasn't expressed a preference (we don't overwrite
     // on every click — just when the section re-appears).
     if (isSocial) {
-      const desiredSpeed: ExportSpeed = this.selectedResolution === 'vertical' ? 'drama' : 'standard'
+      const desiredSpeed: ExportSpeed =
+        this.selectedResolution === 'vertical' ? 'drama' : 'standard'
       this.setSpeed(desiredSpeed)
     }
   }
 
   private setSpeed(speed: ExportSpeed): void {
     this.selectedSpeed = speed
-    this.el.querySelectorAll<HTMLButtonElement>('#speed-group .fps-btn').forEach(btn => {
+    this.el.querySelectorAll<HTMLButtonElement>('#speed-group .fps-btn').forEach((btn) => {
       btn.classList.toggle('fps-btn--on', btn.dataset['speed'] === speed)
     })
   }
 }
-
-const ICON_FILM = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="2" y="4" width="20" height="16" rx="2.5"/>
-  <line x1="2" y1="9"  x2="22" y2="9"/>
-  <line x1="2" y1="15" x2="22" y2="15"/>
-  <line x1="7" y1="4"  x2="7"  y2="20"/>
-  <line x1="17" y1="4" x2="17" y2="20"/>
-</svg>`
-
-const ICON_EXPORT_ARROW = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M12 3v12"/>
-  <polyline points="7 8 12 3 17 8"/>
-  <rect x="3" y="15" width="18" height="6" rx="1.5"/>
-</svg>`

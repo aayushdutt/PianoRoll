@@ -1,10 +1,5 @@
-import {
-  SAMPLES,
-  fetchSampleMidi,
-  computeSparkline,
-  type Sample,
-} from '../core/samples'
 import type { MidiFile } from '../core/midi/types'
+import { computeSparkline, fetchSampleMidi, SAMPLES, type Sample } from '../core/samples'
 
 // Row of sample cards. Each card shows a pitch-density sparkline pulled from
 // the parsed MIDI — so the bars follow the actual shape of the piece rather
@@ -22,7 +17,7 @@ export class SamplesGrid {
     this.el.className = 'samples-grid'
     this.el.innerHTML = SAMPLES.map(renderCard).join('')
     this.bindEvents()
-    this.hydrateAll()
+    void this.hydrateAll()
   }
 
   get root(): HTMLElement {
@@ -30,7 +25,7 @@ export class SamplesGrid {
   }
 
   private bindEvents(): void {
-    this.el.querySelectorAll<HTMLButtonElement>('.sample-card').forEach(btn => {
+    this.el.querySelectorAll<HTMLButtonElement>('.sample-card').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.dataset['sampleId']
         if (id) this.onSelect?.(id)
@@ -69,25 +64,37 @@ function renderCard(sample: Sample): string {
         <div class="sample-card-bars">${placeholder}</div>
       </div>
       <div class="sample-card-meta">
-        <div class="sample-card-title">${escape(sample.title)}</div>
-        <div class="sample-card-sub">${escape(sample.composer)} · —</div>
+        <div class="sample-card-title">${escapeHtml(sample.title)}</div>
+        <div class="sample-card-sub">${escapeHtml(sample.composer)} · —</div>
       </div>
     </button>
   `
 }
 
 function renderBars(values: readonly number[], _midi: MidiFile): string {
-  return `<div class="sample-card-bars">${values.map((v, i) => {
-    const h = Math.max(14, Math.round(v * 100))
-    const delay = i * 18   // ms — staggers the ambient breathe across the row
-    return `<span style="--h: ${h}%; --d: ${delay}ms"></span>`
-  }).join('')}</div>`
+  return `<div class="sample-card-bars">${values
+    .map((v, i) => {
+      const h = Math.max(14, Math.round(v * 100))
+      const delay = i * 18 // ms — staggers the ambient breathe across the row
+      return `<span style="--h: ${h}%; --d: ${delay}ms"></span>`
+    })
+    .join('')}</div>`
 }
 
-function escape(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  } as Record<string, string>)[c] ?? c)
+function escapeHtml(s: string): string {
+  return s.replace(
+    /[&<>"']/g,
+    (c) =>
+      (
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        }) as Record<string, string>
+      )[c] ?? c,
+  )
 }
 
 function formatDuration(s: number): string {

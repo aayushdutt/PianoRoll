@@ -1,4 +1,4 @@
-import { KEYBOARD_HEIGHT_MIN, KEYBOARD_HEIGHT_MAX } from '../renderer/PianoRollRenderer'
+import { KEYBOARD_HEIGHT_MAX, KEYBOARD_HEIGHT_MIN } from '../renderer/PianoRollRenderer'
 
 const STORAGE_KEY = 'midee.keyboardHeight'
 
@@ -10,7 +10,7 @@ function viewportBounds(): { min: number; max: number } {
   // Use svh-equivalent via innerHeight — mobile URL bar fluctuations are fine
   // because we clamp on every resize/restore anyway.
   const min = Math.max(KEYBOARD_HEIGHT_MIN, Math.round(vh * 0.18))
-  const max = Math.min(KEYBOARD_HEIGHT_MAX, Math.round(vh * 0.60))
+  const max = Math.min(KEYBOARD_HEIGHT_MAX, Math.round(vh * 0.6))
   // Guard against degenerate viewports (min ending up above max).
   if (min >= max) return { min: KEYBOARD_HEIGHT_MIN, max: KEYBOARD_HEIGHT_MAX }
   return { min, max }

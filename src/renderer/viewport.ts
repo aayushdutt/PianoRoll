@@ -1,4 +1,4 @@
-import { MIDI_MIN, MIDI_MAX, isBlackKey } from '../core/midi/types'
+import { isBlackKey, MIDI_MAX, MIDI_MIN } from '../core/midi/types'
 
 // The strike line sits directly on the keyboard edge so notes "land" where the
 // keys begin instead of floating relative to the HUD.
@@ -36,7 +36,8 @@ export class Viewport {
       this.cfg.canvasWidth !== prevWidth ||
       this.cfg.pitchMin !== prevMin ||
       this.cfg.pitchMax !== prevMax
-    ) this.buildKeyLayout()
+    )
+      this.buildKeyLayout()
   }
 
   get config(): Readonly<ViewportConfig> {
@@ -79,7 +80,7 @@ export class Viewport {
   isTimeVisible(time: number, duration: number, currentTime: number): boolean {
     const start = time - currentTime
     const end = start + duration
-    return end > -(this.trailSeconds + 0.5) && start < (this.lookaheadSeconds + 0.5)
+    return end > -(this.trailSeconds + 0.5) && start < this.lookaheadSeconds + 0.5
   }
 
   getAllKeyPositions(): Map<number, { x: number; width: number }> {

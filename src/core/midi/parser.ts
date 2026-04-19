@@ -1,6 +1,16 @@
 import { Midi } from '@tonejs/midi'
 import type { MidiFile, MidiNote, MidiTrack } from './types'
 
+// Thrown when the parser succeeds structurally but produces no playable notes.
+// loadMidi() catches this alongside @tonejs/midi's own parse failures and
+// surfaces a user-visible toast either way.
+export class EmptyMidiError extends Error {
+  constructor() {
+    super('MIDI contains no playable notes.')
+    this.name = 'EmptyMidiError'
+  }
+}
+
 // Distinct, vibrant track colors — ordered for visual variety
 const TRACK_COLORS = [
   0x6366f1, // indigo
@@ -20,9 +30,9 @@ export async function parseMidiFile(source: File | ArrayBuffer, name?: string): 
   const midi = new Midi(buffer)
 
   const tracks: MidiTrack[] = midi.tracks
-    .filter(t => t.notes.length > 0)
+    .filter((t) => t.notes.length > 0)
     .map((t, i) => {
-      const notes: MidiNote[] = t.notes.map(n => ({
+      const notes: MidiNote[] = t.notes.map((n) => ({
         pitch: n.midi,
         time: n.time,
         duration: Math.max(n.duration, 0.05), // clamp to minimum visible duration
@@ -40,6 +50,8 @@ export async function parseMidiFile(source: File | ArrayBuffer, name?: string): 
         colorIndex: i % TRACK_COLORS.length,
       }
     })
+
+  if (tracks.length === 0) throw new EmptyMidiError()
 
   const bpm = midi.header.tempos[0]?.bpm ?? 120
   const rawTimeSig = midi.header.timeSignatures[0]?.timeSignature ?? [4, 4]

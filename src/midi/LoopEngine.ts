@@ -1,6 +1,6 @@
 import * as Tone from 'tone'
-import { Signal } from '../store/state'
 import type { MasterClock } from '../core/clock/MasterClock'
+import { Signal } from '../store/state'
 import type { CapturedEvent } from './MidiEncoding'
 
 export type LoopState = 'idle' | 'armed' | 'recording' | 'playing' | 'overdubbing'
@@ -62,18 +62,28 @@ export class LoopEngine {
   private lastProgressEmitted = -1
 
   constructor(
-    private clock: MasterClock,
+    _clock: MasterClock,
     private callbacks: LoopCallbacks,
     private quantizeDuration?: QuantizeDurationFn,
   ) {}
 
   toggle(): void {
     switch (this.state.value) {
-      case 'idle':         this.arm(); break
-      case 'armed':        this.cancelArm(); break
-      case 'recording':    this.finishBaseRecording(); break
-      case 'playing':      this.startOverdub(); break
-      case 'overdubbing':  this.commitOverdub(); break
+      case 'idle':
+        this.arm()
+        break
+      case 'armed':
+        this.cancelArm()
+        break
+      case 'recording':
+        this.finishBaseRecording()
+        break
+      case 'playing':
+        this.startOverdub()
+        break
+      case 'overdubbing':
+        this.commitOverdub()
+        break
     }
   }
 
@@ -123,14 +133,18 @@ export class LoopEngine {
     }
     if (this.state.value === 'recording') {
       this.recordBuffer.push({
-        type: 'on', pitch, velocity,
+        type: 'on',
+        pitch,
+        velocity,
         time: Math.max(0, Tone.getContext().currentTime - this.recordStartCtxTime),
       })
       return
     }
     if (this.state.value === 'overdubbing') {
       this.pendingOverdub.push({
-        type: 'on', pitch, velocity,
+        type: 'on',
+        pitch,
+        velocity,
         time: this.cyclePosNow(),
       })
     }
@@ -142,14 +156,18 @@ export class LoopEngine {
   captureNoteOff(pitch: number, clockTime: number): void {
     if (this.state.value === 'recording') {
       this.recordBuffer.push({
-        type: 'off', pitch, velocity: 0,
+        type: 'off',
+        pitch,
+        velocity: 0,
         time: Math.max(0, Tone.getContext().currentTime - this.recordStartCtxTime),
       })
       return
     }
     if (this.state.value === 'overdubbing') {
       this.pendingOverdub.push({
-        type: 'off', pitch, velocity: 0,
+        type: 'off',
+        pitch,
+        velocity: 0,
         time: this.cyclePosNow(),
       })
     }
@@ -161,7 +179,10 @@ export class LoopEngine {
   }
 
   snapshot(): { events: LoopEvent[]; duration: number } {
-    const merged = this.layers.flat().slice().sort((a, b) => a.time - b.time)
+    const merged = this.layers
+      .flat()
+      .slice()
+      .sort((a, b) => a.time - b.time)
     return { events: merged, duration: this.loopDuration }
   }
 
@@ -186,9 +207,7 @@ export class LoopEngine {
     // `last.time` instead would clip the tail and make the loop retrigger
     // immediately on note-off.
     const raw = Math.max(0.1, Tone.getContext().currentTime - this.recordStartCtxTime)
-    this.loopDuration = this.quantizeDuration
-      ? Math.max(0.1, this.quantizeDuration(raw))
-      : raw
+    this.loopDuration = this.quantizeDuration ? Math.max(0.1, this.quantizeDuration(raw)) : raw
     this.closeOrphans(this.recordBuffer, this.loopDuration)
     this.layers = [this.recordBuffer]
     this.recordBuffer = []
@@ -230,8 +249,8 @@ export class LoopEngine {
   private closeOrphans(events: LoopEvent[], closeAt: number): void {
     const open = new Map<number, number>()
     for (const e of events) {
-      if (e.type === 'on')  open.set(e.pitch, (open.get(e.pitch) ?? 0) + 1)
-      else                  open.set(e.pitch, Math.max(0, (open.get(e.pitch) ?? 0) - 1))
+      if (e.type === 'on') open.set(e.pitch, (open.get(e.pitch) ?? 0) + 1)
+      else open.set(e.pitch, Math.max(0, (open.get(e.pitch) ?? 0) - 1))
     }
     for (const [pitch, count] of open) {
       for (let i = 0; i < count; i++) {

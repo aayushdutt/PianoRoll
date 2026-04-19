@@ -1,5 +1,5 @@
-import { Signal } from '../store/state'
 import type { MasterClock } from '../core/clock/MasterClock'
+import { Signal } from '../store/state'
 import type { CapturedEvent } from './MidiEncoding'
 
 // Captures every live note played during a session, independently of the

@@ -1,5 +1,5 @@
-import { Signal } from '../store/state'
 import type { MasterClock } from '../core/clock/MasterClock'
+import { Signal } from '../store/state'
 import type { MidiNoteEvent } from './MidiInputManager'
 
 // FL Studio / DAW-style typing-keyboard layout.
@@ -8,13 +8,41 @@ import type { MidiNoteEvent } from './MidiInputManager'
 const DEFAULT_OCTAVE = 4
 const NOTE_MAP: Record<string, number> = {
   // Lower octave — starts at C of current octave
-  KeyZ: 0,  KeyS: 1,  KeyX: 2,  KeyD: 3,  KeyC: 4,
-  KeyV: 5,  KeyG: 6,  KeyB: 7,  KeyH: 8,  KeyN: 9,
-  KeyJ: 10, KeyM: 11, Comma: 12, KeyL: 13, Period: 14, Semicolon: 15, Slash: 16,
+  KeyZ: 0,
+  KeyS: 1,
+  KeyX: 2,
+  KeyD: 3,
+  KeyC: 4,
+  KeyV: 5,
+  KeyG: 6,
+  KeyB: 7,
+  KeyH: 8,
+  KeyN: 9,
+  KeyJ: 10,
+  KeyM: 11,
+  Comma: 12,
+  KeyL: 13,
+  Period: 14,
+  Semicolon: 15,
+  Slash: 16,
   // Upper octave — starts one octave higher
-  KeyQ: 12, Digit2: 13, KeyW: 14, Digit3: 15, KeyE: 16,
-  KeyR: 17, Digit5: 18, KeyT: 19, Digit6: 20, KeyY: 21,
-  Digit7: 22, KeyU: 23, KeyI: 24, Digit9: 25, KeyO: 26, Digit0: 27, KeyP: 28,
+  KeyQ: 12,
+  Digit2: 13,
+  KeyW: 14,
+  Digit3: 15,
+  KeyE: 16,
+  KeyR: 17,
+  Digit5: 18,
+  KeyT: 19,
+  Digit6: 20,
+  KeyY: 21,
+  Digit7: 22,
+  KeyU: 23,
+  KeyI: 24,
+  Digit9: 25,
+  KeyO: 26,
+  Digit0: 27,
+  KeyP: 28,
 }
 
 const DEFAULT_VELOCITY = 0.75
@@ -22,13 +50,13 @@ const DEFAULT_VELOCITY = 0.75
 // Reads the browser keydown/keyup stream and translates it into synthetic
 // MIDI note events. Only active while live mode is enabled.
 export class ComputerKeyboardInput {
-  readonly noteOn  = new Signal<MidiNoteEvent | null>(null)
+  readonly noteOn = new Signal<MidiNoteEvent | null>(null)
   readonly noteOff = new Signal<MidiNoteEvent | null>(null)
-  readonly octave  = new Signal<number>(DEFAULT_OCTAVE)
+  readonly octave = new Signal<number>(DEFAULT_OCTAVE)
   // Software stand-in for a sustain pedal: Space-bar hold mirrors a damper.
   // Useful for users without hardware pedals; merged with the MIDI-device
   // pedal upstream in App so either source can engage sustain.
-  readonly pedal   = new Signal<boolean>(false)
+  readonly pedal = new Signal<boolean>(false)
 
   private active = false
   private held = new Map<string, number>() // code → pitch (for correct release after octave change)

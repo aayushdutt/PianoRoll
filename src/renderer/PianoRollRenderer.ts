@@ -1,14 +1,14 @@
-import { Application, Graphics, Ticker } from 'pixi.js'
-import type { MidiFile } from '../core/midi/types'
+import { Application, Graphics, type Ticker } from 'pixi.js'
 import type { MasterClock } from '../core/clock/MasterClock'
-import { NoteRenderer } from './NoteRenderer'
+import type { MidiFile } from '../core/midi/types'
+import type { LiveNoteStore } from '../midi/LiveNoteStore'
+import { BeatGrid } from './BeatGrid'
 import { KeyboardRenderer } from './KeyboardRenderer'
 import { LiveNoteRenderer } from './LiveNoteRenderer'
+import { NoteRenderer } from './NoteRenderer'
 import { ParticleSystem } from './ParticleSystem'
-import { BeatGrid } from './BeatGrid'
-import { Viewport } from './viewport'
 import { darkTheme, getTrackColor, type Theme } from './theme'
-import type { LiveNoteStore } from '../midi/LiveNoteStore'
+import { Viewport } from './viewport'
 
 // Must match the `--keyboard-h` value in main.css :root and the reset value
 // in KeyboardResizer.onDoubleClick — all three describe the same default,
@@ -33,7 +33,7 @@ function computeInitialKeyboardHeight(): number {
   const vh = window.innerHeight || 800
   const isPortrait = window.matchMedia('(orientation: portrait)').matches
   if (isPortrait) {
-    return Math.min(KEYBOARD_HEIGHT_MAX, Math.max(140, Math.round(vh * 0.20)))
+    return Math.min(KEYBOARD_HEIGHT_MAX, Math.max(140, Math.round(vh * 0.2)))
   }
   // Landscape mobile: short viewport (~390px on iPhone). Keep the keyboard
   // small so the HUD + roll area still have room.
@@ -202,10 +202,14 @@ export class PianoRollRenderer {
     const glow = this.theme.nowLineGlow
 
     // Layered soft glow above the now-line
-    g.rect(0, y - 14, w, 14); g.fill({ color: glow, alpha: 0.010 })
-    g.rect(0, y - 8,  w, 8);  g.fill({ color: glow, alpha: 0.022 })
-    g.rect(0, y - 4,  w, 4);  g.fill({ color: glow, alpha: 0.040 })
-    g.rect(0, y - 2,  w, 2);  g.fill({ color: glow, alpha: 0.065 })
+    g.rect(0, y - 14, w, 14)
+    g.fill({ color: glow, alpha: 0.01 })
+    g.rect(0, y - 8, w, 8)
+    g.fill({ color: glow, alpha: 0.022 })
+    g.rect(0, y - 4, w, 4)
+    g.fill({ color: glow, alpha: 0.04 })
+    g.rect(0, y - 2, w, 2)
+    g.fill({ color: glow, alpha: 0.065 })
 
     g.rect(0, y, w, 1.5)
     g.fill({ color: this.theme.nowLine, alpha: this.theme.nowLineAlpha })
@@ -213,7 +217,7 @@ export class PianoRollRenderer {
 
   loadMidi(midi: MidiFile): void {
     this.midi = midi
-    this.visibleTrackIds = new Set(midi.tracks.map(t => t.id))
+    this.visibleTrackIds = new Set(midi.tracks.map((t) => t.id))
     this.noteRenderer.setTracks(midi.tracks)
     this.particles.clear()
     this.prevActive.clear()
@@ -303,8 +307,9 @@ export class PianoRollRenderer {
 
   private onTick(clock: MasterClock, ticker: Ticker): void {
     if (this.exportMode) return
-    const hasLive = (this.liveNoteStore?.hasRenderableNotes ?? false)
-      || (this.loopNoteStore?.hasRenderableNotes ?? false)
+    const hasLive =
+      (this.liveNoteStore?.hasRenderableNotes ?? false) ||
+      (this.loopNoteStore?.hasRenderableNotes ?? false)
     if (!this.midi && !hasLive) return
     this.renderFrame(clock.currentTime, ticker.deltaMS / 1000, clock.playing)
   }
@@ -378,7 +383,13 @@ export class PianoRollRenderer {
         if (!curr.has(key)) this.scheduledEmitNext.delete(key)
       }
 
-      this.beatGrid.draw(currentTime, this.midi.bpm, this.midi.timeSignature[0] ?? 4, this.viewport, this.theme)
+      this.beatGrid.draw(
+        currentTime,
+        this.midi.bpm,
+        this.midi.timeSignature[0] ?? 4,
+        this.viewport,
+        this.theme,
+      )
       this.noteRenderer.draw(tracks, currentTime, this.viewport, this.visibleTrackIds)
     } else {
       this.noteRenderer.clear()

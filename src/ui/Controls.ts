@@ -1,7 +1,8 @@
-import type { appState, AppMode } from '../store/state'
 import type { MasterClock } from '../core/clock/MasterClock'
-import type { MidiDeviceStatus } from '../midi/MidiInputManager'
 import type { LoopState } from '../midi/LoopEngine'
+import type { MidiDeviceStatus } from '../midi/MidiInputManager'
+import type { AppMode, appState } from '../store/state'
+import { icons } from './icons'
 
 type State = typeof appState
 
@@ -45,7 +46,6 @@ export class Controls {
   private timeDisplay!: HTMLElement
   private durationEl!: HTMLElement
   private homeBtn!: HTMLButtonElement
-  private statusEl!: HTMLElement
   private contextKickerEl!: HTMLElement
   private contextTitleEl!: HTMLElement
   private openBtn!: HTMLButtonElement
@@ -120,19 +120,19 @@ export class Controls {
     el.id = 'top-strip'
     el.innerHTML = `
       <button class="ts-home" id="ts-home" type="button" aria-label="midee home" data-tip="Home">
-        ${ICON_WORDMARK}
+        ${icons.wordmark()}
         <span class="ts-home-name">midee</span>
       </button>
 
       <div class="ts-mode-switch" role="tablist" aria-label="App mode">
         <button class="ts-mode-seg" id="ts-mode-file" type="button"
                 role="tab" aria-selected="false" data-tip="Play a MIDI file">
-          <span class="ts-mode-icon" aria-hidden="true">${ICON_MODE_FILE}</span>
+          <span class="ts-mode-icon" aria-hidden="true">${icons.modeFile()}</span>
           <span class="ts-mode-label">File</span>
         </button>
         <button class="ts-mode-seg" id="ts-mode-live" type="button"
                 role="tab" aria-selected="false" data-tip="Play live">
-          <span class="ts-mode-icon" aria-hidden="true">${ICON_MODE_LIVE}</span>
+          <span class="ts-mode-icon" aria-hidden="true">${icons.modeLive()}</span>
           <span class="ts-mode-label">Live</span>
         </button>
         <span class="ts-mode-thumb" aria-hidden="true"></span>
@@ -151,21 +151,21 @@ export class Controls {
 
       <div class="ts-end">
         <button class="ts-pill" id="ts-open" type="button" aria-label="Open MIDI file" data-tip="Open MIDI file">
-          ${ICON_UPLOAD}<span>Open MIDI</span>
+          ${icons.upload()}<span>Open MIDI</span>
         </button>
         <button class="ts-pill ts-pill--file" id="ts-tracks" type="button" aria-label="Tracks" data-tip="Tracks">
-          ${ICON_TRACKS}<span>Tracks</span>
+          ${icons.tracks()}<span>Tracks</span>
         </button>
         <span id="ts-instrument-slot"></span>
         <div class="ts-sep" aria-hidden="true"></div>
         <button class="ts-pill ts-pill--midi" id="ts-midi" type="button"
                 aria-label="MIDI device" data-tip="MIDI device">
-          ${ICON_MIDI}
+          ${icons.midi()}
           <span id="ts-menu-midi-label" class="ts-midi-label">MIDI</span>
         </button>
         <button class="ts-theme-btn ts-particle-btn" id="ts-particle" type="button"
                 aria-label="Cycle particle style" data-tip="Particle style">
-          <span class="ts-particle-icon" aria-hidden="true">${ICON_SPARKLES}</span>
+          <span class="ts-particle-icon" aria-hidden="true">${icons.sparkles()}</span>
           <span class="theme-label" id="ts-particle-label">Sparks</span>
         </button>
         <button class="ts-theme-btn" id="ts-theme" type="button"
@@ -174,7 +174,7 @@ export class Controls {
           <span class="theme-label" id="ts-theme-label">Theme</span>
         </button>
         <button class="ts-record-btn" id="ts-record" type="button" aria-label="Export MP4" data-tip="Export MP4">
-          ${ICON_EXPORT}
+          ${icons.export()}
           <span>Export</span>
         </button>
       </div>
@@ -190,17 +190,17 @@ export class Controls {
       <div class="hud-bar">
         <button class="hud-drag-handle" id="hud-drag" type="button"
                 aria-label="Move controls" data-tip="Drag to move controls">
-          ${ICON_GRIP}
+          ${icons.grip()}
         </button>
         <button class="hud-pin-btn" id="hud-pin" type="button"
                 aria-label="Pin controls" data-tip="Pin — prevents auto-hide">
-          ${ICON_PIN}
+          ${icons.pin()}
         </button>
 
         <div class="hud-group hud-group--transport">
-          <button class="btn-skip" id="hud-skip-back" aria-label="Back 10 seconds" data-tip="Back 10s">${ICON_SKIP_BACK}</button>
-          <button class="btn-play" id="hud-play" aria-label="Play" data-tip="Play / Pause">${ICON_PLAY}</button>
-          <button class="btn-skip" id="hud-skip-fwd" aria-label="Forward 10 seconds" data-tip="Forward 10s">${ICON_SKIP_FWD}</button>
+          <button class="btn-skip" id="hud-skip-back" aria-label="Back 10 seconds" data-tip="Back 10s">${icons.skipBack()}</button>
+          <button class="btn-play" id="hud-play" aria-label="Play" data-tip="Play / Pause">${icons.play()}</button>
+          <button class="btn-skip" id="hud-skip-fwd" aria-label="Forward 10 seconds" data-tip="Forward 10s">${icons.skipForward()}</button>
         </div>
 
         <div class="hud-divider hud-group--transport"></div>
@@ -215,7 +215,7 @@ export class Controls {
         <div class="hud-divider hud-group--transport"></div>
 
         <div class="ctrl-group" data-tip="Volume">
-          <span class="ctrl-icon">${ICON_VOLUME}</span>
+          <span class="ctrl-icon">${icons.volume()}</span>
           <input type="range" id="hud-volume" class="mini-slider"
             min="0" max="1" step="0.02" value="0.8" aria-label="Volume" />
         </div>
@@ -229,7 +229,7 @@ export class Controls {
         <div class="hud-divider"></div>
 
         <div class="ctrl-group" data-tip="Zoom (note height)">
-          <span class="ctrl-icon">${ICON_ZOOM}</span>
+          <span class="ctrl-icon">${icons.zoom()}</span>
           <input type="range" id="hud-zoom" class="mini-slider mini-slider--zoom"
             min="${ZOOM_MIN}" max="${ZOOM_MAX}" step="10" value="${ZOOM_DEFAULT}" aria-label="Zoom" />
         </div>
@@ -239,7 +239,7 @@ export class Controls {
         <div class="hud-metro hud-group--live" id="hud-metro-group">
           <button class="hud-metro-toggle" id="hud-metro" type="button"
                   aria-label="Toggle metronome" data-tip="Metronome">
-            <span class="hud-metro-icon">${ICON_METRONOME}</span>
+            <span class="hud-metro-icon">${icons.metronome()}</span>
             <span class="hud-metro-beat" aria-hidden="true"></span>
           </button>
           <button class="hud-metro-step" id="hud-metro-dec" type="button"
@@ -259,20 +259,20 @@ export class Controls {
         <button class="hud-loop-btn hud-group--live" id="hud-loop"
                 type="button" aria-label="Looper"
                 data-tip="Play a phrase then loop it">
-          <span class="hud-loop-icon">${ICON_LOOP}</span>
+          <span class="hud-loop-icon">${icons.loop()}</span>
           <span class="hud-loop-label" id="hud-loop-label">Loop</span>
         </button>
         <button class="hud-loop-undo hud-group--live hidden" id="hud-loop-undo"
                 type="button" aria-label="Undo last layer" data-tip="Undo last layer">
-          ${ICON_UNDO}
+          ${icons.undo()}
         </button>
         <button class="hud-loop-save hud-group--live hidden" id="hud-loop-save"
                 type="button" aria-label="Download loop as MIDI" data-tip="Download loop as MIDI">
-          ${ICON_DOWNLOAD}
+          ${icons.download()}
         </button>
         <button class="hud-loop-clear hud-group--live hidden" id="hud-loop-clear"
                 type="button" aria-label="Clear loop" data-tip="Clear loop">
-          ${ICON_CLOSE}
+          ${icons.close()}
         </button>
       </div>
     `
@@ -326,7 +326,6 @@ export class Controls {
     this.timeDisplay = this.hud.querySelector<HTMLElement>('#hud-time')!
     this.durationEl = this.hud.querySelector<HTMLElement>('#hud-duration')!
     this.homeBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-home')!
-    this.statusEl = this.topStrip.querySelector<HTMLElement>('#ts-status')!
     this.contextKickerEl = this.topStrip.querySelector<HTMLElement>('#ts-context-kicker')!
     this.contextTitleEl = this.topStrip.querySelector<HTMLElement>('#ts-context-title')!
     this.openBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-open')!
@@ -388,9 +387,13 @@ export class Controls {
       this.isScrubbing = true
       this.wakeUp()
     })
-    this.scrubber.addEventListener('touchstart', () => {
-      this.isScrubbing = true
-    }, { passive: true })
+    this.scrubber.addEventListener(
+      'touchstart',
+      () => {
+        this.isScrubbing = true
+      },
+      { passive: true },
+    )
     this.scrubber.addEventListener('input', () => {
       const t = parseFloat(this.scrubber.value)
       this.timeDisplay.textContent = formatTime(t)
@@ -452,12 +455,16 @@ export class Controls {
     this.metroBtn.addEventListener('click', () => this.opts.onMetronomeToggle?.())
     this.metroDecBtn.addEventListener('click', () => this.bumpBpm(-1))
     this.metroIncBtn.addEventListener('click', () => this.bumpBpm(+1))
-    this.metroGroupEl.addEventListener('wheel', (e) => {
-      e.preventDefault()
-      const dir = e.deltaY < 0 ? 1 : -1
-      const step = e.shiftKey ? 10 : 1
-      this.bumpBpm(dir * step)
-    }, { passive: false })
+    this.metroGroupEl.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault()
+        const dir = e.deltaY < 0 ? 1 : -1
+        const step = e.shiftKey ? 10 : 1
+        this.bumpBpm(dir * step)
+      },
+      { passive: false },
+    )
 
     this.hudDragHandle.addEventListener('pointerdown', (e) => this.startHudDrag(e))
     this.hudPinBtn.addEventListener('click', () => this.togglePin())
@@ -514,11 +521,26 @@ export class Controls {
       // collide with the FL note map.
       if (e.shiftKey) {
         switch (e.code) {
-          case 'KeyR': e.preventDefault(); this.opts.onSessionToggle?.(); break
-          case 'KeyL': e.preventDefault(); this.opts.onLoopToggle?.(); break
-          case 'KeyU': e.preventDefault(); this.opts.onLoopUndo?.(); break
-          case 'KeyC': e.preventDefault(); this.opts.onLoopClear?.(); break
-          case 'KeyM': e.preventDefault(); this.opts.onMetronomeToggle?.(); break
+          case 'KeyR':
+            e.preventDefault()
+            this.opts.onSessionToggle?.()
+            break
+          case 'KeyL':
+            e.preventDefault()
+            this.opts.onLoopToggle?.()
+            break
+          case 'KeyU':
+            e.preventDefault()
+            this.opts.onLoopUndo?.()
+            break
+          case 'KeyC':
+            e.preventDefault()
+            this.opts.onLoopClear?.()
+            break
+          case 'KeyM':
+            e.preventDefault()
+            this.opts.onMetronomeToggle?.()
+            break
         }
       }
     }
@@ -590,7 +612,9 @@ export class Controls {
   // older call sites don't break; no-op until fully migrated off.
   updateInstrument(_name: string): void {}
 
-  get tracksButton(): HTMLElement { return this.tracksBtn }
+  get tracksButton(): HTMLElement {
+    return this.tracksBtn
+  }
   get instrumentSlot(): HTMLElement {
     return this.topStrip.querySelector<HTMLElement>('#ts-instrument-slot')!
   }
@@ -609,7 +633,10 @@ export class Controls {
   // 0–1 fraction around the loop button as a conic-gradient ring. Hidden when
   // the loop isn't playing (the setter flips a class to toggle visibility).
   updateLoopProgress(fraction: number): void {
-    this.loopBtn.style.setProperty('--loop-progress', `${Math.max(0, Math.min(1, fraction)) * 360}deg`)
+    this.loopBtn.style.setProperty(
+      '--loop-progress',
+      `${Math.max(0, Math.min(1, fraction)) * 360}deg`,
+    )
   }
 
   updateMetronome(running: boolean, bpm: number): void {
@@ -734,7 +761,7 @@ export class Controls {
     this.hud.classList.toggle('hud--live', showLiveHud)
     this.hud.classList.toggle('hud--file', showFileHud)
     this.applyHudOffset()
-    this.playBtn.innerHTML = status === 'playing' ? ICON_PAUSE : ICON_PLAY
+    this.playBtn.innerHTML = status === 'playing' ? icons.pause() : icons.play()
 
     this.keyHint.classList.toggle('kh--visible', mode === 'live')
 
@@ -759,9 +786,10 @@ export class Controls {
 
     if (mode === 'live') {
       this.contextKickerEl.textContent = 'Live'
-      this.contextTitleEl.textContent = this.currentMidiStatus === 'connected'
-        ? (this.currentMidiDeviceName || 'MIDI session')
-        : 'Play with your keyboard'
+      this.contextTitleEl.textContent =
+        this.currentMidiStatus === 'connected'
+          ? this.currentMidiDeviceName || 'MIDI session'
+          : 'Play with your keyboard'
       return
     }
 
@@ -929,150 +957,15 @@ function clamp(value: number, min: number, max: number): number {
 
 function loopLabel(state: LoopState, layerCount: number): string {
   switch (state) {
-    case 'idle':        return 'Loop'
-    case 'armed':       return 'Play now…'
-    case 'recording':   return 'Stop'
-    case 'playing':     return layerCount > 1 ? `Loop ×${layerCount}` : 'Tap to overdub'
-    case 'overdubbing': return `Overdub ${layerCount + 1}`
+    case 'idle':
+      return 'Loop'
+    case 'armed':
+      return 'Play now…'
+    case 'recording':
+      return 'Stop'
+    case 'playing':
+      return layerCount > 1 ? `Loop ×${layerCount}` : 'Tap to overdub'
+    case 'overdubbing':
+      return `Overdub ${layerCount + 1}`
   }
 }
-
-const ICON_LOOP = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polyline points="17 1 21 5 17 9"/>
-  <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-  <polyline points="7 23 3 19 7 15"/>
-  <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-</svg>`
-
-const ICON_DOWNLOAD = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-  <polyline points="7 10 12 15 17 10"/>
-  <line x1="12" y1="15" x2="12" y2="3"/>
-</svg>`
-
-const ICON_UNDO = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polyline points="3 7 3 13 9 13"/>
-  <path d="M3 13a9 9 0 1 0 3-7l-3 4"/>
-</svg>`
-
-const ICON_METRONOME = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M6 22 L10 3 H14 L18 22 Z"/>
-  <line x1="5" y1="17" x2="19" y2="17"/>
-  <line x1="12" y1="17" x2="17" y2="6"/>
-</svg>`
-
-const ICON_TRACKS = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <line x1="4" y1="6" x2="20" y2="6"/>
-  <line x1="4" y1="12" x2="20" y2="12"/>
-  <line x1="4" y1="18" x2="20" y2="18"/>
-</svg>`
-
-const ICON_MIDI = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="2" y="4" width="20" height="16" rx="2"/>
-  <line x1="2" y1="14" x2="22" y2="14"/>
-  <line x1="7" y1="4"  x2="7"  y2="14"/>
-  <line x1="12" y1="4" x2="12" y2="14"/>
-  <line x1="17" y1="4" x2="17" y2="14"/>
-  <rect x="5"  y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
-  <rect x="10" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
-  <rect x="15" y="4" width="3" height="6" rx="1" fill="currentColor" stroke="none"/>
-</svg>`
-
-const ICON_WORDMARK = `<svg class="ts-home-mark" width="22" height="18" viewBox="0 0 32 24" fill="currentColor" aria-hidden="true">
-  <rect x="1" y="6" width="5" height="15" rx="1.5"/>
-  <rect x="9" y="1" width="5" height="20" rx="1.5"/>
-  <rect x="17" y="4" width="5" height="12" rx="1.5" opacity="0.55"/>
-  <rect x="25" y="8" width="5" height="9" rx="1.5" opacity="0.35"/>
-</svg>`
-
-const ICON_CHEV = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <polyline points="6 9 12 15 18 9"/>
-</svg>`
-
-const ICON_UPLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-  <polyline points="17 8 12 3 7 8"/>
-  <line x1="12" y1="3" x2="12" y2="15"/>
-</svg>`
-
-/* File mode — three stacked note-bars, echoing the piano-roll visual. */
-const ICON_MODE_FILE = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-  <rect x="2" y="3.5" width="7" height="2.2" rx="0.8"/>
-  <rect x="2" y="7" width="12" height="2.2" rx="0.8"/>
-  <rect x="2" y="10.5" width="5" height="2.2" rx="0.8"/>
-</svg>`
-
-/* Live mode — a clean pulse waveform, evoking real-time input. */
-const ICON_MODE_LIVE = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M1.5 8h2l1.2-3.5L7 12l1.8-6 1.3 3 0.9-1.2H14"/>
-</svg>`
-
-const ICON_CLOSE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <line x1="6" y1="6" x2="18" y2="18"/>
-  <line x1="6" y1="18" x2="18" y2="6"/>
-</svg>`
-
-const ICON_RECORD = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>
-  <circle cx="12" cy="12" r="9"/>
-</svg>`
-
-const ICON_EXPORT = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M12 3v12"/>
-  <polyline points="7 8 12 3 17 8"/>
-  <rect x="3" y="15" width="18" height="6" rx="1.5"/>
-</svg>`
-
-const ICON_PLAY = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-  <polygon points="6 3 20 12 6 21 6 3"/>
-</svg>`
-
-const ICON_PAUSE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-  <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
-</svg>`
-
-const ICON_GRIP = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-  <circle cx="9" cy="6" r="1.6"/>
-  <circle cx="15" cy="6" r="1.6"/>
-  <circle cx="9" cy="12" r="1.6"/>
-  <circle cx="15" cy="12" r="1.6"/>
-  <circle cx="9" cy="18" r="1.6"/>
-  <circle cx="15" cy="18" r="1.6"/>
-</svg>`
-
-const ICON_PIN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <line x1="12" y1="17" x2="12" y2="22"/>
-  <path d="M5 17h14l-1.5-2V9a5.5 5.5 0 1 0-11 0v6L5 17z"/>
-</svg>`
-
-const ICON_SKIP_BACK = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polygon points="19 20 9 12 19 4 19 20"/>
-  <line x1="5" y1="19" x2="5" y2="5"/>
-</svg>`
-
-const ICON_SKIP_FWD = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polygon points="5 4 15 12 5 20 5 4"/>
-  <line x1="19" y1="5" x2="19" y2="19"/>
-</svg>`
-
-const ICON_VOLUME = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-</svg>`
-
-const ICON_INSTRUMENT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-  <path d="M9 3h6a1 1 0 0 1 1 1v14a3 3 0 1 1-2 0V9h-2v9a3 3 0 1 1-2 0V4a1 1 0 0 1 1-1z" opacity="0.9"/>
-</svg>`
-
-const ICON_SPARKLES = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-  <path d="M12 3l1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3z"/>
-  <path d="M19 13l.7 2.2 2.3.8-2.3.8-.7 2.2-.7-2.2-2.3-.8 2.3-.8.7-2.2z" opacity="0.7"/>
-  <path d="M5 14l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6.6-1.9z" opacity="0.55"/>
-</svg>`
-
-const ICON_ZOOM = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="11" cy="11" r="8"/>
-  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-  <line x1="11" y1="8" x2="11" y2="14"/>
-  <line x1="8" y1="11" x2="14" y2="11"/>
-</svg>`

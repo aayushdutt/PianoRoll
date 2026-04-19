@@ -23,8 +23,12 @@ export function installViewportClassSync(): () => void {
   const coarse = window.matchMedia('(pointer: coarse)')
   const narrow = window.matchMedia(NARROW_VIEWPORT_MQ)
 
-  const syncCoarse = (): void => { body.classList.toggle('is-touch', coarse.matches) }
-  const syncNarrow = (): void => { body.classList.toggle('is-narrow', narrow.matches) }
+  const syncCoarse = (): void => {
+    body.classList.toggle('is-touch', coarse.matches)
+  }
+  const syncNarrow = (): void => {
+    body.classList.toggle('is-narrow', narrow.matches)
+  }
   syncCoarse()
   syncNarrow()
 

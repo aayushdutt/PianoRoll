@@ -1,5 +1,6 @@
 import type { MidiFile } from '../core/midi/types'
 import type { PianoRollRenderer } from '../renderer/PianoRollRenderer'
+import { icons } from './icons'
 import { escHtml, hexToCSS, isNarrowViewport } from './utils'
 
 // Popover dropdown anchored under the Tracks button in the top strip.
@@ -15,7 +16,7 @@ export class TrackPanel {
   private onDocPointer = (e: PointerEvent): void => {
     const target = e.target as Node
     if (this.panel.contains(target)) return
-    if (this.trigger && this.trigger.contains(target)) return
+    if (this.trigger?.contains(target)) return
     this.close()
   }
   private onKey = (e: KeyboardEvent): void => {
@@ -47,7 +48,7 @@ export class TrackPanel {
       <div class="panel-items" id="panel-items"></div>
       <div class="panel-footer">
         <button class="panel-load-btn" id="panel-load-new" type="button">
-          ${ICON_UPLOAD}
+          ${icons.upload(11)}
           Load new file
         </button>
       </div>
@@ -61,7 +62,9 @@ export class TrackPanel {
   }
 
   render(midi: MidiFile): void {
-    this.itemsEl.innerHTML = midi.tracks.map(t => `
+    this.itemsEl.innerHTML = midi.tracks
+      .map(
+        (t) => `
       <label class="track-item">
         <span class="track-swatch" style="background:${hexToCSS(t.color)}"></span>
         <span class="track-info">
@@ -73,9 +76,11 @@ export class TrackPanel {
           <span class="toggle-track"></span>
         </span>
       </label>
-    `).join('')
+    `,
+      )
+      .join('')
 
-    this.itemsEl.querySelectorAll<HTMLInputElement>('.track-toggle').forEach(cb => {
+    this.itemsEl.querySelectorAll<HTMLInputElement>('.track-toggle').forEach((cb) => {
       cb.addEventListener('change', (e) => {
         e.stopPropagation()
         const id = cb.dataset['id']
@@ -89,7 +94,9 @@ export class TrackPanel {
     this.trigger = el
   }
 
-  toggle(): void { this.isOpen ? this.close() : this.open() }
+  toggle(): void {
+    this.isOpen ? this.close() : this.open()
+  }
 
   open(): void {
     if (this.isOpen) return
@@ -125,7 +132,9 @@ export class TrackPanel {
     window.removeEventListener('resize', this.onResize)
   }
 
-  hide(): void { this.close() }
+  hide(): void {
+    this.close()
+  }
 
   private positionUnder(): void {
     const trigger = this.trigger
@@ -141,12 +150,7 @@ export class TrackPanel {
     this.panel.style.left = ''
     // Belt-and-suspenders: if we still don't fit, clamp to viewport.
     const desiredLeft = window.innerWidth - right - panelW
-    if (desiredLeft < 12) this.panel.style.right = `${Math.max(12, window.innerWidth - panelW - 12)}px`
+    if (desiredLeft < 12)
+      this.panel.style.right = `${Math.max(12, window.innerWidth - panelW - 12)}px`
   }
 }
-
-const ICON_UPLOAD = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-  <polyline points="17 8 12 3 7 8"/>
-  <line x1="12" y1="3" x2="12" y2="15"/>
-</svg>`
