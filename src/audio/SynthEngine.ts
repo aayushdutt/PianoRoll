@@ -117,9 +117,21 @@ export class SynthEngine implements AudioEngine {
     const nominalBpm = this.midi.bpm
     transport.bpm.value = nominalBpm
 
+    // Notes are time-sorted (parser invariant) so we can binary-search to the
+    // first note at/after `fromTime` instead of iterating all of them. Matters
+    // on 10k+ note MIDIs where a linear scan stalls the main thread visibly
+    // on every play/seek.
     for (const track of this.midi.tracks) {
-      for (const note of track.notes) {
-        if (note.time < fromTime) continue
+      const notes = track.notes
+      let lo = 0
+      let hi = notes.length
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1
+        if (notes[mid]!.time < fromTime) lo = mid + 1
+        else hi = mid
+      }
+      for (let i = lo; i < notes.length; i++) {
+        const note = notes[i]!
         const t = note.time - fromTime
         this.scheduledIds.push(
           transport.schedule((time) => this.triggerNoteOn(note, time), t),

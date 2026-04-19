@@ -86,6 +86,11 @@ export class KeyboardRenderer {
   // sustained chords and idle frames).
   private lastSignature = ''
   private activeLayerDirty = true
+  // Signature of the last baked-texture inputs (size + key positions + theme
+  // colors). Used to short-circuit build() when nothing that affects the
+  // baked RenderTextures has actually changed — skips a texture destroy/
+  // recreate that would otherwise stall the GPU on every theme re-apply.
+  private lastBuildSignature = ''
 
   constructor(
     private app: Application,
@@ -113,8 +118,26 @@ export class KeyboardRenderer {
   // Build or rebuild the static keyboard textures.
   // Call on init and whenever the canvas is resized.
   build(viewport: Viewport, yOffset: number): void {
-    const { keyboardHeight, canvasWidth } = viewport.config
+    const { keyboardHeight, canvasWidth, pitchMin, pitchMax } = viewport.config
     const positions = viewport.getAllKeyPositions()
+
+    // Skip the destroy+re-bake when every input to the bake is unchanged. All
+    // the baked pixels depend on: canvas width, keyboard height, the pitch
+    // range (which determines key positions), and the three theme colours
+    // that tint the white/black keys and gap. Hitting this cache path turns
+    // a theme re-apply or redundant rebuildStaticLayers() into a no-op.
+    const sig =
+      `${canvasWidth}x${keyboardHeight}|${pitchMin ?? 21}-${pitchMax ?? 108}|` +
+      `${this.theme.whiteKey}.${this.theme.blackKey}.${this.theme.keyBorder}|y=${yOffset}`
+    if (sig === this.lastBuildSignature && this.whiteSprite && this.blackSprite) {
+      // Positions may still need to be re-cached if the caller swapped the
+      // Viewport instance — but sig encodes every positional input, so
+      // referential equality is fine here too.
+      if (!this.lastPositions) this.lastPositions = new Map(positions)
+      return
+    }
+    this.lastBuildSignature = sig
+
     // Snapshot for the practice-hint layer (which redraws on its own ticker
     // and doesn't otherwise have a Viewport reference handy).
     this.lastPositions = new Map(positions)

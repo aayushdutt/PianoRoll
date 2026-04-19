@@ -38,6 +38,11 @@ export async function parseMidiFile(source: File | ArrayBuffer, name?: string): 
         duration: Math.max(n.duration, 0.05), // clamp to minimum visible duration
         velocity: n.velocity,
       }))
+      // Guarantee ascending time order so downstream code (scheduler binary
+      // search, visible-range culling) can rely on the invariant without
+      // re-sorting. @tonejs/midi usually emits them sorted already, but edited
+      // MIDIs can arrive out of order.
+      notes.sort((a, b) => a.time - b.time)
 
       return {
         id: `track-${i}`,

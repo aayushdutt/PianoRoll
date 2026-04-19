@@ -1,12 +1,15 @@
 import { categorizeMidiDevice, track, trackActivation } from './analytics'
 import { Metronome } from './audio/Metronome'
-import { renderAudioOffline } from './audio/OfflineAudioRenderer'
 import { INSTRUMENTS, SynthEngine } from './audio/SynthEngine'
 import { MasterClock } from './core/clock/MasterClock'
 import { parseMidiFile } from './core/midi/parser'
 import { booleanPersisted, indexPersisted, numberPersisted } from './core/persistence'
 import { fetchSampleMidi, getSample } from './core/samples'
-import { VideoExporter } from './export/VideoExporter'
+// VideoExporter + OfflineAudioRenderer pull in mp4-muxer and an offline Tone
+// context (~60 KB combined). They're only reachable via the Export button, so
+// we dynamic-import them in startExport() and let Vite split them out of the
+// main chunk. Types stay as type-only imports — no runtime cost.
+import type { VideoExporter } from './export/VideoExporter'
 import { ComputerKeyboardInput } from './midi/ComputerKeyboardInput'
 import { LiveNoteStore } from './midi/LiveNoteStore'
 import { LoopEngine } from './midi/LoopEngine'
@@ -89,6 +92,10 @@ export class App {
   private onWindowBlur = (): void => this.releaseAllLiveNotes()
   private onFirstPointerDown = (): void => this.primeInteractiveAudio()
   private onFirstKeyDown = (): void => this.primeInteractiveAudio()
+  // Unsubscribe closures from every Signal.subscribe() in init(). Invoked from
+  // dispose() so each Signal's listener set is cleared — otherwise the
+  // captured `this` leaks for the lifetime of the surrounding signals.
+  private unsubs: Array<() => void> = []
 
   async init(): Promise<void> {
     const canvas = document.querySelector<HTMLCanvasElement>('#pianoroll')!
@@ -191,20 +198,24 @@ export class App {
 
     const pushLoop = (): void =>
       this.controls.updateLoopState(this.loopEngine.state.value, this.loopEngine.layerCount.value)
-    this.loopEngine.state.subscribe(pushLoop)
-    this.loopEngine.layerCount.subscribe(pushLoop)
+    this.unsubs.push(
+      this.loopEngine.state.subscribe(pushLoop),
+      this.loopEngine.layerCount.subscribe(pushLoop),
+    )
     pushLoop()
 
     this.metronome.setBpm(metronomeBpmStore.load())
     const pushMetronome = (): void =>
       this.controls.updateMetronome(this.metronome.running.value, this.metronome.bpm.value)
-    this.metronome.running.subscribe(pushMetronome)
-    this.metronome.bpm.subscribe(pushMetronome)
-    this.metronome.beatCount.subscribe((count) => {
-      if (count === 0) return
-      const isDownbeat = (count - 1) % 4 === 0
-      this.controls.pulseMetronomeBeat(isDownbeat)
-    })
+    this.unsubs.push(
+      this.metronome.running.subscribe(pushMetronome),
+      this.metronome.bpm.subscribe(pushMetronome),
+      this.metronome.beatCount.subscribe((count) => {
+        if (count === 0) return
+        const isDownbeat = (count - 1) % 4 === 0
+        this.controls.pulseMetronomeBeat(isDownbeat)
+      }),
+    )
     pushMetronome()
 
     const pushSession = (): void =>
@@ -212,9 +223,11 @@ export class App {
         this.sessionRec.recording.value,
         this.sessionRec.elapsed.value,
       )
-    this.sessionRec.recording.subscribe(pushSession)
-    this.sessionRec.elapsed.subscribe(pushSession)
-    this.loopEngine.progress.subscribe((p) => this.controls.updateLoopProgress(p))
+    this.unsubs.push(
+      this.sessionRec.recording.subscribe(pushSession),
+      this.sessionRec.elapsed.subscribe(pushSession),
+      this.loopEngine.progress.subscribe((p) => this.controls.updateLoopProgress(p)),
+    )
     pushSession()
 
     // Keep the HUD visible whenever something is actively running — session
@@ -226,9 +239,11 @@ export class App {
       const metroOn = this.metronome.running.value
       this.controls.setHudActivityLock(recording || loopActive || metroOn)
     }
-    this.sessionRec.recording.subscribe(recomputeActivity)
-    this.loopEngine.state.subscribe(recomputeActivity)
-    this.metronome.running.subscribe(recomputeActivity)
+    this.unsubs.push(
+      this.sessionRec.recording.subscribe(recomputeActivity),
+      this.loopEngine.state.subscribe(recomputeActivity),
+      this.metronome.running.subscribe(recomputeActivity),
+    )
     recomputeActivity()
 
     this.trackPanel = new TrackPanel(overlay, this.renderer, () => this.openFilePicker())
@@ -236,10 +251,12 @@ export class App {
 
     this.instrumentMenu = new InstrumentMenu(this.controls.instrumentSlot, overlay)
     this.instrumentMenu.onSelect = (id) => this.setInstrumentById(id)
-    this.synth.loadingInstrument.subscribe((id) => {
-      this.instrumentMenu.setLoading(id)
-      this.controls.setInstrumentLoading(id !== null)
-    })
+    this.unsubs.push(
+      this.synth.loadingInstrument.subscribe((id) => {
+        this.instrumentMenu.setLoading(id)
+        this.controls.setInstrumentLoading(id !== null)
+      }),
+    )
     this.instrumentMenu.setLoading(this.synth.loadingInstrument.value)
     this.controls.setInstrumentLoading(this.synth.loadingInstrument.value !== null)
 
@@ -264,7 +281,7 @@ export class App {
     // what the user is already hearing without contributing to "play along"
     // affordances. Keep it scoped to live/home where it confirms what the
     // player is sounding.
-    appState.mode.subscribe(() => this.applyChordOverlayVisibility())
+    this.unsubs.push(appState.mode.subscribe(() => this.applyChordOverlayVisibility()))
 
     // Customization popover bundles theme / particles / chord toggle —
     // collapses three topbar pills into a single trigger.
@@ -285,7 +302,7 @@ export class App {
       onWaitStart: () => this.onPracticeWaitStart(),
       onWaitEnd:   (resumeAt) => this.onPracticeWaitEnd(resumeAt),
     })
-    this.practiceEngine.status.subscribe((s) => this.onPracticeStatusChange(s))
+    this.unsubs.push(this.practiceEngine.status.subscribe((s) => this.onPracticeStatusChange(s)))
     this.controls.updatePracticeState(false, false)
 
     this.applyTheme(THEMES[this.themeIndex]!)
@@ -306,68 +323,70 @@ export class App {
     this.controls.updateMidiStatus(this.midiInput.status.value, '')
     this.dropzone.updateMidiStatus(this.midiInput.status.value, '')
 
-    this.clock.subscribe((t) => {
-      appState.setCurrentTime(t)
-      // Engagement milestones — cross once per loaded file. The 30s mark
-      // doubles as the activation trigger: watched ≥30s = real user.
-      for (const m of [30, 60, 120]) {
-        if (t >= m && !this.playbackMilestones.has(m)) {
-          this.playbackMilestones.add(m)
-          track('playback_milestone', { seconds: m, mode: appState.mode.value })
-          if (m === 30) trackActivation('playback_30s')
+    this.unsubs.push(
+      this.clock.subscribe((t) => {
+        appState.setCurrentTime(t)
+        // Engagement milestones — cross once per loaded file. The 30s mark
+        // doubles as the activation trigger: watched ≥30s = real user.
+        for (const m of [30, 60, 120]) {
+          if (t >= m && !this.playbackMilestones.has(m)) {
+            this.playbackMilestones.add(m)
+            track('playback_milestone', { seconds: m, mode: appState.mode.value })
+            if (m === 30) trackActivation('playback_30s')
+          }
         }
-      }
-      this.maybeUpdateChordOverlay(t)
-    })
-
-    appState.status.subscribe((status) => {
-      if (appState.mode.value === 'file' && status === 'playing') {
-        void this.synth.play(this.clock.currentTime)
-        if (!this.firstPlayLogged) {
-          this.firstPlayLogged = true
-          const midi = appState.loadedMidi.value
-          track('first_play', {
-            mode: 'file',
-            duration_s: midi ? Math.round(midi.duration) : null,
-          })
+        this.maybeUpdateChordOverlay(t)
+      }),
+      appState.status.subscribe((status) => {
+        if (appState.mode.value === 'file' && status === 'playing') {
+          void this.synth.play(this.clock.currentTime)
+          if (!this.firstPlayLogged) {
+            this.firstPlayLogged = true
+            const midi = appState.loadedMidi.value
+            track('first_play', {
+              mode: 'file',
+              duration_s: midi ? Math.round(midi.duration) : null,
+            })
+          }
+        } else if (status === 'paused') {
+          this.synth.pause()
+          if (appState.mode.value === 'live') {
+            this.liveNotes.releaseAll(this.clock.currentTime)
+            this.synth.liveReleaseAll()
+          }
         }
-      } else if (status === 'paused') {
-        this.synth.pause()
-        if (appState.mode.value === 'live') {
-          this.liveNotes.releaseAll(this.clock.currentTime)
-          this.synth.liveReleaseAll()
-        }
-      }
-    })
-
-    appState.volume.subscribe((v) => this.synth.setVolume(v))
-    appState.speed.subscribe((s) => {
-      this.clock.speed = s
-      this.synth.setSpeed(s)
-    })
+      }),
+      appState.volume.subscribe((v) => this.synth.setVolume(v)),
+      appState.speed.subscribe((s) => {
+        this.clock.speed = s
+        this.synth.setSpeed(s)
+      }),
+    )
 
     // ── Live input wiring (MIDI device + computer keyboard) ───────────────
-    this.midiInput.noteOn.subscribe((evt) => {
-      if (evt) this.handleLiveNoteOn(evt, 'midi')
-    })
-    this.midiInput.noteOff.subscribe((evt) => {
-      if (evt) this.handleLiveNoteOff(evt)
-    })
-    this.midiInput.pedal.subscribe((down) => {
-      this.midiPedalDown = down
-      this.applyPedalState('midi')
-    })
-    this.keyboardInput.noteOn.subscribe((evt) => {
-      if (evt) this.handleLiveNoteOn(evt, 'keyboard')
-    })
-    this.keyboardInput.noteOff.subscribe((evt) => {
-      if (evt) this.handleLiveNoteOff(evt)
-    })
-    this.keyboardInput.pedal.subscribe((down) => {
-      this.keyPedalDown = down
-      this.applyPedalState('keyboard')
-    })
-    this.keyboardInput.octave.subscribe((o) => this.controls.updateOctave(o))
+    this.unsubs.push(
+      this.midiInput.noteOn.subscribe((evt) => {
+        if (evt) this.handleLiveNoteOn(evt, 'midi')
+      }),
+      this.midiInput.noteOff.subscribe((evt) => {
+        if (evt) this.handleLiveNoteOff(evt)
+      }),
+      this.midiInput.pedal.subscribe((down) => {
+        this.midiPedalDown = down
+        this.applyPedalState('midi')
+      }),
+      this.keyboardInput.noteOn.subscribe((evt) => {
+        if (evt) this.handleLiveNoteOn(evt, 'keyboard')
+      }),
+      this.keyboardInput.noteOff.subscribe((evt) => {
+        if (evt) this.handleLiveNoteOff(evt)
+      }),
+      this.keyboardInput.pedal.subscribe((down) => {
+        this.keyPedalDown = down
+        this.applyPedalState('keyboard')
+      }),
+      this.keyboardInput.octave.subscribe((o) => this.controls.updateOctave(o)),
+    )
 
     // Mouse/touch on the on-screen keyboard — down to press, move to slide
     // between keys (glissando), up/cancel/leave to release.
@@ -379,21 +398,23 @@ export class App {
 
     // Update MIDI button whenever either status or device name changes.
     // Reading the *other* signal's current value avoids a stale-name flash.
-    this.midiInput.status.subscribe((status) => {
-      this.controls.updateMidiStatus(status, this.midiInput.deviceName.value)
-      this.dropzone.updateMidiStatus(status, this.midiInput.deviceName.value)
-      if (status === 'connected') {
-        // Vendor enum instead of raw device name — cardinality-friendly and
-        // avoids leaking user-customised device labels.
-        track('midi_device_connected', {
-          vendor: categorizeMidiDevice(this.midiInput.deviceName.value),
-        })
-      }
-    })
-    this.midiInput.deviceName.subscribe((name) => {
-      this.controls.updateMidiStatus(this.midiInput.status.value, name)
-      this.dropzone.updateMidiStatus(this.midiInput.status.value, name)
-    })
+    this.unsubs.push(
+      this.midiInput.status.subscribe((status) => {
+        this.controls.updateMidiStatus(status, this.midiInput.deviceName.value)
+        this.dropzone.updateMidiStatus(status, this.midiInput.deviceName.value)
+        if (status === 'connected') {
+          // Vendor enum instead of raw device name — cardinality-friendly and
+          // avoids leaking user-customised device labels.
+          track('midi_device_connected', {
+            vendor: categorizeMidiDevice(this.midiInput.deviceName.value),
+          })
+        }
+      }),
+      this.midiInput.deviceName.subscribe((name) => {
+        this.controls.updateMidiStatus(this.midiInput.status.value, name)
+        this.dropzone.updateMidiStatus(this.midiInput.status.value, name)
+      }),
+    )
 
     // Release all held notes when the page loses focus (prevents stuck notes)
     document.addEventListener('visibilitychange', this.onVisibilityChange)
@@ -761,6 +782,12 @@ export class App {
 
     const filename = settings.output === 'audio-only' ? 'midee.m4a' : 'midee.mp4'
 
+    // Lazy-load the export chunk — first export pays a ~60 KB one-time cost;
+    // users who never export don't pay it at all.
+    const [{ VideoExporter }, { renderAudioOffline }] = await Promise.all([
+      import('./export/VideoExporter'),
+      import('./audio/OfflineAudioRenderer'),
+    ])
     const exporter = new VideoExporter(this.renderer.canvas)
     this.currentExporter = exporter
 
@@ -1233,6 +1260,8 @@ export class App {
   }
 
   dispose(): void {
+    for (const unsub of this.unsubs) unsub()
+    this.unsubs = []
     this.releaseAllLiveNotes()
     document.removeEventListener('visibilitychange', this.onVisibilityChange)
     window.removeEventListener('blur', this.onWindowBlur)

@@ -109,6 +109,9 @@ export class Controls {
   private onPointerMoveDoc = (e: PointerEvent): void => this.handleHudDragMove(e)
   private onPointerUpDoc = (): void => this.stopHudDrag()
   private onWindowResize = (): void => this.clampHudOffset()
+  // Unsubscribe closures from every Signal we listen to — invoked in dispose()
+  // so the signals' listener sets don't accumulate dead references.
+  private unsubs: Array<() => void> = []
 
   constructor(private opts: ControlsOptions) {
     this.buildTopStrip()
@@ -586,45 +589,45 @@ export class Controls {
   private bindState(): void {
     const { state, clock } = this.opts
 
-    clock.subscribe((t) => {
-      if (state.mode.value !== 'file' || this.isScrubbing) return
-      // Skip UI updates during export — frame-by-frame seeks would thrash the
-      // scrubber behind the export modal and compete with the encoder for cycles.
-      if (state.status.value === 'exporting') return
-      const dur = state.duration.value
+    this.unsubs.push(
+      clock.subscribe((t) => {
+        if (state.mode.value !== 'file' || this.isScrubbing) return
+        // Skip UI updates during export — frame-by-frame seeks would thrash the
+        // scrubber behind the export modal and compete with the encoder for cycles.
+        if (state.status.value === 'exporting') return
+        const dur = state.duration.value
 
-      // Scrubber knob moves every frame for smooth tracking
-      this.scrubber.value = String(t)
+        // Scrubber knob moves every frame for smooth tracking
+        this.scrubber.value = String(t)
 
-      // Time display changes at second resolution
-      const sec = Math.floor(t)
-      if (sec !== this.lastDisplaySec) {
-        this.timeDisplay.textContent = formatTime(t)
-        this.lastDisplaySec = sec
-      }
+        // Time display changes at second resolution
+        const sec = Math.floor(t)
+        if (sec !== this.lastDisplaySec) {
+          this.timeDisplay.textContent = formatTime(t)
+          this.lastDisplaySec = sec
+        }
 
-      // Fill gradient — 0.1% resolution is indistinguishable from 60fps
-      const pct = dur > 0 ? Math.min((t / dur) * 100, 100) : 0
-      if (Math.abs(pct - this.lastFillPct) >= 0.1) {
-        this.scrubber.style.setProperty('--pct', `${pct.toFixed(1)}%`)
-        this.lastFillPct = pct
-      }
+        // Fill gradient — 0.1% resolution is indistinguishable from 60fps
+        const pct = dur > 0 ? Math.min((t / dur) * 100, 100) : 0
+        if (Math.abs(pct - this.lastFillPct) >= 0.1) {
+          this.scrubber.style.setProperty('--pct', `${pct.toFixed(1)}%`)
+          this.lastFillPct = pct
+        }
 
-      if (dur > 0 && t >= dur) {
-        clock.pause()
-        clock.seek(0)
-        state.setReady()
-      }
-    })
-
-    state.duration.subscribe((d) => {
-      this.scrubber.max = String(d)
-      this.durationEl.textContent = formatTime(d)
-    })
-
-    state.mode.subscribe(() => this.refreshUi())
-    state.status.subscribe(() => this.refreshUi())
-    state.loadedMidi.subscribe(() => this.refreshUi())
+        if (dur > 0 && t >= dur) {
+          clock.pause()
+          clock.seek(0)
+          state.setReady()
+        }
+      }),
+      state.duration.subscribe((d) => {
+        this.scrubber.max = String(d)
+        this.durationEl.textContent = formatTime(d)
+      }),
+      state.mode.subscribe(() => this.refreshUi()),
+      state.status.subscribe(() => this.refreshUi()),
+      state.loadedMidi.subscribe(() => this.refreshUi()),
+    )
 
     this.refreshUi()
   }
@@ -761,6 +764,8 @@ export class Controls {
   }
 
   dispose(): void {
+    for (const unsub of this.unsubs) unsub()
+    this.unsubs = []
     document.removeEventListener('mousemove', this.onMouseMoveDoc)
     document.removeEventListener('keydown', this.onKeyDownDoc)
     document.removeEventListener('pointermove', this.onPointerMoveDoc)
