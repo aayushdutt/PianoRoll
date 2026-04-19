@@ -78,7 +78,9 @@ function buildJsonLd({ data, html }) {
   }
   if (isPost) {
     base.datePublished = data.date
-    base.dateModified = data.date
+    // `modified` takes precedence when present so the sitemap `lastmod` and
+    // the structured-data `dateModified` stay in sync for edited posts.
+    base.dateModified = data.modified || data.date
     base.mainEntityOfPage = `${SITE}${data.path}`
     // Rough word count — helps some crawlers size the article.
     const wordCount = (html.replace(/<[^>]+>/g, '').match(/\S+/g) || []).length

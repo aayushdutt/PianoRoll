@@ -236,7 +236,7 @@ export class Controls {
 
         <div class="hud-divider hud-group--live"></div>
 
-        <div class="hud-metro hud-group--live" id="hud-metro-group" title="Scroll on BPM to adjust">
+        <div class="hud-metro hud-group--live" id="hud-metro-group">
           <button class="hud-metro-toggle" id="hud-metro" type="button"
                   aria-label="Toggle metronome" data-tip="Metronome">
             <span class="hud-metro-icon">${ICON_METRONOME}</span>
@@ -244,7 +244,7 @@ export class Controls {
           </button>
           <button class="hud-metro-step" id="hud-metro-dec" type="button"
                   aria-label="Decrease BPM">−</button>
-          <span class="hud-metro-bpm" id="hud-metro-bpm">120</span>
+          <span class="hud-metro-bpm" id="hud-metro-bpm" data-tip="Scroll to change BPM" tabindex="0">120</span>
           <button class="hud-metro-step" id="hud-metro-inc" type="button"
                   aria-label="Increase BPM">+</button>
         </div>
