@@ -348,6 +348,16 @@ export class PianoRollRenderer {
       const tracks = this.midi.tracks
       const prev = this.prevActive
       const nowLineY = this.viewport.nowLineY
+      // Don't light up the keyboard for scheduled notes when the clock is
+      // paused at the very start of the timeline — nothing has actually
+      // sounded yet. The classic case this guards against: opening a session
+      // recording in file mode where the user held a key at recording start
+      // (note.time === 0). Without this gate the keyboard would show that
+      // key as pressed before the user has touched play.
+      // Once playback has started or the playhead has moved past 0, the
+      // normal "sounds now" rule applies — pausing mid-piece still shows
+      // sustained notes correctly.
+      const beforeFirstPlay = !emitParticles && currentTime === 0
 
       for (let ti = 0; ti < tracks.length; ti++) {
         const track = tracks[ti]!
@@ -362,7 +372,7 @@ export class PianoRollRenderer {
 
           const key = keyBase + note.pitch
           curr.add(key)
-          activeColors.set(note.pitch, trackColor)
+          if (!beforeFirstPlay) activeColors.set(note.pitch, trackColor)
 
           if (!emitParticles) continue
 
