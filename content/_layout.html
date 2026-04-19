@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{title}} — midee</title>
+    <meta name="description" content="{{description}}" />
+    <meta name="theme-color" content="#06060e" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="author" content="Aayush Dutt" />
+
+    <meta property="og:type" content="{{ogType}}" />
+    <meta property="og:site_name" content="midee" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="{{title}}" />
+    <meta property="og:description" content="{{description}}" />
+    <meta property="og:url" content="https://midee.app{{path}}" />
+    <meta property="og:image" content="https://midee.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{title}}" />
+    <meta name="twitter:description" content="{{description}}" />
+    <meta name="twitter:image" content="https://midee.app/og.png" />
+
+    <link rel="canonical" href="https://midee.app{{path}}" />
+    <link rel="alternate" type="application/rss+xml" title="midee blog" href="https://midee.app/blog/rss.xml" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='2' y='8' width='7' height='20' rx='2' fill='%23f97316'/><rect x='13' y='2' width='7' height='26' rx='2' fill='%23f97316'/><rect x='23' y='6' width='7' height='16' rx='2' fill='%23f97316' opacity='.6'/><rect x='0' y='30' width='32' height='2' rx='1' fill='%23f97316' opacity='.35'/></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/content.css" />
+    {{articleMeta}}
+
+    <script type="application/ld+json">
+    {{jsonLd}}
+    </script>
+    <script type="application/ld+json">
+    {{breadcrumbJsonLd}}
+    </script>
+  </head>
+  <body>
+    <header class="page-header">
+      <a href="{{appHrefBrand}}" class="brand" aria-label="midee home">
+        <svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="2"  y="8" width="7" height="20" rx="2" fill="#f97316"/>
+          <rect x="13" y="2" width="7" height="26" rx="2" fill="#f97316"/>
+          <rect x="23" y="6" width="7" height="16" rx="2" fill="#f97316" opacity=".6"/>
+        </svg>
+        <span>midee</span>
+      </a>
+      <nav class="page-nav">
+        <a href="{{appHrefNav}}">App</a>
+        <a href="/blog/">Blog</a>
+        <a href="https://github.com/aayushdutt/midee" rel="noopener">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="page-main">
+      {{meta}}
+      {{content}}
+      <section class="page-cta">
+        <h2>Try midee</h2>
+        <p>Free, open source, runs in your browser. Drop a MIDI, watch it sing.</p>
+        <a class="cta-button" href="{{appHrefCta}}">Open the app →</a>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      <p>midee is open source (MIT) — <a href="https://github.com/aayushdutt/midee" rel="noopener">github.com/aayushdutt/midee</a></p>
+    </footer>
+  </body>
+</html>

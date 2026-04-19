@@ -2,6 +2,7 @@ import "./styles/main.css";
 import { inject } from "@vercel/analytics";
 import posthog from "posthog-js";
 import { App } from "./app";
+import { registerAnalyticsContext } from "./analytics";
 
 // Privacy-friendly page-view + custom event tracking. Only active once the
 // script has been served with a real Vercel project id — in dev or on forks
@@ -16,6 +17,7 @@ if (posthogKey) {
     defaults: "2026-01-30",
     person_profiles: "always",
   });
+  registerAnalyticsContext();
 }
 
 const app = new App();

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "postbuild": "node scripts/stamp-sitemap.mjs",
+    "postbuild": "node scripts/build-content.mjs && node scripts/build-og.mjs && node scripts/stamp-sitemap.mjs && node scripts/check-links.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +21,11 @@
     "tone": "^14.7.77"
   },
   "devDependencies": {
+    "@fontsource/instrument-serif": "^5.2.8",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@resvg/resvg-js": "^2.6.2",
+    "marked": "^18.0.2",
     "typescript": "^5.4.0",
     "vite": "^5.2.0"
   }

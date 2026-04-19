@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="bg" cx="58%" cy="40%" r="90%">
+      <stop offset="0%"  stop-color="#141420"/>
+      <stop offset="55%" stop-color="#09090f"/>
+      <stop offset="100%" stop-color="#050509"/>
+    </radialGradient>
+
+    <linearGradient id="noteBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#fca85d" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#f97316" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#c2410c" stop-opacity="0.55"/>
+    </linearGradient>
+
+    <linearGradient id="noteSoft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#f97316" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#c2410c" stop-opacity="0.25"/>
+    </linearGradient>
+
+    <radialGradient id="accentGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#f97316" stop-opacity="0.28"/>
+      <stop offset="70%" stop-color="#f97316" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- ambient glow behind the notes -->
+  <ellipse cx="900" cy="290" rx="380" ry="300" fill="url(#accentGlow)"/>
+
+  <!-- cascading notes, right side — echoes the favicon bar motif scaled up -->
+  <g>
+    <rect x="680"  y="110" width="62" height="300" rx="14" fill="url(#noteBody)"/>
+    <rect x="762"  y="54"  width="62" height="380" rx="14" fill="url(#noteBody)"/>
+    <rect x="844"  y="170" width="62" height="240" rx="14" fill="url(#noteBody)" opacity="0.92"/>
+    <rect x="926"  y="82"  width="62" height="350" rx="14" fill="url(#noteSoft)"/>
+    <rect x="1008" y="150" width="62" height="280" rx="14" fill="url(#noteSoft)" opacity="0.78"/>
+    <rect x="1090" y="200" width="62" height="220" rx="14" fill="url(#noteSoft)" opacity="0.55"/>
+  </g>
+
+  <!-- baseline: thin accent bar under the notes, like the favicon -->
+  <rect x="660" y="445" width="520" height="4" rx="2" fill="#f97316" opacity="0.35"/>
+
+  <!-- piano keys hinted at the bottom -->
+  <g transform="translate(660, 455)">
+    <rect x="0" y="0" width="520" height="90" fill="#0c0c14"/>
+    <g stroke="#1a1a26" stroke-width="1.2">
+      <line x1="43"  y1="0" x2="43"  y2="90"/>
+      <line x1="87"  y1="0" x2="87"  y2="90"/>
+      <line x1="130" y1="0" x2="130" y2="90"/>
+      <line x1="173" y1="0" x2="173" y2="90"/>
+      <line x1="217" y1="0" x2="217" y2="90"/>
+      <line x1="260" y1="0" x2="260" y2="90"/>
+      <line x1="303" y1="0" x2="303" y2="90"/>
+      <line x1="347" y1="0" x2="347" y2="90"/>
+      <line x1="390" y1="0" x2="390" y2="90"/>
+      <line x1="433" y1="0" x2="433" y2="90"/>
+      <line x1="477" y1="0" x2="477" y2="90"/>
+    </g>
+    <g fill="#05050a">
+      <rect x="27"  y="0" width="32" height="56" rx="3"/>
+      <rect x="70"  y="0" width="32" height="56" rx="3"/>
+      <rect x="157" y="0" width="32" height="56" rx="3"/>
+      <rect x="200" y="0" width="32" height="56" rx="3"/>
+      <rect x="243" y="0" width="32" height="56" rx="3"/>
+      <rect x="330" y="0" width="32" height="56" rx="3"/>
+      <rect x="373" y="0" width="32" height="56" rx="3"/>
+      <rect x="460" y="0" width="32" height="56" rx="3"/>
+    </g>
+    <!-- one key lit by a landing note -->
+    <rect x="304" y="0" width="43" height="90" fill="#f97316" opacity="0.18"/>
+  </g>
+
+  <!-- left content -->
+  <g transform="translate(80, 0)">
+    <!-- brand wordmark in Instrument Serif italic -->
+    <text x="0" y="258"
+          font-family="Instrument Serif"
+          font-style="italic"
+          font-weight="400"
+          font-size="156"
+          fill="#fafafa"
+          letter-spacing="-3">midee</text>
+
+    <!-- hero tagline -->
+    <text x="2" y="322"
+          font-family="Inter"
+          font-size="30"
+          font-weight="500"
+          fill="#d5d5e2"
+          letter-spacing="-0.3">Drop a MIDI. Watch it sing.</text>
+
+    <!-- sub line -->
+    <text x="2" y="367"
+          font-family="Inter"
+          font-size="19"
+          font-weight="400"
+          fill="#8a8a9c">A free, open-source MIDI visualizer in your browser.</text>
+
+    <!-- feature chips -->
+    <g transform="translate(2, 412)">
+      <g>
+        <rect x="0"   y="0" width="118" height="34" rx="17" fill="#ffffff" fill-opacity="0.035"/>
+        <rect x="0.5" y="0.5" width="117" height="33" rx="16.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+        <text x="59"  y="22" font-family="Inter" font-size="14" font-weight="500" fill="#c8c8d2" text-anchor="middle">Visualize</text>
+      </g>
+      <g transform="translate(130, 0)">
+        <rect x="0"   y="0" width="80"  height="34" rx="17" fill="#ffffff" fill-opacity="0.035"/>
+        <rect x="0.5" y="0.5" width="79" height="33" rx="16.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+        <text x="40"  y="22" font-family="Inter" font-size="14" font-weight="500" fill="#c8c8d2" text-anchor="middle">Loop</text>
+      </g>
+      <g transform="translate(222, 0)">
+        <rect x="0"   y="0" width="94"  height="34" rx="17" fill="#ffffff" fill-opacity="0.035"/>
+        <rect x="0.5" y="0.5" width="93" height="33" rx="16.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+        <text x="47"  y="22" font-family="Inter" font-size="14" font-weight="500" fill="#c8c8d2" text-anchor="middle">Record</text>
+      </g>
+      <g transform="translate(328, 0)">
+        <rect x="0"   y="0" width="128" height="34" rx="17" fill="#f97316" fill-opacity="0.12"/>
+        <rect x="0.5" y="0.5" width="127" height="33" rx="16.5" fill="none" stroke="#f97316" stroke-opacity="0.4" stroke-width="1"/>
+        <text x="64"  y="22" font-family="Inter" font-size="14" font-weight="600" fill="#f97316" text-anchor="middle">Export MP4</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- url footer -->
+  <text x="82" y="585"
+        font-family="JetBrains Mono"
+        font-size="16"
+        font-weight="400"
+        fill="#606070">midee.app</text>
+
+  <text x="1118" y="585"
+        font-family="Inter"
+        font-size="14"
+        font-weight="400"
+        fill="#484858"
+        text-anchor="end">Open source · MIT</text>
+</svg>

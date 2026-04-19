@@ -25,6 +25,7 @@ import { PostSessionModal, type SessionAction } from './ui/PostSessionModal'
 import { InstrumentMenu } from './ui/InstrumentMenu'
 import { installViewportClassSync } from './ui/utils'
 import { getSample, fetchSampleMidi } from './core/samples'
+import { track, trackActivation, categorizeMidiDevice } from './analytics'
 
 export class App {
   private clock         = new MasterClock()
@@ -53,6 +54,11 @@ export class App {
   private instrumentIndex = loadInstrumentIndex()
   private particleIndex = loadParticleIndex()
   private audioPrimed = false
+  // Analytics one-shot flags. Reset when a new file is loaded so a user
+  // who opens MIDI A then MIDI B gets `first_play` events for both.
+  private firstPlayLogged = false
+  private firstLiveNoteLogged = false
+  private playbackMilestones = new Set<number>()
   private onVisibilityChange = (): void => { if (document.hidden) this.releaseAllLiveNotes() }
   private onWindowBlur = (): void => this.releaseAllLiveNotes()
   private onFirstPointerDown = (): void => this.primeInteractiveAudio()
@@ -125,7 +131,12 @@ export class App {
       onThemeCycle:  () => this.cycleTheme(),
       onMidiConnect: () => void this.connectMidi(),
       onOpenTracks:  () => this.trackPanel.toggle(),
-      onRecord:      () => this.exportModal.open(),
+      onRecord:      () => {
+        // First-time vs repeat opens are derivable in PostHog funnels via
+        // "first occurrence per user" — no need for a duplicate event.
+        track('export_opened', { has_midi: appState.loadedMidi.value !== null })
+        this.exportModal.open()
+      },
       onOpenFile:    () => this.openFilePicker(),
       onModeRequest: (mode) => this.requestMode(mode),
       onHome:        () => this.enterHomeMode(),
@@ -233,11 +244,30 @@ export class App {
     this.controls.updateMidiStatus(this.midiInput.status.value, '')
     this.dropzone.updateMidiStatus(this.midiInput.status.value, '')
 
-    this.clock.subscribe((t) => appState.setCurrentTime(t))
+    this.clock.subscribe((t) => {
+      appState.setCurrentTime(t)
+      // Engagement milestones — cross once per loaded file. The 30s mark
+      // doubles as the activation trigger: watched ≥30s = real user.
+      for (const m of [30, 60, 120]) {
+        if (t >= m && !this.playbackMilestones.has(m)) {
+          this.playbackMilestones.add(m)
+          track('playback_milestone', { seconds: m, mode: appState.mode.value })
+          if (m === 30) trackActivation('playback_30s')
+        }
+      }
+    })
 
     appState.status.subscribe((status) => {
       if (appState.mode.value === 'file' && status === 'playing') {
         void this.synth.play(this.clock.currentTime)
+        if (!this.firstPlayLogged) {
+          this.firstPlayLogged = true
+          const midi = appState.loadedMidi.value
+          track('first_play', {
+            mode: 'file',
+            duration_s: midi ? Math.round(midi.duration) : null,
+          })
+        }
       } else if (status === 'paused') {
         this.synth.pause()
         if (appState.mode.value === 'live') {
@@ -254,9 +284,9 @@ export class App {
     })
 
     // ── Live input wiring (MIDI device + computer keyboard) ───────────────
-    this.midiInput.noteOn.subscribe((evt) => { if (evt) this.handleLiveNoteOn(evt) })
+    this.midiInput.noteOn.subscribe((evt) => { if (evt) this.handleLiveNoteOn(evt, 'midi') })
     this.midiInput.noteOff.subscribe((evt) => { if (evt) this.handleLiveNoteOff(evt) })
-    this.keyboardInput.noteOn.subscribe((evt) => { if (evt) this.handleLiveNoteOn(evt) })
+    this.keyboardInput.noteOn.subscribe((evt) => { if (evt) this.handleLiveNoteOn(evt, 'keyboard') })
     this.keyboardInput.noteOff.subscribe((evt) => { if (evt) this.handleLiveNoteOff(evt) })
     this.keyboardInput.octave.subscribe((o) => this.controls.updateOctave(o))
 
@@ -273,6 +303,13 @@ export class App {
     this.midiInput.status.subscribe((status) => {
       this.controls.updateMidiStatus(status, this.midiInput.deviceName.value)
       this.dropzone.updateMidiStatus(status, this.midiInput.deviceName.value)
+      if (status === 'connected') {
+        // Vendor enum instead of raw device name — cardinality-friendly and
+        // avoids leaking user-customised device labels.
+        track('midi_device_connected', {
+          vendor: categorizeMidiDevice(this.midiInput.deviceName.value),
+        })
+      }
     })
     this.midiInput.deviceName.subscribe((name) => {
       this.controls.updateMidiStatus(this.midiInput.status.value, name)
@@ -294,11 +331,17 @@ export class App {
     this.synth.liveReleaseAll()
   }
 
-  private handleLiveNoteOn(evt: MidiNoteEvent): void {
+  private handleLiveNoteOn(evt: MidiNoteEvent, source: 'midi' | 'keyboard' | 'touch' = 'midi'): void {
     if (appState.status.value === 'exporting') return
     // Home → first note dissolves into live mode. File mode plays-along alongside
     // whatever scheduled MIDI is running (or paused), which is the point.
     if (appState.mode.value === 'home') this.enterLiveMode(false)
+
+    if (!this.firstLiveNoteLogged) {
+      this.firstLiveNoteLogged = true
+      track('first_live_note', { source })
+      trackActivation('live_note')
+    }
 
     this.synth.liveNoteOn(evt.pitch, evt.velocity)
     this.liveNotes.press(evt.pitch, evt.velocity, evt.clockTime)
@@ -340,7 +383,7 @@ export class App {
       this.handleLiveNoteOff({ pitch: this.activeMouseNote, velocity: 0, clockTime: this.clock.currentTime })
     }
     this.activeMouseNote = pitch
-    this.handleLiveNoteOn({ pitch, velocity: 0.8, clockTime: this.clock.currentTime })
+    this.handleLiveNoteOn({ pitch, velocity: 0.8, clockTime: this.clock.currentTime }, 'touch')
   }
 
   private onCanvasPointerMove = (e: PointerEvent): void => {
@@ -353,7 +396,7 @@ export class App {
     const prev = this.activeMouseNote
     this.activeMouseNote = pitch
     this.handleLiveNoteOff({ pitch: prev, velocity: 0, clockTime: this.clock.currentTime })
-    this.handleLiveNoteOn({ pitch, velocity: 0.8, clockTime: this.clock.currentTime })
+    this.handleLiveNoteOn({ pitch, velocity: 0.8, clockTime: this.clock.currentTime }, 'touch')
   }
 
   private onCanvasPointerUp = (): void => {
@@ -388,8 +431,19 @@ export class App {
       this.trackPanel.render(midi)
       document.title = `${midi.name} · midee`
       this.dropzone.hide()
+      this.firstPlayLogged = false
+      this.playbackMilestones.clear()
+      track('midi_loaded', {
+        source: 'file_picker',
+        track_count: midi.tracks.length,
+        duration_s: Math.round(midi.duration),
+        file_size_kb: Math.round(file.size / 1024),
+      })
     } catch (err) {
       console.error('Failed to load MIDI:', err)
+      // Only failure path for loadMidi is parsing — bucket as such so we
+      // avoid sending free-text error messages (high cardinality + PII risk).
+      track('midi_load_failed', { source: 'file_picker', error_type: 'parse' })
       if (previousMode === 'file' && previousMidi) {
         appState.enterFile()
         this.renderer.loadMidi(previousMidi)
@@ -420,9 +474,11 @@ export class App {
   private setInstrumentById(id: string): void {
     const idx = INSTRUMENTS.findIndex(i => i.id === id)
     if (idx < 0 || idx === this.instrumentIndex) return
+    const from = INSTRUMENTS[this.instrumentIndex]?.id
     this.instrumentIndex = idx
     this.applyInstrument()
     saveInstrumentIndex(this.instrumentIndex)
+    track('instrument_changed', { from, to: id })
   }
 
   private applyInstrument(): void {
@@ -448,6 +504,17 @@ export class App {
     const midi = appState.loadedMidi.value
     if (!midi || appState.mode.value !== 'file') return
 
+    const exportStartedAt = performance.now()
+    track('export_started', {
+      output: settings.output,
+      resolution: settings.resolution,
+      fps: settings.fps,
+      focus: settings.focus,
+      speed: settings.speed,
+      midi_duration_s: Math.round(midi.duration),
+    })
+    trackActivation('export_started')
+
     // MIDI-only output skips all render/encode work — just re-serialise the
     // loaded MidiFile to .mid bytes. Especially useful after "Open in file
     // mode" from a live session, where the raw .mid was never downloaded.
@@ -456,6 +523,10 @@ export class App {
       triggerMidiDownload(bytes, `${sanitiseFilename(midi.name)}.mid`)
       this.exportModal.close()
       this.showSuccess(`↓ ${sanitiseFilename(midi.name)}.mid`)
+      track('export_completed', {
+        output: 'midi',
+        elapsed_ms: Math.round(performance.now() - exportStartedAt),
+      })
       return
     }
 
@@ -541,12 +612,23 @@ export class App {
       })
       this.exportModal.close()
       this.showSuccess(`↓ ${filename} ready`)
+      track('export_completed', {
+        output: settings.output,
+        resolution: settings.resolution,
+        fps: settings.fps,
+        elapsed_ms: Math.round(performance.now() - exportStartedAt),
+      })
     } catch (err) {
       const isCancel = err instanceof DOMException && err.name === 'AbortError'
       if (!isCancel) {
         console.error('Export failed:', err)
         this.showError((err as Error).message || 'Export failed — check console for details.')
       }
+      track(isCancel ? 'export_cancelled' : 'export_failed', {
+        output: settings.output,
+        resolution: settings.resolution,
+        elapsed_ms: Math.round(performance.now() - exportStartedAt),
+      })
       this.exportModal.close()
     } finally {
       this.currentExporter = null
@@ -592,6 +674,14 @@ export class App {
       return
     }
     this.loadSessionAsFile(midi)
+    this.firstPlayLogged = false
+    this.playbackMilestones.clear()
+    track('midi_loaded', {
+      source: 'sample',
+      sample_id: sampleId,
+      track_count: midi.tracks.length,
+      duration_s: Math.round(midi.duration),
+    })
     // Samples are a "watch it" gesture — start playback as soon as the synth
     // is ready. Sample click counts as the user gesture that unlocks audio.
     setTimeout(() => {
@@ -629,6 +719,7 @@ export class App {
   }
 
   private enterLiveMode(primeAudio = true): void {
+    const wasAlreadyLive = appState.mode.value === 'live'
     this.resetInteractionState()
     appState.enterLive()
     this.renderer.clearMidi()
@@ -637,6 +728,11 @@ export class App {
     this.keyboardInput.enable()
     document.title = 'midee · live'
     if (primeAudio) this.primeInteractiveAudio()
+    if (!wasAlreadyLive) {
+      track('live_mode_entered', {
+        midi_connected: this.midiInput.status.value === 'connected',
+      })
+    }
   }
 
   private enterFileMode(): void {
@@ -669,11 +765,13 @@ export class App {
     if (!this.sessionRec.recording.value) {
       this.primeInteractiveAudio()
       this.sessionRec.start()
+      track('session_started')
       return
     }
     const { events, duration } = this.sessionRec.stop()
     if (events.length === 0) {
       this.showError('Nothing recorded — play a few notes while Record is on.')
+      track('session_record_empty')
       return
     }
     // Hold the recording in memory and let the user pick next steps — saving
@@ -681,12 +779,15 @@ export class App {
     this.pendingSession = { events, duration }
     const noteCount = events.reduce((n, e) => n + (e.type === 'on' ? 1 : 0), 0)
     this.postSessionModal.open(duration, noteCount)
+    track('session_recorded', { duration_s: Math.round(duration), notes: noteCount })
   }
 
   private handleSessionAction(action: SessionAction): void {
     const pending = this.pendingSession
     this.postSessionModal.close()
     if (!pending) return
+
+    track('session_action', { action, duration_s: Math.round(pending.duration) })
 
     if (action === 'discard') {
       this.pendingSession = null
@@ -746,6 +847,10 @@ export class App {
     })
     triggerMidiDownload(bytes, 'midee-loop.mid')
     this.showSuccess('↓ midee-loop.mid')
+    track('loop_saved', {
+      duration_s: Math.round(snap.duration),
+      layers: this.loopEngine.layerCount.value,
+    })
   }
 
   private metronomeBpm(): number {

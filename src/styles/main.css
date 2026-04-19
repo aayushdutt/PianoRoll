@@ -144,7 +144,7 @@ html, body {
   align-items: flex-start;
   gap: 14px;
   width: min(620px, calc(100vw - 48px));
-  padding: 44px;
+  padding: 44px 44px 30px;
   background:
     linear-gradient(145deg, rgba(12, 15, 28, 0.94), rgba(7, 8, 18, 0.90)),
     rgba(6, 6, 14, 0.84);
@@ -501,6 +501,39 @@ html, body {
   margin: 0 1px;
 }
 
+/* Meta links (Blog · GitHub) — icon-only, deliberately quiet. Visible but
+   not competing with the primary CTAs above. Hidden with the rest of the
+   card in file/live mode. */
+.home-meta-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 2px auto 0;
+}
+
+.home-meta-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  opacity: 0.72;
+  transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.home-meta-link:hover,
+.home-meta-link:focus-visible {
+  color: var(--text);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.05);
+  outline: none;
+}
+
+#dropzone.dropzone--touch .home-meta-links { margin-top: 0; }
+
 /* ───────────────────────────────────────────────────────────────────────
    TOP STRIP — progressive label cascade
    ≥1121px  Full layout
@@ -516,7 +549,7 @@ html, body {
 @media (max-width: 1120px) {
   .home-card {
     width: min(100%, calc(100vw - 32px));
-    padding: 32px 26px;
+    padding: 32px 26px 22px;
     gap: 14px;
   }
 
@@ -564,7 +597,7 @@ html, body {
   }
 
   .home-card {
-    padding: 26px 20px;
+    padding: 26px 20px 18px;
     border-radius: 24px;
   }
 

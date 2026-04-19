@@ -80,6 +80,14 @@ export class DropZone {
           <div class="home-midi-status" id="home-midi-status">Looking for MIDI…</div>
           <div class="home-drop-hint">Drop <code>.mid</code> anywhere · play with <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>…</div>
         </div>
+        <nav class="home-meta-links" aria-label="midee links">
+          <a href="/blog/" class="home-meta-link" aria-label="Read the blog" title="Blog">
+            ${ICON_BLOG}
+          </a>
+          <a href="https://github.com/aayushdutt/midee" class="home-meta-link" aria-label="Source on GitHub" title="GitHub" target="_blank" rel="noopener noreferrer">
+            ${ICON_GITHUB}
+          </a>
+        </nav>
         <input type="file" id="midi-input" accept=".mid,.midi" style="display:none" />
       </div>
     `
@@ -165,6 +173,17 @@ const ICON_UPLOAD = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"
   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
   <polyline points="17 8 12 3 7 8"/>
   <line x1="12" y1="3" x2="12" y2="15"/>
+</svg>`
+
+const ICON_BLOG = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  <polyline points="14 2 14 8 20 8"/>
+  <line x1="8" y1="13" x2="16" y2="13"/>
+  <line x1="8" y1="17" x2="13" y2="17"/>
+</svg>`
+
+const ICON_GITHUB = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <path d="M12 2C6.475 2 2 6.588 2 12.253c0 4.537 2.862 8.369 6.838 9.727.5.092.687-.222.687-.492 0-.245-.013-1.052-.013-1.912-2.512.475-3.162-.63-3.362-1.21-.113-.292-.6-1.21-1.025-1.455-.35-.192-.85-.665-.013-.677.788-.012 1.35.745 1.538 1.052.9 1.555 2.338 1.12 2.912.85.088-.665.35-1.12.638-1.376-2.225-.257-4.55-1.137-4.55-5.048 0-1.122.388-2.05 1.025-2.772-.1-.257-.45-1.31.1-2.723 0 0 .837-.272 2.75 1.06.8-.23 1.65-.345 2.5-.345s1.7.115 2.5.345c1.912-1.345 2.75-1.06 2.75-1.06.55 1.413.2 2.466.1 2.722.637.724 1.025 1.64 1.025 2.772 0 3.924-2.337 4.79-4.562 5.047.363.33.675.944.675 1.922 0 1.38-.012 2.49-.012 2.835 0 .27.188.59.688.491C19.14 20.622 22 16.777 22 12.252 22 6.588 17.525 2 12 2z"/>
 </svg>`
 
 const ICON_MIDI = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
