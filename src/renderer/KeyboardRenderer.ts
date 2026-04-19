@@ -120,6 +120,9 @@ export class KeyboardRenderer {
   build(viewport: Viewport, yOffset: number): void {
     const { keyboardHeight, canvasWidth, pitchMin, pitchMax } = viewport.config
     const positions = viewport.getAllKeyPositions()
+    // Snapshot for the practice-hint layer (which redraws on its own ticker
+    // and doesn't otherwise have a Viewport reference handy).
+    this.lastPositions = new Map(positions)
 
     // Skip the destroy+re-bake when every input to the bake is unchanged. All
     // the baked pixels depend on: canvas width, keyboard height, the pitch

@@ -2700,6 +2700,43 @@ body.is-touch #kbd-resizer {
   overflow-y: auto;
 }
 
+/* ── Custom scrollbar — shared across every popover scroll region ──────
+   Applies to any direct overflow container inside .ts-popover (instrument
+   list, track list, panel-items, customize sections, etc.). Firefox uses
+   the standard properties; WebKit/Blink picks up the pseudo-elements. */
+.ts-popover *,
+.ts-popover {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.ts-popover *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ts-popover *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ts-popover *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  /* Inset border = padding around the thumb so it doesn't kiss the edges. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.18s ease;
+}
+
+.ts-popover *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: padding-box;
+}
+
+.ts-popover *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .instrument-item {
   display: flex;
   align-items: center;
