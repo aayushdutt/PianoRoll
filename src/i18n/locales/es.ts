@@ -65,6 +65,8 @@ const es: Messages = {
   'hud.tip.practice': 'Modo práctica · pausa en cada nota hasta que la toques',
   'hud.tip.kbdRefHide': 'Ocultar',
   'hud.tip.kbdRefShow': 'Mostrar referencia del teclado',
+  'hud.tip.octaveDown': 'Octava −',
+  'hud.tip.octaveUp': 'Octava +',
 
   // ── HUD — accessibility (aria-label) ────────────────────────
   'hud.aria.appMode': 'Modo',
@@ -88,6 +90,8 @@ const es: Messages = {
   'hud.aria.loopClear': 'Borrar bucle',
   'hud.aria.kbdRefHide': 'Ocultar referencia del teclado',
   'hud.aria.kbdRefShow': 'Mostrar referencia del teclado',
+  'hud.aria.octaveDown': 'Bajar una octava',
+  'hud.aria.octaveUp': 'Subir una octava',
 
   // ── Export modal ───────────────────────────────────────────
   'export.title': 'Exportar MP4',

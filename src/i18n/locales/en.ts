@@ -84,6 +84,8 @@ export const en = {
   'hud.tip.practice': 'Practice mode · pause at every note until you play it',
   'hud.tip.kbdRefHide': 'Hide',
   'hud.tip.kbdRefShow': 'Show keyboard reference',
+  'hud.tip.octaveDown': 'Octave −',
+  'hud.tip.octaveUp': 'Octave +',
 
   // ── HUD — accessibility (aria-label) ────────────────────────
   // Often longer/more descriptive than the visible tip — a screen-reader
@@ -109,6 +111,8 @@ export const en = {
   'hud.aria.loopClear': 'Clear loop',
   'hud.aria.kbdRefHide': 'Hide keyboard reference',
   'hud.aria.kbdRefShow': 'Show keyboard reference',
+  'hud.aria.octaveDown': 'Shift octave down',
+  'hud.aria.octaveUp': 'Shift octave up',
 
   // ── Export modal ───────────────────────────────────────────
   'export.title': 'Export MP4',

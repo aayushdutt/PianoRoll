@@ -2356,6 +2356,38 @@ body {
   border-color: rgba(255, 255, 255, 0.14);
 }
 
+/* Clickable cap — thin wrapper around a <kbd> glyph that turns it into a real
+   button. Users were clicking the octave arrows expecting them to work, so the
+   ↑/↓ in the Octave row are now wrapped in .kh-cap-btn. Everything visual
+   comes from the inner <kbd>; the wrapper just strips UA styles and adds
+   cursor/hover/press affordance. */
+.kh-keys .kh-cap-btn {
+  display: inline-flex;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 0;
+  cursor: pointer;
+  border-radius: 5px;
+  -webkit-tap-highlight-color: transparent;
+}
+.kh-keys .kh-cap-btn:hover kbd {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.04));
+}
+.kh-keys .kh-cap-btn:active kbd {
+  transform: translateY(1px);
+  border-bottom-width: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08));
+}
+.kh-keys .kh-cap-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 /* ─── Close + reopen affordances ─────────────────────────────── */
 /* The close button shares a flex row with the first section's "PLAY"
    label — guaranteed alignment with the heading instead of relying on

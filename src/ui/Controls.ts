@@ -38,6 +38,11 @@ export interface ControlsOptions {
   onHudPinChange?: (pinned: boolean) => void
   onChordToggle?: () => void
   onPracticeToggle?: () => void
+  // Clickable octave arrows in the key-hint panel — delta is −1 / +1.
+  // Users click the ↑/↓ glyphs thinking they're buttons; this makes the
+  // inference correct. Backed by the same handlers as the ArrowUp/ArrowDown
+  // keybindings in ComputerKeyboardInput.
+  onOctaveShift?: (delta: number) => void
 }
 
 export class Controls {
@@ -83,6 +88,8 @@ export class Controls {
   private metroDecBtn!: HTMLButtonElement
   private metroIncBtn!: HTMLButtonElement
   private octaveEl!: HTMLElement
+  private octaveDownBtn!: HTMLButtonElement
+  private octaveUpBtn!: HTMLButtonElement
   private keyHintCloseBtn!: HTMLButtonElement
   private keyHintReopenBtn!: HTMLButtonElement
   private keyHintHidden = false
@@ -315,7 +322,12 @@ export class Controls {
         <div class="kh-section">
           <span class="kh-label">Octave</span>
           <span class="kh-keys">
-            <kbd class="kh-cap-sym">↓</kbd><kbd class="kh-cap-sym">↑</kbd>
+            <button class="kh-cap-btn" id="kh-octave-down" type="button"
+                    aria-label="${t('hud.aria.octaveDown')}" data-tip="${t('hud.tip.octaveDown')}"
+            ><kbd class="kh-cap-sym">↓</kbd></button>
+            <button class="kh-cap-btn" id="kh-octave-up" type="button"
+                    aria-label="${t('hud.aria.octaveUp')}" data-tip="${t('hud.tip.octaveUp')}"
+            ><kbd class="kh-cap-sym">↑</kbd></button>
             <span class="kh-octave-pill" id="kh-octave">C4</span>
           </span>
         </div>
@@ -339,10 +351,14 @@ export class Controls {
     this.opts.container.appendChild(el)
     this.keyHint = el
     this.octaveEl = el.querySelector<HTMLElement>('#kh-octave')!
+    this.octaveDownBtn = el.querySelector<HTMLButtonElement>('#kh-octave-down')!
+    this.octaveUpBtn = el.querySelector<HTMLButtonElement>('#kh-octave-up')!
     this.keyHintCloseBtn = el.querySelector<HTMLButtonElement>('#kh-close')!
     this.keyHintReopenBtn = el.querySelector<HTMLButtonElement>('#kh-reopen')!
     this.keyHintCloseBtn.addEventListener('click', () => this.setKeyHintHidden(true))
     this.keyHintReopenBtn.addEventListener('click', () => this.setKeyHintHidden(false))
+    this.octaveDownBtn.addEventListener('click', () => this.opts.onOctaveShift?.(-1))
+    this.octaveUpBtn.addEventListener('click', () => this.opts.onOctaveShift?.(+1))
     this.keyHintHidden = loadKeyHintHidden()
     this.applyKeyHintHiddenClass()
   }

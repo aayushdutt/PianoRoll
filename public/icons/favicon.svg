@@ -1,0 +1,17 @@
+<!--
+  midee favicon — canonical source.
+  Used for browser tabs, Google SERPs, and PWA launcher icons.
+  Rastered by `npm run icons` via scripts/build-icons.mjs into public/icons/.
+
+  Design: three orange "falling note" bars over the theme-dark backdrop,
+  with a thin keybed line at the bottom — piano roll in miniature.
+  The filled background is important: Google SERPs are white, and a
+  transparent orange-on-white favicon reads poorly at 16–32px.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#06060e"/>
+  <rect x="5"    y="11" width="4" height="14" rx="1" fill="#f97316"/>
+  <rect x="12.5" y="7"  width="4" height="18" rx="1" fill="#f97316"/>
+  <rect x="20"   y="10" width="4" height="12" rx="1" fill="#f97316" opacity="0.65"/>
+  <rect x="5"    y="26" width="22" height="1.5" rx="0.75" fill="#f97316" opacity="0.4"/>
+</svg>

@@ -1,63 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>midee — free MIDI visualizer in your browser · loop, record, export MP4</title>
-    <meta name="description" content="Free MIDI visualizer in your browser. Play MIDI files on a piano roll, jam with a MIDI controller, loop phrases, record takes, and export 1080p MP4 — fully client-side, no upload." />
-    <meta name="theme-color" content="#06060e" />
-    <meta name="color-scheme" content="dark light" />
-    <meta name="keywords" content="midi visualizer, free midi visualizer, online midi visualizer, midi to mp4, midi to video, midi video maker, synthesia alternative, seemusic alternative, midiano alternative, piano roll visualizer, piano roll animation, browser midi player, online midi player, midi looper, browser loop station, midi keyboard visualizer, web midi, webgl piano, open source midi visualizer, midi animation, piano visualization" />
-    <meta name="author" content="Aayush Dutt" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
 
-    <!-- iOS / PWA behavior -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="midee" />
-    <meta name="application-name" content="midee" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="format-detection" content="telephone=no" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>midee - free MIDI visualizer · jam, loop, record, export MP4</title>
+  <meta name="description"
+    content="Free MIDI visualizer - play any .mid on a full piano roll, jam, loop, record, export 1080p MP4. Fully client-side, no upload, no account." />
+  <meta name="theme-color" content="#06060e" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="keywords"
+    content="midi visualizer, free midi visualizer, midi player, online midi visualizer, midi to mp4, midi to video, midi video maker, synthesia alternative, seemusic alternative, midiano alternative, piano roll visualizer, piano roll animation, browser midi player, online midi player, midi looper, browser loop station, midi keyboard visualizer, web midi, webgl piano, open source midi visualizer, midi animation, piano visualization" />
+  <meta name="author" content="Aayush Dutt" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
 
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="midee" />
-    <meta property="og:locale" content="en_US" />
-    <meta property="og:title" content="midee — free MIDI visualizer in your browser" />
-    <meta property="og:description" content="Drop a MIDI and watch it play on a full 88-key piano with cascading notes, glow, and particles. Play live, loop, record, export as 1080p MP4. Free, open source, fully client-side." />
-    <meta property="og:url" content="https://midee.app" />
-    <meta property="og:image" content="https://midee.app/og.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="midee — a free MIDI visualizer in the browser, with cascading notes, glowing keys, and particle bursts." />
+  <!-- iOS / PWA behavior -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="midee" />
+  <meta name="application-name" content="midee" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="midee — free MIDI visualizer in your browser" />
-    <meta name="twitter:description" content="Drop a MIDI, play live, loop, record, export as 1080p MP4. Free, open source, client-side." />
-    <meta name="twitter:image" content="https://midee.app/og.png" />
-    <meta name="twitter:image:alt" content="midee — a free MIDI visualizer in the browser, with cascading notes, glowing keys, and particle bursts." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="midee" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:title" content="midee - free MIDI visualizer in your browser" />
+  <meta property="og:description"
+    content="Drop a MIDI and watch it play on a full 88-key piano with cascading notes, glow, and particles. Play live, jam, loop, record, export as 1080p MP4. Free, open source, fully client-side." />
+  <meta property="og:url" content="https://midee.app" />
+  <meta property="og:image" content="https://midee.app/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt"
+    content="midee - a free MIDI visualizer in the browser, with cascading notes, glowing keys, and particle bursts." />
 
-    <link rel="canonical" href="https://midee.app" />
-    <link rel="alternate" type="application/rss+xml" title="midee blog" href="https://midee.app/blog/rss.xml" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='2' y='8' width='7' height='20' rx='2' fill='%23f97316'/><rect x='13' y='2' width='7' height='26' rx='2' fill='%23f97316'/><rect x='23' y='6' width='7' height='16' rx='2' fill='%23f97316' opacity='.6'/><rect x='0' y='30' width='32' height='2' rx='1' fill='%23f97316' opacity='.35'/></svg>" />
-    <!-- Raster icons for Google search results, Apple home screen, and Android — create these PNGs in /public/ -->
-    <!-- <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" /> -->
-    <!-- <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" /> -->
-    <!-- <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" /> -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="midee - free MIDI visualizer in your browser" />
+  <meta name="twitter:description"
+    content="Drop a MIDI, play live, jam, loop, record, export as 1080p MP4. Free, open source, client-side." />
+  <meta name="twitter:image" content="https://midee.app/og.png" />
+  <meta name="twitter:image:alt"
+    content="midee - a free MIDI visualizer in the browser, with cascading notes, glowing keys, and particle bursts." />
 
-    <!-- Google Search Console verification: paste your token below when you create the property -->
-    <!-- <meta name="google-site-verification" content="PASTE_TOKEN_HERE" /> -->
+  <link rel="canonical" href="https://midee.app" />
+  <link rel="alternate" type="application/rss+xml" title="midee blog" href="https://midee.app/blog/rss.xml" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <!-- Favicons & app icons - source: content/favicon.svg, rasters: public/icons/ (regenerate with `npm run icons`).
+         Google SERPs require a crawlable URL (data: URIs are ignored) and prefer a 96×96 or larger PNG. -->
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="96x96" href="/icons/favicon-96.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
 
-    <script type="application/ld+json">
+  <!-- Google Search Console verification: paste your token below when you create the property -->
+  <!-- <meta name="google-site-verification" content="PASTE_TOKEN_HERE" /> -->
+
+  <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "midee",
-      "alternateName": ["midee MIDI visualizer", "midee — free MIDI visualizer", "midee piano roll"],
-      "description": "Free, open-source MIDI visualizer in the browser. A Synthesia-style piano-roll visualizer that plays any .mid file across a full 88-key piano with cascading notes, glow, and particles. Also a live MIDI instrument, loop station, and session recorder — jam with a MIDI controller or your laptop keyboard, loop bar-snapped phrases, record takes, and export the result as a 1080p MP4. Fully client-side, no upload, no server, no watermark. A free, web-native alternative to SeeMusic, Synthesia, and MIDIano.",
+      "alternateName": ["midee MIDI visualizer", "midee - free MIDI visualizer", "midee piano roll"],
+      "description": "Free, open-source MIDI visualizer in the browser. A Synthesia-style piano-roll visualizer that plays any .mid file across a full 88-key piano with cascading notes, glow, and particles. Also a live MIDI instrument, loop station, and session recorder - jam with a MIDI controller or your laptop keyboard, loop bar-snapped phrases, record takes, and export the result as a 1080p MP4. Fully client-side, no upload, no server, no watermark. A free, web-native alternative to SeeMusic, Synthesia, and MIDIano.",
       "applicationCategory": "MultimediaApplication",
       "applicationSubCategory": "Music",
       "operatingSystem": "Web",
@@ -80,55 +91,76 @@
       ]
     }
     </script>
-  </head>
-  <body>
-    <div id="app">
-      <canvas id="pianoroll"></canvas>
-      <div id="ui-overlay"></div>
+</head>
+
+<body>
+  <div id="app">
+    <canvas id="pianoroll"></canvas>
+    <div id="ui-overlay"></div>
+  </div>
+  <noscript>
+    <div
+      style="max-width:720px;margin:4rem auto;padding:2rem;font-family:system-ui,sans-serif;color:#e8e8f0;background:#0b0b10;border-radius:12px;line-height:1.55;">
+      <h1>midee - free MIDI visualizer in your browser</h1>
+      <p>midee is a free, open-source MIDI visualizer that runs entirely in your browser. Drop a <strong>.mid</strong>
+        file and it plays on a full 88-key piano roll with cascading notes, glow halos, and particle bursts - a
+        Synthesia-style piano-roll visualizer, but web-native, design-forward, and free.</p>
+      <p>It's also a live MIDI instrument and a simple loop station. Plug in a MIDI keyboard (Web MIDI), or play from
+        your laptop keyboard, and jam. Loop a phrase bar-snapped to the metronome, layer takes, record a session, and
+        export the result as a frame-accurate <strong>1080p MP4</strong> with audio baked in.</p>
+      <p><em>midee requires JavaScript. Please enable JavaScript to use the app.</em></p>
+
+      <h2>What midee does</h2>
+      <ul>
+        <li><strong>Play MIDI files</strong> in the browser - multi-track, per-track color, full 88 keys.</li>
+        <li><strong>Live MIDI play</strong> from Web MIDI controllers or your laptop keyboard (FL Studio layout).</li>
+        <li><strong>Loop station</strong> - bar-snapped to the metronome, layerable, undo stack, export as .mid.</li>
+        <li><strong>Session recording</strong> - capture a live performance and bounce to .mid or video.</li>
+        <li><strong>MP4 export</strong> - 720p, 1080p, vertical (TikTok, Reels), square, or native. Frame-accurate,
+          audio baked in, rendered locally via WebCodecs.</li>
+        <li><strong>Themes, instruments, particles</strong> - five themes, sampled Salamander Grand piano plus Rhodes,
+          pad, and pluck, cycleable particle styles.</li>
+        <li><strong>Free and open source</strong> - MIT-licensed, 100% client-side, no upload, no account, no watermark.
+        </li>
+      </ul>
+
+      <h2>Who midee is for</h2>
+      <p>Bedroom producers who want a quick piano-roll video for a Reel or YouTube Short. Piano learners who want to
+        visualize a new piece. Classical music fans who want to turn a MIDI from the Mutopia project into a shareable
+        clip. MIDI keyboard owners who want something beautiful to look at while they jam, without firing up a full DAW.
+      </p>
+
+      <h2>How midee compares</h2>
+      <p>If you've looked at <strong>SeeMusic</strong> (beautiful but paid, native app), <strong>Synthesia</strong>
+        (learn-to-play focus, paid for custom MIDIs), or <strong>MIDIano</strong> / <strong>midi2vidi</strong> (free but
+        dated), midee is the web-native, open-source alternative - with frame-accurate 1080p MP4 export built in, no
+        server round-trip, and no watermark.</p>
+
+      <h2>Common questions</h2>
+      <p><strong>Is it really free?</strong> Yes. MIT-licensed. No account, no paywall, no watermark.</p>
+      <p><strong>Does my MIDI get uploaded?</strong> No. Everything runs in your browser. Your .mid and the rendered MP4
+        never leave the machine.</p>
+      <p><strong>Can I use my MIDI keyboard?</strong> Yes - any Web MIDI-compatible controller works. Your laptop
+        keyboard works too.</p>
+      <p><strong>What do I need to run it?</strong> A recent Chromium browser (Chrome 94+), Safari 16.4+, or Firefox
+        130+. Desktop recommended; iPad works; phone is limited.</p>
+
+      <h2>Read more</h2>
+      <ul>
+        <li><a href="/midi-to-mp4/">How to turn a MIDI file into an MP4 video</a></li>
+        <li><a href="/vs/synthesia/">midee vs. Synthesia - free, open-source alternative</a></li>
+        <li><a href="/vs/seemusic/">midee vs. SeeMusic - the browser-native option</a></li>
+        <li><a href="/blog/why-i-replaced-ffmpeg-wasm-with-webcodecs/">Why I replaced ffmpeg.wasm with WebCodecs</a>
+        </li>
+        <li><a href="/blog/playing-your-midi-keyboard-in-the-browser/">Playing your MIDI keyboard in the browser</a>
+        </li>
+        <li><a href="/blog/">All blog posts</a></li>
+      </ul>
+
+      <p>Open source on <a href="https://github.com/aayushdutt/midee">GitHub</a> - contributions welcome.</p>
     </div>
-    <noscript>
-      <div style="max-width:720px;margin:4rem auto;padding:2rem;font-family:system-ui,sans-serif;color:#e8e8f0;background:#0b0b10;border-radius:12px;line-height:1.55;">
-        <h1>midee — free MIDI visualizer in your browser</h1>
-        <p>midee is a free, open-source MIDI visualizer that runs entirely in your browser. Drop a <strong>.mid</strong> file and it plays on a full 88-key piano roll with cascading notes, glow halos, and particle bursts — a Synthesia-style piano-roll visualizer, but web-native, design-forward, and free.</p>
-        <p>It's also a live MIDI instrument and a simple loop station. Plug in a MIDI keyboard (Web MIDI), or play from your laptop keyboard, and jam. Loop a phrase bar-snapped to the metronome, layer takes, record a session, and export the result as a frame-accurate <strong>1080p MP4</strong> with audio baked in.</p>
-        <p><em>midee requires JavaScript. Please enable JavaScript to use the app.</em></p>
+  </noscript>
+  <script type="module" src="/src/main.ts"></script>
+</body>
 
-        <h2>What midee does</h2>
-        <ul>
-          <li><strong>Play MIDI files</strong> in the browser — multi-track, per-track color, full 88 keys.</li>
-          <li><strong>Live MIDI play</strong> from Web MIDI controllers or your laptop keyboard (FL Studio layout).</li>
-          <li><strong>Loop station</strong> — bar-snapped to the metronome, layerable, undo stack, export as .mid.</li>
-          <li><strong>Session recording</strong> — capture a live performance and bounce to .mid or video.</li>
-          <li><strong>MP4 export</strong> — 720p, 1080p, vertical (TikTok, Reels), square, or native. Frame-accurate, audio baked in, rendered locally via WebCodecs.</li>
-          <li><strong>Themes, instruments, particles</strong> — five themes, sampled Salamander Grand piano plus Rhodes, pad, and pluck, cycleable particle styles.</li>
-          <li><strong>Free and open source</strong> — MIT-licensed, 100% client-side, no upload, no account, no watermark.</li>
-        </ul>
-
-        <h2>Who midee is for</h2>
-        <p>Bedroom producers who want a quick piano-roll video for a Reel or YouTube Short. Piano learners who want to visualize a new piece. Classical music fans who want to turn a MIDI from the Mutopia project into a shareable clip. MIDI keyboard owners who want something beautiful to look at while they jam, without firing up a full DAW.</p>
-
-        <h2>How midee compares</h2>
-        <p>If you've looked at <strong>SeeMusic</strong> (beautiful but paid, native app), <strong>Synthesia</strong> (learn-to-play focus, paid for custom MIDIs), or <strong>MIDIano</strong> / <strong>midi2vidi</strong> (free but dated), midee is the web-native, open-source alternative — with frame-accurate 1080p MP4 export built in, no server round-trip, and no watermark.</p>
-
-        <h2>Common questions</h2>
-        <p><strong>Is it really free?</strong> Yes. MIT-licensed. No account, no paywall, no watermark.</p>
-        <p><strong>Does my MIDI get uploaded?</strong> No. Everything runs in your browser. Your .mid and the rendered MP4 never leave the machine.</p>
-        <p><strong>Can I use my MIDI keyboard?</strong> Yes — any Web MIDI-compatible controller works. Your laptop keyboard works too.</p>
-        <p><strong>What do I need to run it?</strong> A recent Chromium browser (Chrome 94+), Safari 16.4+, or Firefox 130+. Desktop recommended; iPad works; phone is limited.</p>
-
-        <h2>Read more</h2>
-        <ul>
-          <li><a href="/midi-to-mp4/">How to turn a MIDI file into an MP4 video</a></li>
-          <li><a href="/vs/synthesia/">midee vs. Synthesia — free, open-source alternative</a></li>
-          <li><a href="/vs/seemusic/">midee vs. SeeMusic — the browser-native option</a></li>
-          <li><a href="/blog/why-i-replaced-ffmpeg-wasm-with-webcodecs/">Why I replaced ffmpeg.wasm with WebCodecs</a></li>
-          <li><a href="/blog/playing-your-midi-keyboard-in-the-browser/">Playing your MIDI keyboard in the browser</a></li>
-          <li><a href="/blog/">All blog posts</a></li>
-        </ul>
-
-        <p>Open source on <a href="https://github.com/aayushdutt/midee">GitHub</a> — contributions welcome.</p>
-      </div>
-    </noscript>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
 </html>

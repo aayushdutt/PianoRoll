@@ -65,6 +65,8 @@ const ptBR: Messages = {
   'hud.tip.practice': 'Modo prática · pausa em cada nota até você tocá-la',
   'hud.tip.kbdRefHide': 'Ocultar',
   'hud.tip.kbdRefShow': 'Mostrar referência do teclado',
+  'hud.tip.octaveDown': 'Oitava −',
+  'hud.tip.octaveUp': 'Oitava +',
 
   // ── HUD — accessibility (aria-label) ────────────────────────
   'hud.aria.appMode': 'Modo',
@@ -88,6 +90,8 @@ const ptBR: Messages = {
   'hud.aria.loopClear': 'Limpar loop',
   'hud.aria.kbdRefHide': 'Ocultar referência do teclado',
   'hud.aria.kbdRefShow': 'Mostrar referência do teclado',
+  'hud.aria.octaveDown': 'Descer uma oitava',
+  'hud.aria.octaveUp': 'Subir uma oitava',
 
   // ── Export modal ───────────────────────────────────────────
   'export.title': 'Exportar MP4',

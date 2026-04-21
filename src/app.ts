@@ -193,6 +193,10 @@ export class App {
       onHudPinChange: (pinned) => hudPinnedStore.save(pinned),
       onChordToggle: () => this.toggleChordOverlay(),
       onPracticeToggle: () => this.togglePracticeMode(),
+      onOctaveShift: (delta) => {
+        if (delta < 0) this.keyboardInput.shiftOctaveDown()
+        else this.keyboardInput.shiftOctaveUp()
+      },
     })
 
     this.controls.setHudPinned(hudPinnedStore.load())

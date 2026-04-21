@@ -14,7 +14,9 @@
     "format": "biome format --write src",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "icons": "node scripts/build-icons.mjs",
+    "preview:serp": "node scripts/preview-serp.mjs"
   },
   "dependencies": {
     "@tonejs/midi": "^2.0.28",

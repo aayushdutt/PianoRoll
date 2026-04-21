@@ -1,140 +1,201 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
-    <radialGradient id="bg" cx="58%" cy="40%" r="90%">
-      <stop offset="0%"  stop-color="#141420"/>
-      <stop offset="55%" stop-color="#09090f"/>
-      <stop offset="100%" stop-color="#050509"/>
-    </radialGradient>
-
-    <linearGradient id="noteBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#fca85d" stop-opacity="1"/>
-      <stop offset="55%" stop-color="#f97316" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#c2410c" stop-opacity="0.55"/>
+    <!-- Base background — deep near-black with a soft warm light leaking in from upper right -->
+    <linearGradient id="bgBase" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#0a0a13"/>
+      <stop offset="100%" stop-color="#04040a"/>
     </linearGradient>
-
-    <linearGradient id="noteSoft" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#f97316" stop-opacity="0.75"/>
-      <stop offset="100%" stop-color="#c2410c" stop-opacity="0.25"/>
-    </linearGradient>
-
-    <radialGradient id="accentGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"  stop-color="#f97316" stop-opacity="0.28"/>
-      <stop offset="70%" stop-color="#f97316" stop-opacity="0.04"/>
+    <radialGradient id="bgGlow" cx="82%" cy="18%" r="72%">
+      <stop offset="0%"  stop-color="#f97316" stop-opacity="0.22"/>
+      <stop offset="40%" stop-color="#f97316" stop-opacity="0.06"/>
       <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
     </radialGradient>
+    <radialGradient id="bgVignette" cx="50%" cy="50%" r="75%">
+      <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+    </radialGradient>
+
+    <!-- Note gradients: hot front layer, cool back layer -->
+    <linearGradient id="noteHot" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"  stop-color="#ffb27a"/>
+      <stop offset="40%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#b94710" stop-opacity="0.35"/>
+    </linearGradient>
+    <linearGradient id="noteCool" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"  stop-color="#f97316" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- Soft glow where notes meet the keybed -->
+    <radialGradient id="hitGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#ffd0a8" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#f97316" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
   </defs>
 
-  <!-- background -->
-  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Background stack -->
+  <rect width="1200" height="630" fill="url(#bgBase)"/>
+  <rect width="1200" height="630" fill="url(#bgGlow)"/>
 
-  <!-- ambient glow behind the notes -->
-  <ellipse cx="900" cy="290" rx="380" ry="300" fill="url(#accentGlow)"/>
+  <!-- Faint DAW-style horizontal rows (very subtle) -->
+  <g stroke="#ffffff" stroke-opacity="0.025" stroke-width="1">
+    <line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="0" y1="390" x2="1200" y2="390"/>
+    <line x1="0" y1="480" x2="1200" y2="480"/>
+  </g>
 
-  <!-- cascading notes, right side — echoes the favicon bar motif scaled up -->
+  <!-- ─── Right side: cascading notes + keybed ─────────────────────── -->
+  <!-- Ambient bloom behind the notes -->
+  <ellipse cx="930" cy="260" rx="340" ry="260" fill="url(#hitGlow)" filter="url(#softBlur)"/>
+
+  <!-- Cascading notes: back layer (cooler), mid, front (hot) -->
   <g>
-    <rect x="680"  y="110" width="62" height="300" rx="14" fill="url(#noteBody)"/>
-    <rect x="762"  y="54"  width="62" height="380" rx="14" fill="url(#noteBody)"/>
-    <rect x="844"  y="170" width="62" height="240" rx="14" fill="url(#noteBody)" opacity="0.92"/>
-    <rect x="926"  y="82"  width="62" height="350" rx="14" fill="url(#noteSoft)"/>
-    <rect x="1008" y="150" width="62" height="280" rx="14" fill="url(#noteSoft)" opacity="0.78"/>
-    <rect x="1090" y="200" width="62" height="220" rx="14" fill="url(#noteSoft)" opacity="0.55"/>
+    <rect x="700"  y="180" width="44" height="230" rx="10" fill="url(#noteCool)" opacity="0.55"/>
+    <rect x="1088" y="210" width="44" height="200" rx="10" fill="url(#noteCool)" opacity="0.45"/>
+
+    <rect x="760"  y="120" width="52" height="290" rx="11" fill="url(#noteCool)" opacity="0.85"/>
+    <rect x="1028" y="150" width="52" height="260" rx="11" fill="url(#noteCool)" opacity="0.8"/>
+
+    <rect x="828"  y="70"  width="58" height="340" rx="12" fill="url(#noteHot)"/>
+    <rect x="898"  y="160" width="58" height="250" rx="12" fill="url(#noteHot)"/>
+    <rect x="968"  y="96"  width="58" height="314" rx="12" fill="url(#noteHot)"/>
+
+    <!-- Gleam on the top edges of the front notes -->
+    <g fill="#ffffff" opacity="0.25">
+      <rect x="830"  y="72"  width="54" height="2" rx="1"/>
+      <rect x="900"  y="162" width="54" height="2" rx="1"/>
+      <rect x="970"  y="98"  width="54" height="2" rx="1"/>
+    </g>
   </g>
 
-  <!-- baseline: thin accent bar under the notes, like the favicon -->
-  <rect x="660" y="445" width="520" height="4" rx="2" fill="#f97316" opacity="0.35"/>
-
-  <!-- piano keys hinted at the bottom -->
-  <g transform="translate(660, 455)">
-    <rect x="0" y="0" width="520" height="90" fill="#0c0c14"/>
-    <g stroke="#1a1a26" stroke-width="1.2">
-      <line x1="43"  y1="0" x2="43"  y2="90"/>
-      <line x1="87"  y1="0" x2="87"  y2="90"/>
-      <line x1="130" y1="0" x2="130" y2="90"/>
-      <line x1="173" y1="0" x2="173" y2="90"/>
-      <line x1="217" y1="0" x2="217" y2="90"/>
-      <line x1="260" y1="0" x2="260" y2="90"/>
-      <line x1="303" y1="0" x2="303" y2="90"/>
-      <line x1="347" y1="0" x2="347" y2="90"/>
-      <line x1="390" y1="0" x2="390" y2="90"/>
-      <line x1="433" y1="0" x2="433" y2="90"/>
-      <line x1="477" y1="0" x2="477" y2="90"/>
-    </g>
-    <g fill="#05050a">
-      <rect x="27"  y="0" width="32" height="56" rx="3"/>
-      <rect x="70"  y="0" width="32" height="56" rx="3"/>
-      <rect x="157" y="0" width="32" height="56" rx="3"/>
-      <rect x="200" y="0" width="32" height="56" rx="3"/>
-      <rect x="243" y="0" width="32" height="56" rx="3"/>
-      <rect x="330" y="0" width="32" height="56" rx="3"/>
-      <rect x="373" y="0" width="32" height="56" rx="3"/>
-      <rect x="460" y="0" width="32" height="56" rx="3"/>
-    </g>
-    <!-- one key lit by a landing note -->
-    <rect x="304" y="0" width="43" height="90" fill="#f97316" opacity="0.18"/>
+  <!-- Hit-point glows where notes meet the keybed -->
+  <g>
+    <ellipse cx="857" cy="418" rx="46" ry="16" fill="url(#hitGlow)"/>
+    <ellipse cx="997" cy="418" rx="46" ry="16" fill="url(#hitGlow)"/>
   </g>
 
-  <!-- left content -->
-  <g transform="translate(80, 0)">
-    <!-- brand wordmark in Instrument Serif italic -->
-    <text x="0" y="258"
+  <!-- Playhead line -->
+  <rect x="680" y="420" width="480" height="1.5" fill="#f97316" opacity="0.55"/>
+
+  <!-- Keybed: two octaves, better proportions -->
+  <g transform="translate(680, 424)">
+    <rect x="0" y="0" width="480" height="96" fill="#0a0a12"/>
+    <rect x="0" y="0" width="480" height="96" fill="#ffffff" fill-opacity="0.015"/>
+
+    <!-- White-key dividers -->
+    <g stroke="#1c1c28" stroke-width="1">
+      <line x1="34"  y1="0" x2="34"  y2="96"/>
+      <line x1="68"  y1="0" x2="68"  y2="96"/>
+      <line x1="103" y1="0" x2="103" y2="96"/>
+      <line x1="137" y1="0" x2="137" y2="96"/>
+      <line x1="171" y1="0" x2="171" y2="96"/>
+      <line x1="206" y1="0" x2="206" y2="96"/>
+      <line x1="240" y1="0" x2="240" y2="96"/>
+      <line x1="274" y1="0" x2="274" y2="96"/>
+      <line x1="308" y1="0" x2="308" y2="96"/>
+      <line x1="343" y1="0" x2="343" y2="96"/>
+      <line x1="377" y1="0" x2="377" y2="96"/>
+      <line x1="411" y1="0" x2="411" y2="96"/>
+      <line x1="446" y1="0" x2="446" y2="96"/>
+    </g>
+
+    <!-- Lit keys below the front notes -->
+    <rect x="172" y="0" width="34" height="96" fill="#f97316" fill-opacity="0.14"/>
+    <rect x="309" y="0" width="34" height="96" fill="#f97316" fill-opacity="0.18"/>
+
+    <!-- Black keys (two octaves: 2 + 3 pattern × 2) -->
+    <g fill="#03030a">
+      <rect x="22"  y="0" width="24" height="58" rx="2"/>
+      <rect x="56"  y="0" width="24" height="58" rx="2"/>
+      <rect x="124" y="0" width="24" height="58" rx="2"/>
+      <rect x="158" y="0" width="24" height="58" rx="2"/>
+      <rect x="192" y="0" width="24" height="58" rx="2"/>
+      <rect x="262" y="0" width="24" height="58" rx="2"/>
+      <rect x="296" y="0" width="24" height="58" rx="2"/>
+      <rect x="363" y="0" width="24" height="58" rx="2"/>
+      <rect x="397" y="0" width="24" height="58" rx="2"/>
+      <rect x="431" y="0" width="24" height="58" rx="2"/>
+    </g>
+
+    <!-- Top edge highlight -->
+    <rect x="0" y="0" width="480" height="1" fill="#ffffff" opacity="0.06"/>
+  </g>
+
+  <!-- Vignette on top -->
+  <rect width="1200" height="630" fill="url(#bgVignette)" pointer-events="none"/>
+
+  <!-- ─── Left content ─────────────────────────────────────────────── -->
+  <g transform="translate(82, 0)">
+    <!-- Eyebrow label -->
+    <text x="0" y="154"
+          font-family="Inter"
+          font-size="13"
+          font-weight="600"
+          fill="#f97316"
+          letter-spacing="3.4">MIDI VISUALIZER</text>
+    <rect x="0" y="168" width="28" height="1.5" fill="#f97316" opacity="0.75"/>
+
+    <!-- Brand wordmark -->
+    <text x="-6" y="286"
           font-family="Instrument Serif"
           font-style="italic"
           font-weight="400"
-          font-size="156"
+          font-size="168"
           fill="#fafafa"
-          letter-spacing="-3">midee</text>
+          letter-spacing="-4">midee</text>
 
-    <!-- hero tagline -->
-    <text x="2" y="322"
+    <!-- Tagline -->
+    <text x="0" y="352"
           font-family="Inter"
-          font-size="30"
+          font-size="32"
           font-weight="500"
-          fill="#d5d5e2"
-          letter-spacing="-0.3">Drop a MIDI. Watch it sing.</text>
+          fill="#e6e6ef"
+          letter-spacing="-0.4">Drop a MIDI. Watch it sing.</text>
 
-    <!-- sub line -->
-    <text x="2" y="367"
+    <!-- Sub-tagline -->
+    <text x="0" y="396"
           font-family="Inter"
-          font-size="19"
+          font-size="18"
           font-weight="400"
-          fill="#8a8a9c">A free, open-source MIDI visualizer in your browser.</text>
+          fill="#8a8a9c">Free, open-source, runs entirely in your browser.</text>
+    <text x="0" y="422"
+          font-family="Inter"
+          font-size="18"
+          font-weight="400"
+          fill="#8a8a9c">Play live, loop, record, export 1080p MP4.</text>
 
-    <!-- feature chips -->
-    <g transform="translate(2, 412)">
-      <g>
-        <rect x="0"   y="0" width="118" height="34" rx="17" fill="#ffffff" fill-opacity="0.035"/>
-        <rect x="0.5" y="0.5" width="117" height="33" rx="16.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
-        <text x="59"  y="22" font-family="Inter" font-size="14" font-weight="500" fill="#c8c8d2" text-anchor="middle">Visualize</text>
-      </g>
-      <g transform="translate(130, 0)">
-        <rect x="0"   y="0" width="80"  height="34" rx="17" fill="#ffffff" fill-opacity="0.035"/>
-        <rect x="0.5" y="0.5" width="79" height="33" rx="16.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
-        <text x="40"  y="22" font-family="Inter" font-size="14" font-weight="500" fill="#c8c8d2" text-anchor="middle">Loop</text>
-      </g>
-      <g transform="translate(222, 0)">
-        <rect x="0"   y="0" width="94"  height="34" rx="17" fill="#ffffff" fill-opacity="0.035"/>
-        <rect x="0.5" y="0.5" width="93" height="33" rx="16.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
-        <text x="47"  y="22" font-family="Inter" font-size="14" font-weight="500" fill="#c8c8d2" text-anchor="middle">Record</text>
-      </g>
-      <g transform="translate(328, 0)">
-        <rect x="0"   y="0" width="128" height="34" rx="17" fill="#f97316" fill-opacity="0.12"/>
-        <rect x="0.5" y="0.5" width="127" height="33" rx="16.5" fill="none" stroke="#f97316" stroke-opacity="0.4" stroke-width="1"/>
-        <text x="64"  y="22" font-family="Inter" font-size="14" font-weight="600" fill="#f97316" text-anchor="middle">Export MP4</text>
-      </g>
+    <!-- Feature strip (dots instead of chips) -->
+    <g transform="translate(0, 472)" font-family="Inter" font-size="15" font-weight="500" fill="#c8c8d2">
+      <text x="0" y="0">Visualize</text>
+      <circle cx="88"  cy="-5" r="2" fill="#4a4a5c"/>
+      <text x="102" y="0">Loop</text>
+      <circle cx="152" cy="-5" r="2" fill="#4a4a5c"/>
+      <text x="166" y="0">Record</text>
+      <circle cx="232" cy="-5" r="2" fill="#4a4a5c"/>
+      <text x="246" y="0" fill="#f9a66a">Export MP4</text>
     </g>
   </g>
 
-  <!-- url footer -->
-  <text x="82" y="585"
-        font-family="JetBrains Mono"
-        font-size="16"
-        font-weight="400"
-        fill="#606070">midee.app</text>
+  <!-- ─── Footer ────────────────────────────────────────────────────── -->
+  <rect x="82" y="568" width="1036" height="1" fill="#ffffff" opacity="0.06"/>
 
-  <text x="1118" y="585"
+  <text x="82" y="598"
+        font-family="JetBrains Mono"
+        font-size="15"
+        font-weight="400"
+        fill="#8a8a9c">midee.app</text>
+
+  <text x="1118" y="598"
         font-family="Inter"
         font-size="14"
         font-weight="400"
-        fill="#484858"
-        text-anchor="end">Open source · MIT</text>
+        fill="#606070"
+        text-anchor="end">Free · Open source · MIT</text>
 </svg>
