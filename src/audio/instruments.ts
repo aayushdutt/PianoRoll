@@ -44,6 +44,10 @@ export const INSTRUMENTS: readonly InstrumentInfo[] = [
 export interface InstrumentRuntime {
   triggerAttack(note: string, time: number, velocity: number): void
   triggerRelease(note: string, time: number): void
+  // Combined attack+release lets scheduled playback fire one event per note
+  // instead of two separate transport entries — cheaper on dense MIDIs and
+  // lets Tone.Part batch events into a single transport slot.
+  triggerAttackRelease(note: string, duration: number, time: number, velocity: number): void
   releaseAll(): void
   dispose(): void
 }
@@ -100,6 +104,10 @@ async function createPiano(): Promise<InstrumentRuntime> {
     return {
       triggerAttack: (note, time, velocity) => inst.keyDown({ note, velocity, time }),
       triggerRelease: (note, time) => inst.keyUp({ note, time }),
+      triggerAttackRelease: (note, duration, time, velocity) => {
+        inst.keyDown({ note, velocity, time })
+        inst.keyUp({ note, time: time + duration })
+      },
       releaseAll: () => inst.stopAll(),
       dispose: () => inst.dispose(),
     }
@@ -246,18 +254,71 @@ function filenameToNote(file: string): string {
   return raw.replace(/^([A-G])s(\d)$/, '$1#$2')
 }
 
+// Decoded sample buffers cached by folder/file so repeated Sampler construction
+// (e.g. every offline export) doesn't refetch or redecode. AudioBuffer is pure
+// PCM data — safe to share across contexts (live Tone context AND offline
+// render contexts), which is the key fix for slow exports: previously each
+// export refetched MP3s and decoded them against a throwaway offline context.
+const sampleBufferCache = new Map<string, Map<string, AudioBuffer>>()
+const pendingFolderLoads = new Map<string, Promise<Map<string, AudioBuffer>>>()
+
+async function loadFolderBuffers(spec: SampleSpec): Promise<Map<string, AudioBuffer>> {
+  const existing = sampleBufferCache.get(spec.folder)
+  if (existing && spec.files.every((f) => existing.has(f))) return existing
+
+  const pending = pendingFolderLoads.get(spec.folder)
+  if (pending) return pending
+
+  const base = `${SAMPLE_BASE}${spec.folder}/`
+  const load = Promise.race([
+    (async () => {
+      const folder = existing ?? new Map<string, AudioBuffer>()
+      // Decode against the live online context. AudioBuffers returned here
+      // remain valid when passed into a later OfflineContext Sampler.
+      const ctx = Tone.getContext()
+      await Promise.all(
+        spec.files.map(async (file) => {
+          if (folder.has(file)) return
+          const res = await fetch(`${base}${file}`)
+          const arr = await res.arrayBuffer()
+          const decoded = await ctx.decodeAudioData(arr)
+          folder.set(file, decoded)
+        }),
+      )
+      sampleBufferCache.set(spec.folder, folder)
+      return folder
+    })(),
+    new Promise<Map<string, AudioBuffer>>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Sample load timeout: ${spec.folder}`)),
+        SAMPLE_LOAD_TIMEOUT_MS,
+      ),
+    ),
+  ]).finally(() => {
+    pendingFolderLoads.delete(spec.folder)
+  })
+
+  pendingFolderLoads.set(spec.folder, load)
+  return load
+}
+
 async function createSampled(
   spec: SampleSpec,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chain?: (sampler: any) => void,
 ): Promise<InstrumentRuntime> {
-  const urls: Record<string, string> = {}
-  for (const file of spec.files) urls[filenameToNote(file)] = file
+  const buffers = await loadFolderBuffers(spec)
+
+  const urls: Record<string, AudioBuffer> = {}
+  for (const file of spec.files) {
+    const buf = buffers.get(file)
+    if (!buf) throw new Error(`Sample buffer missing after load: ${spec.folder}/${file}`)
+    urls[filenameToNote(file)] = buf
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sampler: any = new Tone.Sampler({
     urls,
-    baseUrl: `${SAMPLE_BASE}${spec.folder}/`,
     release: spec.release ?? 1,
     attack: spec.attack ?? 0,
   })
@@ -265,56 +326,128 @@ async function createSampled(
   if (chain) chain(sampler)
   else sampler.toDestination()
 
-  // Tone.loaded() resolves when every registered buffer is ready. Race against
-  // a hard timeout so a slow or dead CDN can't keep the UI in a loading state.
-  await Promise.race([
-    Tone.loaded(),
-    new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Sample load timeout: ${spec.folder}`)),
-        SAMPLE_LOAD_TIMEOUT_MS,
-      ),
-    ),
-  ])
+  // Buffers are already decoded and passed by reference, so Tone.Sampler has
+  // nothing async to wait on — no Tone.loaded() race needed.
 
   return {
     triggerAttack: (note, time, velocity) => sampler.triggerAttack(note, time, velocity),
     triggerRelease: (note, time) => sampler.triggerRelease(note, time),
+    triggerAttackRelease: (note, duration, time, velocity) =>
+      sampler.triggerAttackRelease(note, duration, time, velocity),
     releaseAll: () => sampler.releaseAll(),
     dispose: () => sampler.dispose(),
   }
 }
 
+// Preload sample buffers for an instrument spec without building a Sampler.
+// Export pipeline calls this on the online context before `Tone.Offline` so
+// that offline render doesn't pay fetch+decode cost.
+export async function preloadSampleBuffers(id: InstrumentId): Promise<void> {
+  const spec = SAMPLED_SPECS[id]
+  if (!spec) return
+  await loadFolderBuffers(spec)
+}
+
+// Spec lookup for sampled instruments. Keeping the spec objects in one place
+// lets the preload path share exactly the same inputs as the Sampler path.
+const SAMPLED_SPECS: Partial<Record<InstrumentId, SampleSpec>> = {
+  upright: {
+    folder: 'piano',
+    files: ['A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3', 'A7.mp3', 'C8.mp3'],
+    release: 1.1,
+    volumeDb: -3,
+  },
+  violin: {
+    folder: 'violin',
+    files: [
+      'A3.mp3',
+      'A4.mp3',
+      'A5.mp3',
+      'A6.mp3',
+      'C4.mp3',
+      'C5.mp3',
+      'C6.mp3',
+      'C7.mp3',
+      'E4.mp3',
+      'E5.mp3',
+      'E6.mp3',
+      'G3.mp3',
+      'G4.mp3',
+      'G5.mp3',
+      'G6.mp3',
+    ],
+    release: 1.4,
+    volumeDb: -4,
+  },
+  flute: {
+    folder: 'flute',
+    files: [
+      'A4.mp3',
+      'A5.mp3',
+      'A6.mp3',
+      'C4.mp3',
+      'C5.mp3',
+      'C6.mp3',
+      'C7.mp3',
+      'E4.mp3',
+      'E5.mp3',
+      'E6.mp3',
+    ],
+    release: 0.9,
+    volumeDb: -6,
+  },
+  guitar: {
+    folder: 'guitar-acoustic',
+    files: [
+      'A2.mp3',
+      'A3.mp3',
+      'A4.mp3',
+      'As2.mp3',
+      'As3.mp3',
+      'As4.mp3',
+      'B2.mp3',
+      'B3.mp3',
+      'B4.mp3',
+      'C3.mp3',
+      'C4.mp3',
+      'C5.mp3',
+      'Cs3.mp3',
+      'Cs4.mp3',
+      'Cs5.mp3',
+      'D2.mp3',
+      'D3.mp3',
+      'D4.mp3',
+      'D5.mp3',
+      'Ds2.mp3',
+      'Ds3.mp3',
+      'Ds4.mp3',
+      'E2.mp3',
+      'E3.mp3',
+      'E4.mp3',
+      'F2.mp3',
+      'F3.mp3',
+      'F4.mp3',
+      'Fs2.mp3',
+      'Fs3.mp3',
+      'Fs4.mp3',
+      'G2.mp3',
+      'G3.mp3',
+      'G4.mp3',
+      'Gs2.mp3',
+      'Gs3.mp3',
+      'Gs4.mp3',
+    ],
+    release: 0.8,
+    volumeDb: -2,
+  },
+}
+
 async function createViolin(): Promise<InstrumentRuntime> {
   try {
-    return await createSampled(
-      {
-        folder: 'violin',
-        files: [
-          'A3.mp3',
-          'A4.mp3',
-          'A5.mp3',
-          'A6.mp3',
-          'C4.mp3',
-          'C5.mp3',
-          'C6.mp3',
-          'C7.mp3',
-          'E4.mp3',
-          'E5.mp3',
-          'E6.mp3',
-          'G3.mp3',
-          'G4.mp3',
-          'G5.mp3',
-          'G6.mp3',
-        ],
-        release: 1.4,
-        volumeDb: -4,
-      },
-      (s) => {
-        const reverb = new Tone.Reverb({ decay: 1.8, wet: 0.22 })
-        s.chain(reverb, Tone.getDestination())
-      },
-    )
+    return await createSampled(SAMPLED_SPECS.violin!, (s) => {
+      const reverb = new Tone.Reverb({ decay: 1.8, wet: 0.22 })
+      s.chain(reverb, Tone.getDestination())
+    })
   } catch (err) {
     console.warn('Violin samples unavailable, falling back to synth strings', err)
     return createStrings()
@@ -323,29 +456,10 @@ async function createViolin(): Promise<InstrumentRuntime> {
 
 async function createFlute(): Promise<InstrumentRuntime> {
   try {
-    return await createSampled(
-      {
-        folder: 'flute',
-        files: [
-          'A4.mp3',
-          'A5.mp3',
-          'A6.mp3',
-          'C4.mp3',
-          'C5.mp3',
-          'C6.mp3',
-          'C7.mp3',
-          'E4.mp3',
-          'E5.mp3',
-          'E6.mp3',
-        ],
-        release: 0.9,
-        volumeDb: -6,
-      },
-      (s) => {
-        const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.18 })
-        s.chain(reverb, Tone.getDestination())
-      },
-    )
+    return await createSampled(SAMPLED_SPECS.flute!, (s) => {
+      const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.18 })
+      s.chain(reverb, Tone.getDestination())
+    })
   } catch (err) {
     console.warn('Flute samples unavailable, falling back to synth', err)
     // No existing flute-ish synth — a soft triangle with gentle attack is the
@@ -359,20 +473,12 @@ async function createUpright(): Promise<InstrumentRuntime> {
     // Eight well-spaced samples (one per octave plus C8) — Tone.Sampler
     // interpolates the semitones between. Piano interpolation sounds clean
     // because timbre doesn't change much within an octave.
-    return await createSampled(
-      {
-        folder: 'piano',
-        files: ['A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3', 'A7.mp3', 'C8.mp3'],
-        release: 1.1,
-        volumeDb: -3,
-      },
-      (s) => {
-        // Slight room reverb — the upright sits "in the room" vs the Grand's
-        // concert stage, but neither wants heavy ambience.
-        const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.15 })
-        s.chain(reverb, Tone.getDestination())
-      },
-    )
+    return await createSampled(SAMPLED_SPECS.upright!, (s) => {
+      // Slight room reverb — the upright sits "in the room" vs the Grand's
+      // concert stage, but neither wants heavy ambience.
+      const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.15 })
+      s.chain(reverb, Tone.getDestination())
+    })
   } catch (err) {
     console.warn('Upright samples unavailable, falling back to Grand', err)
     return createPiano()
@@ -402,56 +508,10 @@ async function createGuitar(): Promise<InstrumentRuntime> {
   try {
     // Guitar has a dense sample map (every semitone A2..G#4), so interpolation
     // artefacts are minimal and the plucked attack reads cleanly.
-    return await createSampled(
-      {
-        folder: 'guitar-acoustic',
-        files: [
-          'A2.mp3',
-          'A3.mp3',
-          'A4.mp3',
-          'As2.mp3',
-          'As3.mp3',
-          'As4.mp3',
-          'B2.mp3',
-          'B3.mp3',
-          'B4.mp3',
-          'C3.mp3',
-          'C4.mp3',
-          'C5.mp3',
-          'Cs3.mp3',
-          'Cs4.mp3',
-          'Cs5.mp3',
-          'D2.mp3',
-          'D3.mp3',
-          'D4.mp3',
-          'D5.mp3',
-          'Ds2.mp3',
-          'Ds3.mp3',
-          'Ds4.mp3',
-          'E2.mp3',
-          'E3.mp3',
-          'E4.mp3',
-          'F2.mp3',
-          'F3.mp3',
-          'F4.mp3',
-          'Fs2.mp3',
-          'Fs3.mp3',
-          'Fs4.mp3',
-          'G2.mp3',
-          'G3.mp3',
-          'G4.mp3',
-          'Gs2.mp3',
-          'Gs3.mp3',
-          'Gs4.mp3',
-        ],
-        release: 0.8,
-        volumeDb: -2,
-      },
-      (s) => {
-        const reverb = new Tone.Reverb({ decay: 1.2, wet: 0.14 })
-        s.chain(reverb, Tone.getDestination())
-      },
-    )
+    return await createSampled(SAMPLED_SPECS.guitar!, (s) => {
+      const reverb = new Tone.Reverb({ decay: 1.2, wet: 0.14 })
+      s.chain(reverb, Tone.getDestination())
+    })
   } catch (err) {
     console.warn('Guitar samples unavailable, falling back to synth pluck', err)
     return createPluck()
@@ -463,6 +523,8 @@ function wrapPolySynth(synth: any): InstrumentRuntime {
   return {
     triggerAttack: (note, time, velocity) => synth.triggerAttack(note, time, velocity),
     triggerRelease: (note, time) => synth.triggerRelease(note, time),
+    triggerAttackRelease: (note, duration, time, velocity) =>
+      synth.triggerAttackRelease(note, duration, time, velocity),
     releaseAll: () => synth.releaseAll(),
     dispose: () => synth.dispose(),
   }

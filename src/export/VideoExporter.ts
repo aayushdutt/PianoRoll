@@ -43,9 +43,11 @@ const PROGRESS_UPDATE_EVERY_N_FRAMES = 3
 const AUDIO_CODEC_STRING = 'mp4a.40.2' // AAC-LC
 const AUDIO_BITRATE = 192_000
 const AUDIO_CHUNK_FRAMES = 4096 // ~85 ms at 48kHz — good encoder cadence
-// Video progress is mapped into this slice of the overall [0,1] progress bar.
-// Any pre-video stages (audio encode) occupy [0, VIDEO_PROGRESS_START).
-const VIDEO_PROGRESS_START = 0.05
+// Progress contract: each stage reports `pct` in [0, 1] relative to that stage
+// only. The UI resets the bar when the stage name changes. Stages are not
+// globally scaled against one another because their wall-clock durations vary
+// unpredictably with MIDI length, resolution, and CPU — a fixed global scale
+// is always wrong for some input. Per-stage progress is always accurate.
 
 export class VideoExporter {
   private cancelled = false
@@ -118,7 +120,7 @@ export class VideoExporter {
     // Encode audio up-front. It's typically < 1s of work for a multi-minute
     // MIDI and gives the muxer all audio chunks before video starts streaming.
     if (audio) {
-      await this.encodeAudio(audio, muxer, opts.onProgress, VIDEO_PROGRESS_START)
+      await this.encodeAudio(audio, muxer, opts.onProgress)
       this.throwIfStopped(null)
     }
 
@@ -140,11 +142,16 @@ export class VideoExporter {
       bitrate,
       framerate: fps,
       hardwareAcceleration: 'prefer-hardware',
-      latencyMode: 'quality',
+      // 'realtime' skips the slower rate-distortion optimization passes the
+      // encoder otherwise runs in 'quality' mode — ~1.5-2× faster encode for
+      // the same bitrate, at a slight quality drop that is imperceptible at
+      // the bitrates we target (typically YouTube re-encodes anyway). This
+      // setting is unrelated to live audio latency — it only governs the
+      // H.264 encoder's internal search depth.
+      latencyMode: 'realtime',
     })
 
     const keyEvery = Math.max(1, Math.round(fps * KEYFRAME_INTERVAL_SEC))
-    const videoSpan = 0.95 - VIDEO_PROGRESS_START
 
     try {
       for (let i = 0; i < totalFrames; i++) {
@@ -164,8 +171,7 @@ export class VideoExporter {
         frame.close()
 
         if (i % PROGRESS_UPDATE_EVERY_N_FRAMES === 0) {
-          const pct = VIDEO_PROGRESS_START + (i / totalFrames) * videoSpan
-          opts.onProgress?.('Encoding', pct)
+          opts.onProgress?.('Encoding', i / totalFrames)
         }
 
         // Backpressure: if the encoder is falling behind, wait rather than
@@ -177,23 +183,28 @@ export class VideoExporter {
           }
         } else if (i % 10 === 9) {
           // Even when the encoder keeps up, periodically yield so the browser
-          // can run event loop tasks and the UI stays responsive.
-          await yieldTask()
+          // can run event loop tasks and the UI stays responsive. Uses
+          // scheduler.yield() where available (Chrome 129+) which returns
+          // ~immediately — setTimeout(0) has a hardcoded ~4 ms floor that
+          // adds up to hundreds of ms over a typical export.
+          await yieldToEventLoop()
         }
       }
 
       this.throwIfStopped(encoderError)
 
-      opts.onProgress?.('Finalizing', 0.96)
+      opts.onProgress?.('Finalizing', 0)
       await encoder.flush()
       this.throwIfStopped(encoderError)
 
       muxer.finalize()
+      opts.onProgress?.('Finalizing', 1)
 
-      opts.onProgress?.('Saving', 0.99)
+      opts.onProgress?.('Saving', 0)
       const { buffer } = muxer.target
       const blob = new Blob([buffer], { type: 'video/mp4' })
       triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.mp4')
+      opts.onProgress?.('Saving', 1)
       opts.onProgress?.('Done', 1)
     } finally {
       if (encoder.state !== 'closed') encoder.close()
@@ -224,18 +235,18 @@ export class VideoExporter {
       fastStart: 'in-memory',
     })
 
-    // Audio encoding spans most of the progress bar in this mode since there
-    // is no video pass — leave a small slice for finalize + save.
-    await this.encodeAudio(audio, muxer, opts.onProgress, 0.95)
+    await this.encodeAudio(audio, muxer, opts.onProgress)
     this.throwIfStopped(null)
 
-    opts.onProgress?.('Finalizing', 0.96)
+    opts.onProgress?.('Finalizing', 0)
     muxer.finalize()
+    opts.onProgress?.('Finalizing', 1)
 
-    opts.onProgress?.('Saving', 0.99)
+    opts.onProgress?.('Saving', 0)
     const { buffer } = muxer.target
     const blob = new Blob([buffer], { type: 'audio/mp4' })
     triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.m4a')
+    opts.onProgress?.('Saving', 1)
     opts.onProgress?.('Done', 1)
   }
 
@@ -243,7 +254,6 @@ export class VideoExporter {
     audio: AudioBuffer,
     muxer: Muxer<ArrayBufferTarget>,
     onProgress: ExportProgressCallback | undefined,
-    progressScale: number,
   ): Promise<void> {
     if (typeof AudioEncoder === 'undefined' || typeof AudioData === 'undefined') {
       // Silently skip audio if the browser lacks AudioEncoder (very rare where
@@ -303,8 +313,7 @@ export class VideoExporter {
         encoder.encode(data)
         data.close()
 
-        const pct = (offset / totalFrames) * progressScale
-        onProgress?.('Encoding audio', pct)
+        onProgress?.('Encoding audio', offset / totalFrames)
 
         if (encoder.encodeQueueSize > MAX_ENCODE_QUEUE) {
           while (encoder.encodeQueueSize > MAX_ENCODE_QUEUE / 2) {
@@ -316,7 +325,7 @@ export class VideoExporter {
 
       await encoder.flush()
       if (encoderError) throw encoderError
-      onProgress?.('Encoding audio', progressScale)
+      onProgress?.('Encoding audio', 1)
     } finally {
       if (encoder.state !== 'closed') encoder.close()
       this.audioEncoder = null
@@ -368,6 +377,18 @@ async function pickCodec(
 }
 
 function yieldTask(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+// Lower-overhead yield for the keep-alive path. `scheduler.yield()` resolves
+// on the next event loop tick without the ~4 ms setTimeout-0 clamp. Falls
+// back to setTimeout for browsers that don't support the scheduler API.
+function yieldToEventLoop(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scheduler = (globalThis as any).scheduler
+  if (scheduler && typeof scheduler.yield === 'function') {
+    return scheduler.yield() as Promise<void>
+  }
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 

@@ -954,10 +954,13 @@ export class App {
       if (needsAudio) {
         this.exportModal.updateProgress('Rendering audio', 0)
         try {
+          // Per-stage progress: pct flows straight through. The bar resets
+          // between stages; the stage label makes that explicit.
           audioBuffer = await renderAudioOffline({
             midi,
             instrumentId: INSTRUMENTS[this.instrumentIndex]!.id,
             volume: this.store.state.volume,
+            onProgress: (pct) => this.exportModal.updateProgress('Rendering audio', pct),
           })
         } catch (err) {
           console.error('Offline audio render failed:', err)
@@ -967,13 +970,16 @@ export class App {
         }
       }
 
+      const exportAudio =
+        audioBuffer && settings.output === 'av' ? trimAudioBuffer(audioBuffer, midi.duration) : audioBuffer
+
       await exporter.export({
         fps: settings.fps,
         duration: midi.duration,
         mode: settings.output,
         filename,
         bitrate: resolveExportBitrate(settings.resolution),
-        ...(audioBuffer ? { audio: audioBuffer } : {}),
+        ...(exportAudio ? { audio: exportAudio } : {}),
         onSeek: (t) => this.clock.seek(t),
         onRenderFrame: (t, dt) => this.renderer.renderManualFrame(t, dt),
         onProgress: (stage, pct) => this.exportModal.updateProgress(stage, pct),
@@ -1425,6 +1431,23 @@ function speedToPps(speed: 'compact' | 'standard' | 'drama'): number {
     case 'drama':
       return 120
   }
+}
+
+function trimAudioBuffer(audio: AudioBuffer, durationSec: number): AudioBuffer {
+  const targetFrames = Math.max(1, Math.ceil(durationSec * audio.sampleRate))
+  if (targetFrames >= audio.length) return audio
+
+  const trimmed = new AudioBuffer({
+    length: targetFrames,
+    numberOfChannels: audio.numberOfChannels,
+    sampleRate: audio.sampleRate,
+  })
+
+  for (let ch = 0; ch < audio.numberOfChannels; ch++) {
+    trimmed.copyToChannel(audio.getChannelData(ch).subarray(0, targetFrames), ch)
+  }
+
+  return trimmed
 }
 
 // Strips characters that misbehave in filenames across Windows/macOS/Linux.
