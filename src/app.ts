@@ -960,6 +960,7 @@ export class App {
             midi,
             instrumentId: INSTRUMENTS[this.instrumentIndex]!.id,
             volume: this.store.state.volume,
+            onRenderAudioProgressMode: (d) => this.exportModal.setRenderAudioProgressMode(d),
             onProgress: (pct) => this.exportModal.updateProgress('Rendering audio', pct),
           })
         } catch (err) {
@@ -971,7 +972,9 @@ export class App {
       }
 
       const exportAudio =
-        audioBuffer && settings.output === 'av' ? trimAudioBuffer(audioBuffer, midi.duration) : audioBuffer
+        audioBuffer && settings.output === 'av'
+          ? trimAudioBuffer(audioBuffer, midi.duration)
+          : audioBuffer
 
       await exporter.export({
         fps: settings.fps,

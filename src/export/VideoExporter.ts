@@ -42,7 +42,8 @@ const PROGRESS_UPDATE_EVERY_N_FRAMES = 3
 
 const AUDIO_CODEC_STRING = 'mp4a.40.2' // AAC-LC
 const AUDIO_BITRATE = 192_000
-const AUDIO_CHUNK_FRAMES = 4096 // ~85 ms at 48kHz — good encoder cadence
+// Chunk size in frames; wall duration follows `buffer.sampleRate` (offline render is 44.1 kHz).
+const AUDIO_CHUNK_FRAMES = 4096 // e.g. ~93 ms at 44.1 kHz — good encoder cadence
 // Progress contract: each stage reports `pct` in [0, 1] relative to that stage
 // only. The UI resets the bar when the stage name changes. Stages are not
 // globally scaled against one another because their wall-clock durations vary

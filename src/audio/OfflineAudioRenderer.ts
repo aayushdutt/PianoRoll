@@ -25,6 +25,10 @@ export interface OfflineRenderOptions {
   // Progress in [0, 1] — how far through the render we are. Called ~20 times
   // across the render, driven by OfflineAudioContext.suspend() checkpoints.
   onProgress?: (pct: number) => void
+  // Fired once the offline context exists, before any async work in that context.
+  // `true` means `onProgress` will be called; `false` = no suspend API (older
+  // runtimes) — the UI should stay indeterminate for this stage.
+  onRenderAudioProgressMode?: (determinate: boolean) => void
 }
 
 // 44.1 kHz matches AAC output in the muxer — rendering at 48 kHz cost ~9% more
@@ -92,6 +96,8 @@ export async function renderAudioOffline(opts: OfflineRenderOptions): Promise<Au
   Tone.setContext(offline)
 
   try {
+    opts.onRenderAudioProgressMode?.(typeof rawContext.suspend === 'function')
+
     const inst = await createInstrument(instrumentId)
     Tone.getDestination().volume.value = Tone.gainToDb(volume)
 

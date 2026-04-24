@@ -312,6 +312,9 @@ export class ExportModal {
   onStart?: (settings: ExportSettings) => void
   onCancel?: () => void
 
+  /** `null` until the offline render reports whether the browser can emit % progress. */
+  private renderAudioProgressDeterminate: boolean | null = null
+
   constructor(container: HTMLElement) {
     const [isOpen, setIsOpen] = createSignal(false)
     const [phase, setPhase] = createSignal<Phase>('settings')
@@ -394,6 +397,7 @@ export class ExportModal {
   }
 
   open(): void {
+    this.renderAudioProgressDeterminate = null
     this.setPhase('settings')
     this.setPct(0)
     this.setIndet(false)
@@ -405,13 +409,30 @@ export class ExportModal {
     this.setIsOpen(false)
   }
 
+  /**
+   * Called from `renderAudioOffline` after `OfflineAudioContext` is ready.
+   * @param determinate false when the browser has no `suspend` hook — `onProgress` never runs.
+   */
+  setRenderAudioProgressMode(determinate: boolean): void {
+    this.renderAudioProgressDeterminate = determinate
+    this.setIndet(!determinate)
+    if (determinate) this.setPct(0)
+  }
+
   updateProgress(stage: ExportStage, pct: number): void {
-    // Rendering audio happens inside Tone.Offline with no progress hook we can
-    // tap, so show an indeterminate shimmer instead of a misleading percent.
-    const indet = stage === 'Rendering audio'
     this.setStage(`${stage}…`)
-    this.setIndet(indet)
-    this.setPct(indet ? 0 : pct)
+    if (stage === 'Rendering audio') {
+      if (this.renderAudioProgressDeterminate === true) {
+        this.setIndet(false)
+        this.setPct(pct)
+        return
+      }
+      this.setIndet(true)
+      this.setPct(0)
+      return
+    }
+    this.setIndet(false)
+    this.setPct(pct)
   }
 
   dispose(): void {
