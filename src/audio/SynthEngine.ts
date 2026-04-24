@@ -31,6 +31,13 @@ export class SynthEngine implements AudioEngine {
   private scheduledFromTime = 0
   private readyPromise: Promise<void> = Promise.resolve()
   private liveWarmupStarted = false
+  // Latest-wins guard for `play()`. `play()` is async (awaits readyPromise +
+  // Tone.start) and can be racing against a subsequent `pause()`. Without
+  // this, calling pause during the async window lets the next transport.start
+  // at the tail of play() fire after we thought we paused — audio leaks.
+  // Each play() call increments; if a newer call or a pause() ran, the older
+  // play() bails before hitting transport.start.
+  private playGeneration = 0
 
   async load(source: MidiFile | AudioBuffer): Promise<void> {
     if (!(source instanceof AudioBuffer)) {
@@ -92,8 +99,12 @@ export class SynthEngine implements AudioEngine {
 
   async play(fromTime: number): Promise<void> {
     if (!this.midi) return
+    const gen = ++this.playGeneration
     await this.readyPromise
     await Tone.start()
+    // A pause() or a newer play() happened during the awaits — abandon this
+    // invocation so we don't resurrect transport audio against user intent.
+    if (gen !== this.playGeneration) return
 
     const transport = Tone.getTransport()
     if (transport.state === 'paused' && Math.abs(fromTime - this.scheduledFromTime) < 0.05) {
@@ -145,12 +156,18 @@ export class SynthEngine implements AudioEngine {
   }
 
   pause(): void {
+    // Bump the generation so any in-flight `play()` aborts before it can
+    // reach `transport.start()` and resurrect audio after the pause.
+    this.playGeneration++
     Tone.getTransport().pause()
     this.releaseAllInstruments()
   }
 
   seek(time: number): void {
     const wasPlaying = Tone.getTransport().state === 'started'
+    // Same latest-wins guard — a concurrent play() racing with a seek would
+    // otherwise restart transport at a stale fromTime.
+    this.playGeneration++
     Tone.getTransport().stop()
     this.clearScheduled()
     this.releaseAllInstruments()

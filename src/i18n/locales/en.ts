@@ -45,8 +45,9 @@ export const en = {
 
   // ── Top strip (primary nav) ─────────────────────────────────
   'topStrip.home': 'Home',
-  'topStrip.modeFile': 'Play a MIDI file',
+  'topStrip.modePlay': 'Play a MIDI file',
   'topStrip.modeLive': 'Play live',
+  'topStrip.modeLearn': 'Learn · exercises, ear training, sight reading',
   'topStrip.openMidi': 'Open MIDI file',
   'topStrip.tracks': 'Tracks',
   'topStrip.midi': 'MIDI device',
@@ -81,7 +82,6 @@ export const en = {
   'hud.volume': 'Volume',
   'hud.speed': 'Playback speed',
   'hud.zoom': 'Zoom (note height)',
-  'hud.tip.practice': 'Practice mode · pause at every note until you play it',
   'hud.tip.kbdRefHide': 'Hide',
   'hud.tip.kbdRefShow': 'Show keyboard reference',
   'hud.tip.octaveDown': 'Octave −',
@@ -100,7 +100,6 @@ export const en = {
   'hud.aria.volume': 'Volume',
   'hud.aria.speed': 'Speed',
   'hud.aria.zoom': 'Zoom',
-  'hud.aria.practice': 'Practice mode — wait for correct notes',
   'hud.aria.metronomeToggle': 'Toggle metronome',
   'hud.aria.bpmDec': 'Decrease BPM',
   'hud.aria.bpmInc': 'Increase BPM',
@@ -147,11 +146,16 @@ export const en = {
   'error.sample.fetchFailed': 'Could not load that sample — check your network and try again.',
   'error.audio.renderFailed': 'Audio render failed — MP4 will be silent.',
   'error.export.generic': 'Export failed — check console for details.',
-  'error.practice.fileOnly': 'Practice mode is only available while playing a MIDI file.',
 
   // ── Document title (browser tab) ───────────────────────────
   'doc.title.home': 'midee — drop a MIDI, watch it sing',
   'doc.title.live': 'midee · live',
+  'doc.title.learn': 'midee · learn',
+
+  // ── Learn hub ───────────────────────────────────────────────
+  'learn.hub.title': 'Learn',
+  'learn.hub.subtitle': 'Exercises, ear training, and sight reading',
+  'learn.hub.placeholder': 'Hub coming soon — exercises land as the catalog fills in.',
 
   // ── Track panel ────────────────────────────────────────────
   'tracks.title': 'Tracks',

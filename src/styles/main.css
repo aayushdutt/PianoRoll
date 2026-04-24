@@ -917,7 +917,10 @@ body {
   top: 3px;
   bottom: 3px;
   left: 3px;
-  width: calc(50% - 3px);
+  /* Three segments now (Play / Live / Learn). The thumb is one-third of the
+     available width (minus the 3px left inset that applies only once). Each
+     active state translates by a full segment width. */
+  width: calc((100% - 6px) / 3);
   border-radius: var(--r-pill);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08));
   box-shadow:
@@ -931,7 +934,7 @@ body {
     opacity 0.18s var(--ease-out);
 }
 
-.ts-mode-switch[data-active="file"] .ts-mode-thumb {
+.ts-mode-switch[data-active="play"] .ts-mode-thumb {
   opacity: 1;
   transform: translateX(0);
 }
@@ -939,6 +942,1374 @@ body {
 .ts-mode-switch[data-active="live"] .ts-mode-thumb {
   opacity: 1;
   transform: translateX(100%);
+}
+
+.ts-mode-switch[data-active="learn"] .ts-mode-thumb {
+  opacity: 1;
+  transform: translateX(200%);
+}
+
+/* ─────────────────────────────────────────
+   LEARN MODE
+───────────────────────────────────────── */
+
+/* Learn "host" layers sit inside #ui-overlay. Each mode-sub-view (hub vs
+   active exercise) owns one. We class-toggle visibility instead of
+   mount/unmount so re-entering the hub is free.
+   IMPORTANT: `--hidden` is declared AFTER the variant rules so its
+   `display: none` wins when it's applied alongside `--hub` or `--exercise`.
+   Both variant rules set their own `display: flex`, so placing the hidden
+   rule first (with equal specificity) would have no effect. This ordering
+   is load-bearing — don't reshuffle. */
+.learn-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.learn-host--hub {
+  pointer-events: auto;
+  /* Contain scroll — the page itself must not scroll. The hub owns its own
+     internal scroll region below the sticky topbar. */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.learn-host--exercise {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.learn-host--hidden {
+  display: none;
+}
+
+/* The hub is a vertical flex: sticky topbar on top, scrolling content below.
+   A soft accent glow sits behind everything so the background reads as a
+   deliberate "inside the app" panel rather than an empty page. */
+.learn-hub {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  overflow: hidden;
+}
+
+.learn-hub__glow {
+  position: absolute;
+  inset: -20% -20% 40% -20%;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      800px 400px at 70% -10%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(600px 400px at 10% 10%, rgba(120, 140, 255, 0.1), transparent 60%);
+  z-index: 0;
+}
+
+.learn-hub__topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 28px 40px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.learn-hub__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.learn-hub__title {
+  font: 700 22px / 1 var(--font);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.learn-hub__subtitle {
+  font: 400 12.5px / 1.3 var(--font);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.learn-hub__scroll {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0; /* let the flex child actually shrink */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Hide scrollbars cross-browser — content still scrolls, gutter doesn't. */
+  scrollbar-width: none;
+}
+.learn-hub__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.learn-hub__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* ─── Streak pill in the topbar ──────────────────────────── */
+
+.learn-hub__streak {
+  display: flex;
+  align-items: center;
+}
+.streak-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: default;
+}
+.streak-row__flame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent);
+}
+.streak-row__count {
+  font: 700 16px / 1 var(--font);
+  letter-spacing: -0.02em;
+  tab-size: 4;
+  font-variant-numeric: tabular-nums;
+}
+.streak-row__label {
+  font: 500 11px / 1 var(--font);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.streak-row__dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+.streak-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+.streak-dot--filled {
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.streak-dot--today {
+  outline: 1px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 1px;
+}
+
+/* ─── Hero card ──────────────────────────────────────────── */
+
+.hero-card {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: center;
+  gap: 20px;
+  padding: 22px 24px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
+    rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 10px 30px rgba(0, 0, 0, 0.2);
+}
+.hero-card__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+}
+.hero-card__badge svg {
+  width: 28px;
+  height: 28px;
+}
+.hero-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hero-card__kicker {
+  font: 600 10.5px / 1 var(--font);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.hero-card__title {
+  font: 700 22px / 1.15 var(--font);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.hero-card__blurb {
+  font: 400 13px / 1.5 var(--font);
+  color: var(--text-muted);
+  margin: 0;
+  max-width: 520px;
+}
+.hero-card__hint {
+  font: 400 12px / 1.4 var(--font);
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-muted));
+  margin: 4px 0 0;
+}
+.hero-card__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.hero-card__primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0a14;
+  border: none;
+  font: 600 13px / 1 var(--font);
+  cursor: pointer;
+  box-shadow:
+    0 10px 30px -8px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  transition:
+    transform 0.15s var(--ease-spring),
+    filter 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.hero-card__primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 34px -8px color-mix(in srgb, var(--accent) 70%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+.hero-card__primary:active {
+  transform: translateY(0) scale(0.98);
+}
+.hero-card__primary-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.hero-card__secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font: 600 11.5px / 1 var(--font);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.hero-card__secondary:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-hi);
+}
+
+/* ─── Samples strip inside Learn hub ─────────────────────── */
+
+.learn-hub__samples-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.learn-hub__section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.learn-hub__section-title {
+  font: 600 13px / 1 var(--font);
+  color: var(--text);
+}
+.learn-hub__section-hint {
+  font: 500 11px / 1 var(--font);
+  color: var(--text-dim);
+}
+.learn-hub__samples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.learn-sample {
+  display: grid;
+  grid-template-columns: 6px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition:
+    transform 0.15s var(--ease-spring),
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.learn-sample:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--sample-accent, var(--accent)) 50%, var(--border));
+  background: color-mix(in srgb, var(--sample-accent, var(--accent)) 7%, rgba(255, 255, 255, 0.04));
+}
+.learn-sample__accent {
+  width: 4px;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--sample-accent, var(--accent));
+  opacity: 0.8;
+}
+.learn-sample__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.learn-sample__title {
+  font: 600 13px / 1.2 var(--font);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.learn-sample__composer {
+  font: 500 11px / 1 var(--font);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.learn-sample__go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sample-accent, var(--accent)) 25%, transparent);
+  color: var(--sample-accent, var(--accent));
+  flex-shrink: 0;
+}
+
+/* ─── Catalog grid ───────────────────────────────────────── */
+
+.learn-hub__grid-label {
+  font: 600 10.5px / 1 var(--font);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-top: 6px;
+}
+
+.learn-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.ex-card {
+  text-align: left;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.15s var(--ease-spring),
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 128px;
+  position: relative;
+}
+.ex-card:hover:not(.ex-card--coming) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.35);
+}
+.ex-card:active:not(.ex-card--coming) {
+  transform: translateY(0);
+}
+.ex-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+.ex-card__icon svg {
+  width: 20px;
+  height: 20px;
+}
+.ex-card:hover:not(.ex-card--coming) .ex-card__icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.ex-card__title {
+  font: 600 15px / 1.2 var(--font);
+  letter-spacing: -0.005em;
+}
+.ex-card__blurb {
+  font: 400 12.5px / 1.45 var(--font);
+  color: var(--text-muted);
+}
+.ex-card--coming {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ─── Play-Along HUD ─────────────────────────────────────── */
+
+/* Floating, moveable, pinnable card. Reuses `hud-bar` for backdrop / border /
+   shadow so it matches the Play and Live bars. Layout is a CSS grid with two
+   rows:
+     row 1 │ handle · transport (play + scrubber) · meta (score + close)
+     row 2 │ options, centered, wrap-friendly
+   `--hud-dx` / `--hud-dy` are set by the HUD's drag handler so the user's
+   position is preserved via CSS transform (no reflow). */
+.pa-hud {
+  pointer-events: auto;
+  position: absolute;
+  bottom: calc(var(--keyboard-h, 120px) + var(--hud-gap, 16px) + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(calc(-50% + var(--hud-dx, 0px))) translateY(var(--hud-dy, 0px));
+  width: min(720px, calc(100vw - 24px));
+  height: auto;
+  padding: 10px 14px 12px;
+  /* Chrome that mirrors .hud-bar — but owned locally since .hud-bar locks
+     `height: 56px` which breaks this HUD's two-row grid. */
+  background: rgba(7, 7, 15, 0.93);
+  backdrop-filter: blur(48px) saturate(160%);
+  -webkit-backdrop-filter: blur(48px) saturate(160%);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.75),
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  /* `minmax(0, 1fr)` — crucial. `1fr` defaults to `minmax(auto, 1fr)` which
+     has a min of min-content, so if the scrubber's ideal width is wide, the
+     column refuses to shrink and the meta column gets pushed out / overlaps. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "handle transport meta"
+    "options options options";
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 8px;
+  z-index: 15;
+  transition:
+    opacity 0.35s var(--ease-out),
+    transform 0.2s var(--ease-out);
+}
+
+.pa-hud.pa-hud--dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.pa-hud.pa-hud--dragging * {
+  cursor: grabbing !important;
+}
+
+/* Idle fade while playing (matches the main HUD's auto-hide behaviour).
+   Pin suppresses this — see PlayAlongHud.scheduleIdleFade. */
+.pa-hud.pa-hud--idle:not(.pa-hud--pinned):not(.pa-hud--dragging):not(:hover) {
+  opacity: 0.28;
+}
+
+.pa-hud__handle {
+  grid-area: handle;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 2px;
+  border-right: 1px solid var(--border);
+  margin-right: 2px;
+  height: 28px;
+}
+
+.pa-hud__transport {
+  grid-area: transport;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pa-hud__scrub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pa-hud__meta {
+  grid-area: meta;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pa-hud__options {
+  grid-area: options;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.pa-hud__play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0a14;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    0 6px 16px -4px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.25) inset;
+  transition: transform 0.12s var(--ease-spring);
+  flex-shrink: 0;
+}
+.pa-hud__play:hover {
+  transform: scale(1.05);
+}
+.pa-hud__play:active {
+  transform: scale(0.96);
+}
+.pa-hud__play-icon--pause {
+  display: none;
+}
+.pa-hud__play.is-playing .pa-hud__play-icon--play {
+  display: none;
+}
+.pa-hud__play.is-playing .pa-hud__play-icon--pause {
+  display: inline;
+}
+
+.pa-hud__time {
+  font: 600 12px / 1 var(--font);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.pa-hud__time--muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.pa-hud__scrubber {
+  flex: 1 1 120px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  height: 18px;
+  cursor: pointer;
+  min-width: 80px;
+}
+.pa-hud__scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--pct, 0%),
+    rgba(255, 255, 255, 0.1) var(--pct, 0%),
+    rgba(255, 255, 255, 0.1) 100%
+  );
+}
+.pa-hud__scrubber::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--pct, 0%),
+    rgba(255, 255, 255, 0.1) var(--pct, 0%),
+    rgba(255, 255, 255, 0.1) 100%
+  );
+}
+.pa-hud__scrubber::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0a0a14;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+.pa-hud__scrubber::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0a0a14;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+.pa-hud__scrubber:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+/* Segmented control — Apple-style pill with a contained track. Reads as a
+   single affordance instead of three floating chips. */
+.pa-hud__segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.pa-hud__seg-label {
+  font: 600 10px / 1 var(--font);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  user-select: none;
+}
+.pa-hud__seg-track {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  gap: 2px;
+}
+.pa-hud__seg {
+  font: 600 11.5px / 1 var(--font);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.2s ease,
+    transform 0.12s var(--ease-spring);
+  min-width: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.pa-hud__seg:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+.pa-hud__seg.is-active {
+  color: #0a0a14;
+  background: var(--accent);
+  box-shadow:
+    0 2px 6px -1px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+.pa-hud__seg.is-active:hover {
+  background: var(--accent);
+  filter: brightness(1.06);
+}
+
+/* Icon + label pill (Wait / Ramp / Loop). Off = quiet outline, on = accent. */
+.pa-hud__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 11.5px / 1 var(--font);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.2s ease,
+    transform 0.12s var(--ease-spring);
+}
+.pa-hud__pill:hover {
+  color: var(--text);
+  border-color: var(--border-hi);
+  background: rgba(255, 255, 255, 0.06);
+}
+.pa-hud__pill:active {
+  transform: scale(0.97);
+}
+.pa-hud__pill[aria-pressed="true"] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent) inset;
+}
+.pa-hud__pill-sub {
+  font: 500 10.5px / 1 var(--font);
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Loop pill + attached clear button. Clear is only shown when a loop is
+   armed (.pa-hud__loop--on) — this keeps the HUD quiet when looping is off
+   instead of dangling a no-op × next to the pill. */
+.pa-hud__loop {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.pa-hud__loop--on .pa-hud__pill--loop {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.pa-hud__loop-clear {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  border-left: none;
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.pa-hud__loop--on .pa-hud__loop-clear {
+  display: inline-flex;
+}
+.pa-hud__loop-clear:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* Icon-only buttons (close / clear loop). */
+.pa-hud__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.pa-hud__icon-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-hi);
+}
+.pa-hud__icon-btn--tight {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.pa-hud__close {
+  margin-left: auto;
+}
+
+/* Score pill — compact, tabular, quiet. The focus belongs on the roll, not
+   on "you're at 24/37". The label ("hits / total") shows up as a tooltip. */
+.pa-hud__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font: 600 12px / 1 var(--font);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.pa-hud__score-hits {
+  color: var(--accent);
+}
+.pa-hud__score-sep,
+.pa-hud__score-total {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ─── Compact layout for narrow viewports ─────────────────── */
+@media (max-width: 720px) {
+  .learn-hub__topbar {
+    padding: 20px 20px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .learn-hub__inner {
+    padding: 22px 20px 32px;
+  }
+  .hero-card {
+    grid-template-columns: 48px 1fr;
+    grid-template-rows: auto auto;
+  }
+  .hero-card__actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .learn-hub__samples {
+    grid-template-columns: 1fr;
+  }
+  .learn-hub__grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .pa-hud {
+    grid-template-columns: auto 1fr auto;
+    column-gap: 8px;
+    padding: 8px 12px 10px;
+  }
+  .pa-hud__seg-label {
+    display: none;
+  }
+  .pa-hud__options {
+    gap: 8px;
+  }
+}
+
+/* ─── Intervals (ear training) ─────────────────────────── */
+
+/* Centered card surface. Ear training benefits from a quiet, focused frame
+   so the user's attention goes to the sound, not the chrome. Positioned
+   absolutely to fill the exercise host — the whole card breathes inside the
+   viewport gutters so it still feels app-like on small windows. */
+.iv-card {
+  position: absolute;
+  inset: calc(90px + env(safe-area-inset-top)) 20px
+    calc(var(--keyboard-h, 120px) + var(--hud-gap, 16px) + env(safe-area-inset-bottom)) 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(560px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding: 22px 24px 20px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: rgba(8, 8, 16, 0.88);
+  backdrop-filter: blur(48px) saturate(160%);
+  -webkit-backdrop-filter: blur(48px) saturate(160%);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  pointer-events: auto;
+}
+
+.iv-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.iv-card__crumb {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.iv-card__kicker {
+  font: 600 10.5px / 1 var(--font);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.iv-card__title {
+  font: 700 22px / 1.15 var(--font);
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+.iv-card__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.iv-card__close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-hi);
+}
+
+.iv-card__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.iv-card__progress-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.iv-card__progress-fill {
+  width: var(--pct, 0%);
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--accent) 80%, transparent),
+    var(--accent)
+  );
+  transition: width 0.35s var(--ease-out);
+}
+.iv-card__progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 500 11.5px / 1 var(--font);
+  color: var(--text-muted);
+}
+.iv-card__streak {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.iv-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.iv-card__prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.iv-card__prompt-label {
+  font: 600 10.5px / 1 var(--font);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.iv-card__prompt-hint {
+  font: 400 13px / 1.5 var(--font);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.iv-card__listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0a14;
+  border: none;
+  font: 600 14px / 1 var(--font);
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  align-self: flex-start;
+  box-shadow:
+    0 12px 32px -8px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  transition:
+    transform 0.15s var(--ease-spring),
+    filter 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.iv-card__listen:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.iv-card__listen:active {
+  transform: translateY(0) scale(0.97);
+}
+.iv-card__listen-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(10, 10, 20, 0.15);
+}
+
+.iv-card__answers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+.iv-answer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition:
+    transform 0.15s var(--ease-spring),
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.iv-answer:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--border-hi);
+  background: rgba(255, 255, 255, 0.06);
+}
+.iv-answer:active {
+  transform: translateY(0) scale(0.98);
+}
+.iv-answer__short {
+  font: 700 20px / 1 var(--font);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.iv-answer__full {
+  font: 500 11px / 1 var(--font);
+  color: var(--text-muted);
+}
+
+.iv-card[data-phase="feedback"] .iv-answer {
+  cursor: default;
+}
+.iv-answer.iv-answer--correct {
+  border-color: color-mix(in srgb, #7ee7b8 70%, transparent);
+  background: color-mix(in srgb, #7ee7b8 18%, rgba(255, 255, 255, 0.04));
+  color: var(--text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #7ee7b8 45%, transparent) inset;
+}
+.iv-answer.iv-answer--correct .iv-answer__short {
+  color: #7ee7b8;
+}
+.iv-answer.iv-answer--wrong {
+  border-color: color-mix(in srgb, #ff6d6d 70%, transparent);
+  background: color-mix(in srgb, #ff6d6d 18%, rgba(255, 255, 255, 0.04));
+  animation: iv-shake 0.32s var(--ease-out);
+}
+@keyframes iv-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+.iv-card__feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+}
+.iv-card__feedback[hidden] {
+  display: none;
+}
+.iv-card__feedback-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.iv-card__feedback-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: 600 10.5px / 1 var(--font);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.iv-card__feedback-badge--ok {
+  background: color-mix(in srgb, #7ee7b8 22%, transparent);
+  color: #7ee7b8;
+}
+.iv-card__feedback-badge--miss {
+  background: color-mix(in srgb, #ff6d6d 22%, transparent);
+  color: #ff6d6d;
+}
+.iv-card__feedback-copy {
+  font: 500 13px / 1.4 var(--font);
+  color: var(--text);
+}
+.iv-card__feedback-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.iv-card__ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font: 600 11.5px / 1 var(--font);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.iv-card__ghost:hover {
+  color: var(--text);
+  border-color: var(--border-hi);
+  background: rgba(255, 255, 255, 0.04);
+}
+.iv-card__next {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: none;
+  color: #0a0a14;
+  font: 600 12px / 1 var(--font);
+  cursor: pointer;
+  transition:
+    transform 0.15s var(--ease-spring),
+    filter 0.15s ease;
+}
+.iv-card__next:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.iv-card__next:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.iv-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.iv-card__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font: 700 15px / 1 var(--font);
+  font-variant-numeric: tabular-nums;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.iv-card__score-sep {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.iv-card__hint-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 11px / 1 var(--font);
+  color: var(--text-dim);
+}
+.iv-card__hint-row kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .iv-card {
+    padding: 18px 18px 16px;
+    gap: 14px;
+  }
+  .iv-card__title {
+    font-size: 19px;
+  }
+  .iv-card__listen {
+    align-self: stretch;
+    justify-content: center;
+  }
+  .iv-card__hint-row {
+    display: none;
+  }
+  .iv-card__foot {
+    justify-content: center;
+  }
+}
+
+/* ─── Session summary ────────────────────────────────────── */
+
+.session-summary {
+  pointer-events: auto;
+  position: fixed;
+  bottom: calc(var(--keyboard-h, 120px) + 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 380px;
+  padding: 14px 22px;
+  border-radius: 14px;
+  background: rgba(10, 10, 15, 0.7);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  animation: summary-in 0.26s var(--ease-out) both;
+}
+@keyframes summary-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+.session-summary__row {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+.session-summary__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.session-summary__value {
+  font: 700 18px / 1 var(--font);
+}
+.session-summary__label {
+  font: 400 10.5px / 1 var(--font);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.session-summary__metric--streak .session-summary__value {
+  color: var(--accent);
+}
+.session-summary__actions {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.session-summary__btn {
+  font: 500 12px / 1 var(--font);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.session-summary__btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+}
+.session-summary__btn--primary {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 /* Compact widths: shrink segment padding, still show both labels. */
@@ -980,7 +2351,7 @@ body {
   background: var(--accent);
   box-shadow: 0 0 10px var(--accent-glow);
 }
-#top-strip[data-mode="file"] .ts-status-dot {
+#top-strip[data-mode="play"] .ts-status-dot {
   background: var(--accent);
 }
 #top-strip.strip--playing .ts-status-dot {
@@ -3946,6 +5317,18 @@ body.is-touch #kbd-resizer {
 .hud-bar [data-tip]:active::after {
   transform: translateX(-50%) translateY(0);
 }
+/* Play-Along HUD shares the same tooltip convention — flip above so hints
+   don't land on top of the keyboard that sits directly below the bar. */
+.pa-hud [data-tip]::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+}
+.pa-hud [data-tip]:hover::after,
+.pa-hud [data-tip]:focus-visible::after,
+.pa-hud [data-tip]:active::after {
+  transform: translateX(-50%) translateY(0);
+}
 /* On mobile portrait the HUD is docked at the top, so flip back to below. */
 @media (max-width: 640px) and (orientation: portrait) {
   .hud-bar [data-tip]::after {
@@ -4365,8 +5748,8 @@ body.is-touch #kbd-resizer {
 /* File mode plays a MIDI — the chord chip + its toggle hide so the topbar
    stays focused on transport and the chord readout doesn't narrate audio
    the user is already passively listening to. */
-#top-strip[data-mode="file"] .ts-chord-btn,
-#top-strip[data-mode="file"] .ts-chord-slot {
+#top-strip[data-mode="play"] .ts-chord-btn,
+#top-strip[data-mode="play"] .ts-chord-slot {
   display: none;
 }
 
@@ -4867,113 +6250,4 @@ body.is-touch #kbd-resizer {
   .ts-chord-readout--on {
     display: none;
   }
-}
-
-/* ─────────────────────────────────────────
-   PRACTICE MODE  (Synthesia-style wait)
-───────────────────────────────────────── */
-
-.hud-practice-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 12px;
-  height: 30px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-muted);
-  font: 500 11.5px / 1 var(--font);
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.15s var(--ease-spring);
-  position: relative;
-  white-space: nowrap;
-}
-
-.hud-practice-btn:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border-hi);
-}
-
-.hud-practice-btn:active {
-  transform: scale(0.97);
-}
-
-.hud-practice-icon {
-  display: inline-flex;
-  width: 14px;
-  height: 14px;
-  align-items: center;
-  justify-content: center;
-  color: currentColor;
-  opacity: 0.85;
-}
-
-.hud-practice-btn--on {
-  color: var(--text);
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 22%, transparent),
-    color-mix(in srgb, var(--accent) 8%, transparent)
-  );
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) inset,
-    0 6px 20px -10px var(--accent-glow);
-}
-
-.hud-practice-btn--on .hud-practice-icon {
-  color: var(--accent);
-  opacity: 1;
-  filter: drop-shadow(0 0 5px var(--accent-glow));
-}
-
-/* Waiting state — pulses while the engine holds the clock for a chord.
-   Keeps a halo of the accent color breathing so the user knows playback
-   is intentionally paused rather than frozen. */
-@keyframes practice-wait-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) inset,
-      0 0 0 0 color-mix(in srgb, var(--accent) 38%, transparent),
-      0 6px 20px -10px var(--accent-glow);
-  }
-  50% {
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent) inset,
-      0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent),
-      0 8px 26px -8px var(--accent-glow);
-  }
-}
-
-.hud-practice-btn--waiting {
-  animation: practice-wait-pulse 1.25s var(--ease-out) infinite;
-}
-
-.hud-practice-btn--waiting .hud-practice-label::after {
-  content: "";
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-  vertical-align: middle;
-  animation: pulse-dot 1.1s ease-in-out infinite;
-}
-
-/* Hide the practice button outside of file mode. Mirrors the existing
-   .hud-group--file pattern used by transport controls. */
-#hud:not(.hud--file) .hud-practice-btn,
-#hud:not(.hud--file) .hud-divider.hud-group--file {
-  display: none;
 }

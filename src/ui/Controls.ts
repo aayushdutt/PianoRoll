@@ -1,11 +1,9 @@
-import type { MasterClock } from '../core/clock/MasterClock'
+import type { AppServices } from '../core/services'
 import { t } from '../i18n'
-import type { LoopState } from '../midi/LoopEngine'
+import type { LiveLooperState } from '../midi/LiveLooper'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
-import type { AppMode, appState } from '../store/state'
+import type { AppMode } from '../store/state'
 import { icons } from './icons'
-
-type State = typeof appState
 
 const SKIP_SECONDS = 10
 export const ZOOM_MIN = 80
@@ -15,8 +13,7 @@ const IDLE_MS = 2500
 
 export interface ControlsOptions {
   container: HTMLElement
-  state: State
-  clock: MasterClock
+  services: AppServices
   onSeek?: (t: number) => void
   onZoom?: (pps: number) => void
   onThemeCycle?: () => void
@@ -37,7 +34,6 @@ export interface ControlsOptions {
   onSessionToggle?: () => void
   onHudPinChange?: (pinned: boolean) => void
   onChordToggle?: () => void
-  onPracticeToggle?: () => void
   // Clickable octave arrows in the key-hint panel — delta is −1 / +1.
   // Users click the ↑/↓ glyphs thinking they're buttons; this makes the
   // inference correct. Backed by the same handlers as the ArrowUp/ArrowDown
@@ -58,8 +54,9 @@ export class Controls {
   private contextTitleEl!: HTMLElement
   private openBtn!: HTMLButtonElement
   private modeSwitchEl!: HTMLElement
-  private modeFileBtn!: HTMLButtonElement
+  private modePlayBtn!: HTMLButtonElement
   private modeLiveBtn!: HTMLButtonElement
+  private modeLearnBtn!: HTMLButtonElement
   private tracksBtn!: HTMLButtonElement
   private midiBtn!: HTMLButtonElement
   private midiLabelEl!: HTMLElement
@@ -93,8 +90,6 @@ export class Controls {
   private keyHintCloseBtn!: HTMLButtonElement
   private keyHintReopenBtn!: HTMLButtonElement
   private keyHintHidden = false
-  private practiceBtn!: HTMLButtonElement
-  private practiceLabelEl!: HTMLElement
   private isScrubbing = false
   private idleTimer: ReturnType<typeof setTimeout> | null = null
   private currentMidiStatus: MidiDeviceStatus = 'disconnected'
@@ -142,15 +137,20 @@ export class Controls {
       </button>
 
       <div class="ts-mode-switch" role="tablist" aria-label="${t('hud.aria.appMode')}">
-        <button class="ts-mode-seg" id="ts-mode-file" type="button"
-                role="tab" aria-selected="false" data-tip="${t('topStrip.modeFile')}">
-          <span class="ts-mode-icon" aria-hidden="true">${icons.modeFile()}</span>
-          <span class="ts-mode-label">File</span>
+        <button class="ts-mode-seg" id="ts-mode-play" type="button"
+                role="tab" aria-selected="false" data-tip="${t('topStrip.modePlay')}">
+          <span class="ts-mode-icon" aria-hidden="true">${icons.modePlay()}</span>
+          <span class="ts-mode-label">Play</span>
         </button>
         <button class="ts-mode-seg" id="ts-mode-live" type="button"
                 role="tab" aria-selected="false" data-tip="${t('topStrip.modeLive')}">
           <span class="ts-mode-icon" aria-hidden="true">${icons.modeLive()}</span>
           <span class="ts-mode-label">Live</span>
+        </button>
+        <button class="ts-mode-seg" id="ts-mode-learn" type="button"
+                role="tab" aria-selected="false" data-tip="${t('topStrip.modeLearn')}">
+          <span class="ts-mode-icon" aria-hidden="true">${icons.practice()}</span>
+          <span class="ts-mode-label">Learn</span>
         </button>
         <span class="ts-mode-thumb" aria-hidden="true"></span>
       </div>
@@ -242,16 +242,6 @@ export class Controls {
           <input type="range" id="hud-zoom" class="mini-slider mini-slider--zoom"
             min="${ZOOM_MIN}" max="${ZOOM_MAX}" step="10" value="${ZOOM_DEFAULT}" aria-label="${t('hud.aria.zoom')}" />
         </div>
-
-        <div class="hud-divider hud-group--file"></div>
-
-        <button class="hud-practice-btn hud-group--file" id="hud-practice"
-                type="button" aria-label="${t('hud.aria.practice')}"
-                aria-pressed="false"
-                data-tip="${t('hud.tip.practice')}">
-          <span class="hud-practice-icon" aria-hidden="true">${icons.practice()}</span>
-          <span class="hud-practice-label" id="hud-practice-label">Practice</span>
-        </button>
 
         <div class="hud-divider hud-group--live"></div>
 
@@ -364,7 +354,8 @@ export class Controls {
   }
 
   private bindEvents(): void {
-    const { state, clock, onSeek, onZoom } = this.opts
+    const { onSeek, onZoom } = this.opts
+    const { store: state, clock } = this.opts.services
 
     this.playBtn = this.hud.querySelector<HTMLButtonElement>('#hud-play')!
     this.scrubber = this.hud.querySelector<HTMLInputElement>('#hud-scrubber')!
@@ -375,8 +366,9 @@ export class Controls {
     this.contextTitleEl = this.topStrip.querySelector<HTMLElement>('#ts-context-title')!
     this.openBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-open')!
     this.modeSwitchEl = this.topStrip.querySelector<HTMLElement>('.ts-mode-switch')!
-    this.modeFileBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-file')!
+    this.modePlayBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-play')!
     this.modeLiveBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-live')!
+    this.modeLearnBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-mode-learn')!
     this.tracksBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-tracks')!
     this.midiBtn = this.topStrip.querySelector<HTMLButtonElement>('#ts-midi')!
     this.midiLabelEl = this.topStrip.querySelector<HTMLElement>('#ts-menu-midi-label')!
@@ -396,11 +388,9 @@ export class Controls {
     this.metroBeatEl = this.hud.querySelector<HTMLElement>('.hud-metro-beat')!
     this.metroDecBtn = this.hud.querySelector<HTMLButtonElement>('#hud-metro-dec')!
     this.metroIncBtn = this.hud.querySelector<HTMLButtonElement>('#hud-metro-inc')!
-    this.practiceBtn = this.hud.querySelector<HTMLButtonElement>('#hud-practice')!
-    this.practiceLabelEl = this.hud.querySelector<HTMLElement>('#hud-practice-label')!
 
     this.playBtn.addEventListener('click', () => {
-      if (state.mode.value !== 'file') return
+      if (state.mode.value !== 'play') return
       const s = state.status.value
       if (s === 'playing') {
         clock.pause()
@@ -412,14 +402,14 @@ export class Controls {
     })
 
     this.hud.querySelector('#hud-skip-back')!.addEventListener('click', () => {
-      if (state.mode.value !== 'file') return
+      if (state.mode.value !== 'play') return
       const t = Math.max(0, clock.currentTime - SKIP_SECONDS)
       this.invalidateTimeCache()
       clock.seek(t)
       onSeek?.(t)
     })
     this.hud.querySelector('#hud-skip-fwd')!.addEventListener('click', () => {
-      if (state.mode.value !== 'file') return
+      if (state.mode.value !== 'play') return
       const t = Math.min(state.duration.value, clock.currentTime + SKIP_SECONDS)
       this.invalidateTimeCache()
       clock.seek(t)
@@ -482,11 +472,14 @@ export class Controls {
     this.openBtn.addEventListener('click', () => this.opts.onOpenFile?.())
     this.tracksBtn.addEventListener('click', () => this.opts.onOpenTracks?.())
     this.midiBtn.addEventListener('click', () => this.opts.onMidiConnect?.())
-    this.modeFileBtn.addEventListener('click', () => {
-      this.opts.onModeRequest?.('file')
+    this.modePlayBtn.addEventListener('click', () => {
+      this.opts.onModeRequest?.('play')
     })
     this.modeLiveBtn.addEventListener('click', () => {
       this.opts.onModeRequest?.('live')
+    })
+    this.modeLearnBtn.addEventListener('click', () => {
+      this.opts.onModeRequest?.('learn')
     })
     this.loopBtn.addEventListener('click', () => this.opts.onLoopToggle?.())
     this.loopClearBtn.addEventListener('click', () => this.opts.onLoopClear?.())
@@ -496,7 +489,6 @@ export class Controls {
     this.metroBtn.addEventListener('click', () => this.opts.onMetronomeToggle?.())
     this.metroDecBtn.addEventListener('click', () => this.bumpBpm(-1))
     this.metroIncBtn.addEventListener('click', () => this.bumpBpm(+1))
-    this.practiceBtn.addEventListener('click', () => this.opts.onPracticeToggle?.())
     this.metroGroupEl.addEventListener(
       'wheel',
       (e) => {
@@ -515,7 +507,7 @@ export class Controls {
   private handleKey(e: KeyboardEvent): void {
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
-    const mode = this.opts.state.mode.value
+    const mode = this.opts.services.store.mode.value
 
     // Shift+P toggles the pin anywhere the HUD is visible.
     if (e.shiftKey && e.code === 'KeyP') {
@@ -524,7 +516,7 @@ export class Controls {
       return
     }
 
-    if (mode === 'file') {
+    if (mode === 'play') {
       if (e.code === 'Space') {
         e.preventDefault()
         this.playBtn.click()
@@ -540,10 +532,6 @@ export class Controls {
         if (!this.hud.classList.contains('hud--exporting')) {
           this.opts.onRecord?.()
         }
-      } else if (e.code === 'KeyP' && !e.shiftKey) {
-        // P toggles practice mode in file mode (Shift+P is reserved for HUD pin).
-        e.preventDefault()
-        this.opts.onPracticeToggle?.()
       }
       return
     }
@@ -604,11 +592,11 @@ export class Controls {
   }
 
   private bindState(): void {
-    const { state, clock } = this.opts
+    const { store: state, clock } = this.opts.services
 
     this.unsubs.push(
       clock.subscribe((t) => {
-        if (state.mode.value !== 'file' || this.isScrubbing) return
+        if (state.mode.value !== 'play' || this.isScrubbing) return
         // Skip UI updates during export — frame-by-frame seeks would thrash the
         // scrubber behind the export modal and compete with the encoder for cycles.
         if (state.status.value === 'exporting') return
@@ -736,7 +724,7 @@ export class Controls {
     this.opts.onMetronomeBpmChange?.(current + delta)
   }
 
-  updateLoopState(state: LoopState, layerCount: number): void {
+  updateLoopState(state: LiveLooperState, layerCount: number): void {
     this.loopLabelEl.textContent = loopLabel(state, layerCount)
     this.loopBtn.dataset['loopState'] = state
     const active = state !== 'idle' && state !== 'armed'
@@ -756,17 +744,6 @@ export class Controls {
   }
 
   updateChordOverlayState(_on: boolean): void {}
-
-  // Practice mode reflects two states: enabled (button "armed") and waiting
-  // (button pulses while the engine is holding the clock). The two CSS
-  // classes are independent so a non-waiting "armed" state still reads
-  // distinctly from the inactive default.
-  updatePracticeState(enabled: boolean, waiting: boolean): void {
-    this.practiceBtn.classList.toggle('hud-practice-btn--on', enabled)
-    this.practiceBtn.classList.toggle('hud-practice-btn--waiting', waiting)
-    this.practiceBtn.setAttribute('aria-pressed', String(enabled))
-    this.practiceLabelEl.textContent = waiting ? 'Waiting…' : enabled ? 'Practice' : 'Practice'
-  }
 
   updateMidiStatus(status: MidiDeviceStatus, deviceName: string): void {
     this.currentMidiStatus = status
@@ -792,43 +769,45 @@ export class Controls {
   }
 
   private refreshUi(): void {
-    const { state } = this.opts
+    const { store: state } = this.opts.services
     const mode = state.mode.value
     const status = state.status.value
     const midi = state.loadedMidi.value
     const hasFile = midi !== null
-    const isFileMode = mode === 'file'
-    const isLoadingFile = isFileMode && status === 'loading'
-    // HUD is visible for file playback AND live mode (with a reduced set of controls).
-    const showFileHud = isFileMode && hasFile && !isLoadingFile
+    const isPlayMode = mode === 'play'
+    const isLoadingFile = isPlayMode && status === 'loading'
+    // HUD is visible for play-mode playback AND live mode (with a reduced set of controls).
+    const showPlayHud = isPlayMode && hasFile && !isLoadingFile
     const showLiveHud = mode === 'live'
-    const showHud = showFileHud || showLiveHud
+    const showHud = showPlayHud || showLiveHud
 
     this.topStrip.classList.add('strip--active')
-    this.topStrip.classList.toggle('strip--playing', isFileMode && status === 'playing')
+    this.topStrip.classList.toggle('strip--playing', isPlayMode && status === 'playing')
     this.topStrip.classList.toggle('strip--exporting', status === 'exporting')
     this.topStrip.dataset['mode'] = mode
     this.topStrip.dataset['hasFile'] = hasFile ? 'true' : 'false'
 
     // Contextual pill visibility
-    this.tracksBtn.classList.toggle('hidden', !isFileMode || !hasFile || isLoadingFile)
-    this.recordBtn.classList.toggle('hidden', !isFileMode || !hasFile || isLoadingFile)
+    this.tracksBtn.classList.toggle('hidden', !isPlayMode || !hasFile || isLoadingFile)
+    this.recordBtn.classList.toggle('hidden', !isPlayMode || !hasFile || isLoadingFile)
 
-    // Mode switcher: reflect current mode. `home` leaves both neutral so the
-    // user sees both as open paths. The thumb element is positioned via a
-    // data-attribute so the highlight can slide between segments.
-    const activeMode = mode === 'file' || mode === 'live' ? mode : 'none'
+    // Mode switcher: reflect current mode. `home` leaves all segments neutral
+    // so the user sees every path as open. The thumb element is positioned via
+    // a data-attribute so the highlight can slide between segments.
+    const activeMode = mode === 'play' || mode === 'live' || mode === 'learn' ? mode : 'none'
     this.modeSwitchEl.dataset['active'] = activeMode
-    this.modeFileBtn.classList.toggle('is-active', mode === 'file')
+    this.modePlayBtn.classList.toggle('is-active', mode === 'play')
     this.modeLiveBtn.classList.toggle('is-active', mode === 'live')
-    this.modeFileBtn.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false')
+    this.modeLearnBtn.classList.toggle('is-active', mode === 'learn')
+    this.modePlayBtn.setAttribute('aria-selected', mode === 'play' ? 'true' : 'false')
     this.modeLiveBtn.setAttribute('aria-selected', mode === 'live' ? 'true' : 'false')
+    this.modeLearnBtn.setAttribute('aria-selected', mode === 'learn' ? 'true' : 'false')
 
     this.hud.classList.toggle('hud--active', showHud)
-    this.hud.classList.toggle('hud--playing', isFileMode && status === 'playing')
+    this.hud.classList.toggle('hud--playing', isPlayMode && status === 'playing')
     this.hud.classList.toggle('hud--exporting', status === 'exporting')
     this.hud.classList.toggle('hud--live', showLiveHud)
-    this.hud.classList.toggle('hud--file', showFileHud)
+    this.hud.classList.toggle('hud--play', showPlayHud)
     this.applyHudOffset()
     this.playBtn.innerHTML = status === 'playing' ? icons.pause() : icons.play()
 
@@ -837,9 +816,9 @@ export class Controls {
     this.renderContext(mode, midi?.name ?? null)
 
     // Auto-hide the HUD when idle in any mode where it's visible.
-    // File mode: only while playing (pausing needs the controls accessible).
+    // Play mode: only while playing (pausing needs the controls accessible).
     // Live mode: always eligible to auto-hide after inactivity.
-    if ((isFileMode && status === 'playing') || showLiveHud) {
+    if ((isPlayMode && status === 'playing') || showLiveHud) {
       this.scheduleIdle()
     } else {
       this.clearIdle()
@@ -847,7 +826,7 @@ export class Controls {
   }
 
   private renderContext(mode: AppMode, fileName: string | null): void {
-    if (mode === 'file' && this.opts.state.status.value === 'loading') {
+    if (mode === 'play' && this.opts.services.store.status.value === 'loading') {
       this.contextKickerEl.textContent = 'Loading'
       this.contextTitleEl.textContent = 'Opening MIDI'
       return
@@ -862,9 +841,15 @@ export class Controls {
       return
     }
 
-    if (mode === 'file') {
+    if (mode === 'play') {
       this.contextKickerEl.textContent = 'Now playing'
       this.contextTitleEl.textContent = fileName ?? 'Open MIDI'
+      return
+    }
+
+    if (mode === 'learn') {
+      this.contextKickerEl.textContent = 'Learn'
+      this.contextTitleEl.textContent = 'Exercises, ear training, sight reading'
       return
     }
 
@@ -882,9 +867,9 @@ export class Controls {
   private scheduleIdle(): void {
     this.clearIdle()
     if (this.hudPinned || this.hudActivityLock) return
-    const mode = this.opts.state.mode.value
-    const status = this.opts.state.status.value
-    const isPlaying = mode === 'file' && status === 'playing'
+    const mode = this.opts.services.store.mode.value
+    const status = this.opts.services.store.status.value
+    const isPlaying = mode === 'play' && status === 'playing'
     const isLive = mode === 'live'
     if (!isPlaying && !isLive) return
     this.idleTimer = setTimeout(() => {
@@ -964,7 +949,7 @@ export class Controls {
   }
 
   private updateFill(t: number): void {
-    const dur = this.opts.state.duration.value
+    const dur = this.opts.services.store.duration.value
     const pct = dur > 0 ? Math.min((t / dur) * 100, 100) : 0
     this.scrubber.style.setProperty('--pct', `${pct}%`)
   }
@@ -1034,7 +1019,7 @@ function saveKeyHintHidden(hidden: boolean): void {
   localStorage.setItem(KEY_HINT_HIDDEN_KEY, String(hidden))
 }
 
-function loopLabel(state: LoopState, layerCount: number): string {
+function loopLabel(state: LiveLooperState, layerCount: number): string {
   switch (state) {
     case 'idle':
       return 'Loop'

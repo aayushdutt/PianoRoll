@@ -24,7 +24,7 @@ export class Signal<T> {
 }
 
 export type PlaybackStatus = 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'exporting'
-export type AppMode = 'home' | 'file' | 'live'
+export type AppMode = 'home' | 'play' | 'live' | 'learn'
 
 export class AppStore {
   readonly mode = new Signal<AppMode>('home')
@@ -45,26 +45,26 @@ export class AppStore {
     this.status.set('idle')
   }
 
-  beginFileLoad(): void {
+  beginPlayLoad(): void {
     this.currentTime.set(0)
-    this.mode.set('file')
+    this.mode.set('play')
     this.status.set('loading')
   }
 
-  completeFileLoad(midi: MidiFile): void {
+  completePlayLoad(midi: MidiFile): void {
     this.loadedMidi.set(midi)
     this.duration.set(midi.duration)
     this.currentTime.set(0)
-    this.mode.set('file')
+    this.mode.set('play')
     this.status.set('ready')
   }
 
-  enterFile(resetTime = true): boolean {
+  enterPlay(resetTime = true): boolean {
     const midi = this.loadedMidi.value
     if (!midi) return false
     this.duration.set(midi.duration)
     if (resetTime) this.currentTime.set(0)
-    this.mode.set('file')
+    this.mode.set('play')
     this.status.set('ready')
     return true
   }

@@ -3,7 +3,7 @@ import type { MasterClock } from '../core/clock/MasterClock'
 import { Signal } from '../store/state'
 import type { CapturedEvent } from './MidiEncoding'
 
-export type LoopState = 'idle' | 'armed' | 'recording' | 'playing' | 'overdubbing'
+export type LiveLooperState = 'idle' | 'armed' | 'recording' | 'playing' | 'overdubbing'
 
 export type LoopEvent = CapturedEvent
 
@@ -26,8 +26,8 @@ export type QuantizeDurationFn = (rawDuration: number) => number
 const LOOKAHEAD_SEC = 0.15
 const POLL_INTERVAL_MS = 25
 
-export class LoopEngine {
-  readonly state = new Signal<LoopState>('idle')
+export class LiveLooper {
+  readonly state = new Signal<LiveLooperState>('idle')
   readonly progress = new Signal<number>(0)
   readonly layerCount = new Signal<number>(0)
 

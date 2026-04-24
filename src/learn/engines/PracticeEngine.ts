@@ -1,6 +1,6 @@
+import type { MasterClock } from '../../core/clock/MasterClock'
+import type { MidiFile } from '../../core/midi/types'
 import { Signal } from '../../store/state'
-import type { MasterClock } from '../clock/MasterClock'
-import type { MidiFile } from '../midi/types'
 
 // Minimum gap between two consecutive note-onsets to consider them a *new*
 // step. Notes within this window collapse into a single chord step, which is
@@ -15,6 +15,15 @@ const RESUME_NUDGE_SEC = 0.006
 // re-arm waiting. Without it, a moment of float-precision drift on the very
 // next tick would re-engage on the same step.
 const REARM_BUFFER_SEC = 0.003
+
+// Engage wait-mode slightly BEFORE the scheduled step time. The synth
+// scheduler (Tone.js / Tone context lookAhead) schedules note-ons ~100 ms in
+// advance. If we engage at step.time exactly, the synth has already scheduled
+// the upcoming chord's note-ons into the WebAudio graph — pausing the clock
+// can't cancel them, so the player hears the "answer" before they press a key.
+// Engaging 150 ms early closes the window: the scheduler hasn't reached the
+// step yet, so synth.pause() prevents the note-ons from ever being scheduled.
+const ENGAGE_LEAD_SEC = 0.15
 
 export interface PracticeStep {
   // Start time of the chord step (seconds).
@@ -115,14 +124,12 @@ export class PracticeEngine {
     if (this.enabled === enabled) return
     this.enabled = enabled
     if (!enabled) {
-      // If we were holding the clock, hand it back to the host so the user
-      // isn't stuck paused after disabling the mode.
-      if (this.waiting) {
-        this.releaseInternalState()
-        this.callbacks.onWaitEnd(this.clock.currentTime)
-      } else {
-        this.releaseInternalState()
-      }
+      // Drop wait state silently — disabling practice is the CALLER'S
+      // transport decision (pause, detach, mode switch). Firing `onWaitEnd`
+      // here would ask the caller to resume playback while they're actively
+      // trying to stop; the caller already handles resume/seek explicitly
+      // when they re-enable or resume elsewhere.
+      this.releaseInternalState()
     } else {
       this.recomputeNextStep(this.clock.currentTime)
     }
@@ -141,20 +148,25 @@ export class PracticeEngine {
     return this.waiting
   }
 
-  // Called from the App's live note-on handler. Returns true when the press
-  // satisfies the last required pitch and the engine releases the clock.
-  notePressed(pitch: number): boolean {
-    if (!this.enabled || !this.waiting) return false
-    if (!this.pending.has(pitch)) return false
+  // Called from the App's live note-on handler. Returns:
+  //   'advanced' — press satisfied the last required pitch; clock released
+  //   'accepted' — press was correct but the chord still has pending pitches
+  //   'rejected' — press was wrong (not pending) or engine isn't waiting
+  // The tri-state matters because partial-correct presses must not be counted
+  // as misses; treating "not advanced" as "wrong" double-punishes the user
+  // mid-chord.
+  notePressed(pitch: number): 'advanced' | 'accepted' | 'rejected' {
+    if (!this.enabled || !this.waiting) return 'rejected'
+    if (!this.pending.has(pitch)) return 'rejected'
     this.pending.delete(pitch)
     this.accepted.add(pitch)
     if (this.pending.size === 0) {
       this.advancePastCurrentStep()
       this.publish()
-      return true
+      return 'advanced'
     }
     this.publish()
-    return false
+    return 'accepted'
   }
 
   // App calls this whenever the user seeks (scrubber, skip-back/-fwd, etc.)
@@ -180,7 +192,7 @@ export class PracticeEngine {
     const step = this.steps[this.nextStepIdx]
     if (!step) return
 
-    if (time >= step.time) {
+    if (time >= step.time - ENGAGE_LEAD_SEC) {
       this.engageWait(step)
     }
   }

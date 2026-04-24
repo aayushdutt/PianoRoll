@@ -1,7 +1,7 @@
 import { Midi } from '@tonejs/midi'
 import type { MidiFile } from '../core/midi/types'
 
-// Shared note-event format used by both LoopEngine and SessionRecorder.
+// Shared note-event format used by both LiveLooper and SessionRecorder.
 // Time is in seconds from the start of the capture.
 export interface CapturedEvent {
   type: 'on' | 'off'

@@ -26,8 +26,9 @@ const es: Messages = {
 
   // ── Top strip (primary nav) ─────────────────────────────────
   'topStrip.home': 'Inicio',
-  'topStrip.modeFile': 'Reproducir un archivo MIDI',
+  'topStrip.modePlay': 'Reproducir un archivo MIDI',
   'topStrip.modeLive': 'Tocar en vivo',
+  'topStrip.modeLearn': 'Aprender · ejercicios, entrenamiento auditivo, lectura',
   'topStrip.openMidi': 'Abrir archivo MIDI',
   'topStrip.tracks': 'Pistas',
   'topStrip.midi': 'Dispositivo MIDI',
@@ -62,7 +63,6 @@ const es: Messages = {
   'hud.volume': 'Volumen',
   'hud.speed': 'Velocidad de reproducción',
   'hud.zoom': 'Zoom (altura de las notas)',
-  'hud.tip.practice': 'Modo práctica · pausa en cada nota hasta que la toques',
   'hud.tip.kbdRefHide': 'Ocultar',
   'hud.tip.kbdRefShow': 'Mostrar referencia del teclado',
   'hud.tip.octaveDown': 'Octava −',
@@ -79,7 +79,6 @@ const es: Messages = {
   'hud.aria.volume': 'Volumen',
   'hud.aria.speed': 'Velocidad',
   'hud.aria.zoom': 'Zoom',
-  'hud.aria.practice': 'Modo práctica — esperar las notas correctas',
   'hud.aria.metronomeToggle': 'Activar/desactivar metrónomo',
   'hud.aria.bpmDec': 'Bajar BPM',
   'hud.aria.bpmInc': 'Subir BPM',
@@ -127,11 +126,14 @@ const es: Messages = {
     'No se pudo cargar ese ejemplo — revisa tu conexión e inténtalo de nuevo.',
   'error.audio.renderFailed': 'Falló el renderizado de audio — el MP4 quedará en silencio.',
   'error.export.generic': 'La exportación falló — revisa la consola para más detalles.',
-  'error.practice.fileOnly':
-    'El modo práctica solo está disponible cuando se reproduce un archivo MIDI.',
 
   'doc.title.home': 'midee — arrastra un MIDI, míralo cantar',
   'doc.title.live': 'midee · en vivo',
+  'doc.title.learn': 'midee · aprender',
+  'learn.hub.title': 'Aprender',
+  'learn.hub.subtitle': 'Ejercicios, entrenamiento auditivo y lectura a primera vista',
+  'learn.hub.placeholder':
+    'El hub llegará pronto — los ejercicios aparecerán a medida que se complete el catálogo.',
 
   'tracks.title': 'Pistas',
   'tracks.loadNew': 'Cargar nuevo archivo',

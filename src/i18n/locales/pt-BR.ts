@@ -26,8 +26,9 @@ const ptBR: Messages = {
 
   // ── Top strip (primary nav) ─────────────────────────────────
   'topStrip.home': 'Início',
-  'topStrip.modeFile': 'Reproduzir um arquivo MIDI',
+  'topStrip.modePlay': 'Reproduzir um arquivo MIDI',
   'topStrip.modeLive': 'Tocar ao vivo',
+  'topStrip.modeLearn': 'Aprender · exercícios, treino auditivo, leitura',
   'topStrip.openMidi': 'Abrir arquivo MIDI',
   'topStrip.tracks': 'Faixas',
   'topStrip.midi': 'Dispositivo MIDI',
@@ -62,7 +63,6 @@ const ptBR: Messages = {
   'hud.volume': 'Volume',
   'hud.speed': 'Velocidade de reprodução',
   'hud.zoom': 'Zoom (altura das notas)',
-  'hud.tip.practice': 'Modo prática · pausa em cada nota até você tocá-la',
   'hud.tip.kbdRefHide': 'Ocultar',
   'hud.tip.kbdRefShow': 'Mostrar referência do teclado',
   'hud.tip.octaveDown': 'Oitava −',
@@ -79,7 +79,6 @@ const ptBR: Messages = {
   'hud.aria.volume': 'Volume',
   'hud.aria.speed': 'Velocidade',
   'hud.aria.zoom': 'Zoom',
-  'hud.aria.practice': 'Modo prática — esperar as notas corretas',
   'hud.aria.metronomeToggle': 'Ativar/desativar metrônomo',
   'hud.aria.bpmDec': 'Diminuir BPM',
   'hud.aria.bpmInc': 'Aumentar BPM',
@@ -127,11 +126,14 @@ const ptBR: Messages = {
     'Não foi possível carregar esse exemplo — confira sua conexão e tente novamente.',
   'error.audio.renderFailed': 'Falha na renderização de áudio — o MP4 ficará em silêncio.',
   'error.export.generic': 'Falha na exportação — verifique o console para detalhes.',
-  'error.practice.fileOnly':
-    'O modo prática só está disponível durante a reprodução de um arquivo MIDI.',
 
   'doc.title.home': 'midee — arraste um MIDI, veja-o cantar',
   'doc.title.live': 'midee · ao vivo',
+  'doc.title.learn': 'midee · aprender',
+  'learn.hub.title': 'Aprender',
+  'learn.hub.subtitle': 'Exercícios, treino auditivo e leitura à primeira vista',
+  'learn.hub.placeholder':
+    'O hub chega em breve — os exercícios aparecerão conforme o catálogo for preenchido.',
 
   'tracks.title': 'Faixas',
   'tracks.loadNew': 'Carregar novo arquivo',

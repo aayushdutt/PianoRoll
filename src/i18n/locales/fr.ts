@@ -29,8 +29,9 @@ const fr: Messages = {
 
   // ── Top strip (primary nav) ─────────────────────────────────
   'topStrip.home': 'Accueil',
-  'topStrip.modeFile': 'Jouer un fichier MIDI',
+  'topStrip.modePlay': 'Jouer un fichier MIDI',
   'topStrip.modeLive': 'Jouer en direct',
+  'topStrip.modeLearn': 'Apprendre · exercices, oreille, lecture',
   'topStrip.openMidi': 'Ouvrir un fichier MIDI',
   'topStrip.tracks': 'Pistes',
   'topStrip.midi': 'Périphérique MIDI',
@@ -65,7 +66,6 @@ const fr: Messages = {
   'hud.volume': 'Volume',
   'hud.speed': 'Vitesse de lecture',
   'hud.zoom': 'Zoom (hauteur des notes)',
-  'hud.tip.practice': "Mode entraînement · pause à chaque note jusqu'à ce que vous la jouiez",
   'hud.tip.kbdRefHide': 'Masquer',
   'hud.tip.kbdRefShow': 'Afficher la référence du clavier',
   'hud.tip.octaveDown': 'Octave −',
@@ -82,7 +82,6 @@ const fr: Messages = {
   'hud.aria.volume': 'Volume',
   'hud.aria.speed': 'Vitesse',
   'hud.aria.zoom': 'Zoom',
-  'hud.aria.practice': 'Mode entraînement — attendre les notes correctes',
   'hud.aria.metronomeToggle': 'Activer/désactiver le métronome',
   'hud.aria.bpmDec': 'Diminuer le BPM',
   'hud.aria.bpmInc': 'Augmenter le BPM',
@@ -131,12 +130,15 @@ const fr: Messages = {
     'Impossible de charger cet exemple — vérifiez votre connexion et réessayez.',
   'error.audio.renderFailed': 'Échec du rendu audio — le MP4 sera silencieux.',
   'error.export.generic': "Échec de l'export — consultez la console pour plus de détails.",
-  'error.practice.fileOnly':
-    "Le mode entraînement n'est disponible que pendant la lecture d'un fichier MIDI.",
 
   // ── Document title (browser tab) ───────────────────────────
   'doc.title.home': 'midee — déposez un MIDI, regardez-le chanter',
   'doc.title.live': 'midee · direct',
+  'doc.title.learn': 'midee · apprendre',
+  'learn.hub.title': 'Apprendre',
+  'learn.hub.subtitle': 'Exercices, entraînement auditif et lecture',
+  'learn.hub.placeholder':
+    'Le hub arrive bientôt — les exercices apparaîtront au fil du catalogue.',
 
   // ── Track panel ────────────────────────────────────────────
   'tracks.title': 'Pistes',

@@ -13,14 +13,35 @@ export interface Persisted<T> {
 function persisted<T>(key: string, fallback: T, parse: (raw: string) => T | null): Persisted<T> {
   return {
     load(): T {
-      const raw = localStorage.getItem(key)
+      const raw = safeGetItem(key)
       if (raw === null) return fallback
       const parsed = parse(raw)
       return parsed === null ? fallback : parsed
     },
     save(value: T): void {
-      localStorage.setItem(key, String(value))
+      safeSetItem(key, String(value))
     },
+  }
+}
+
+// Swallow localStorage I/O failures — quota exceeded, Safari private mode,
+// disabled storage, cross-origin iframe. Persistence is best-effort: a save
+// that fails shouldn't crash the caller or the subscribe chain that triggered
+// it. Errors still get surfaced in the console for diagnosis.
+function safeGetItem(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch (err) {
+    console.warn(`[persistence] getItem failed for ${key}:`, err)
+    return null
+  }
+}
+
+function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch (err) {
+    console.warn(`[persistence] setItem failed for ${key}:`, err)
   }
 }
 
@@ -52,4 +73,31 @@ export function numberPersisted(
 /** Boolean stored as 'true' / 'false'. */
 export function booleanPersisted(key: string, fallback: boolean): Persisted<boolean> {
   return persisted(key, fallback, (raw) => raw === 'true')
+}
+
+// Structured value serialised as JSON. Callers supply a fallback used when the
+// key is missing, invalid, or a migration throws; and an optional `migrate`
+// hook that runs on every successful parse so older schemas can be upgraded
+// transparently. Keep migrations pure and idempotent — running them twice
+// against already-migrated data must yield the same result.
+export function jsonPersisted<T>(
+  key: string,
+  fallback: T,
+  migrate: (raw: unknown) => T = (raw) => raw as T,
+): Persisted<T> {
+  return {
+    load(): T {
+      const raw = safeGetItem(key)
+      if (raw === null) return fallback
+      try {
+        const parsed = JSON.parse(raw)
+        return migrate(parsed)
+      } catch {
+        return fallback
+      }
+    },
+    save(value: T): void {
+      safeSetItem(key, JSON.stringify(value))
+    },
+  }
 }

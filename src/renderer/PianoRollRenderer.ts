@@ -7,6 +7,7 @@ import { KeyboardRenderer } from './KeyboardRenderer'
 import { LiveNoteRenderer } from './LiveNoteRenderer'
 import { NoteRenderer } from './NoteRenderer'
 import { ParticleSystem } from './ParticleSystem'
+import type { RenderContext, RenderLayer } from './RenderLayer'
 import { darkTheme, getTrackColor, type Theme } from './theme'
 import { Viewport } from './viewport'
 
@@ -102,6 +103,16 @@ export class PianoRollRenderer {
   private practiceHintPending: ReadonlySet<number> | null = null
   private practiceHintAccepted: ReadonlySet<number> | null = null
 
+  // External RenderLayers (Learn-mode overlays, future sheet-music cursor,
+  // etc.) kept sorted by `zIndex` ascending so a single forward iteration
+  // draws them in the right order.
+  private externalLayers: RenderLayer[] = []
+  // Whether to draw the upward-floating live-note sprites. True in Play/Live
+  // where the user expects their keypresses to animate up the roll; false
+  // in Learn where the scheduled MIDI is what matters and user presses
+  // should only manifest as a keyboard-key highlight.
+  private liveNotesVisible = true
+
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.app = new Application()
 
@@ -172,11 +183,13 @@ export class PianoRollRenderer {
 
   // Redraw every layer whose contents don't change per frame: background, now-line,
   // keyboard texture. Follow with `renderStaticFrame()` if the current frame also
-  // needs to be re-presented.
+  // needs to be re-presented. External layers get rebuilt too so overlays that
+  // cache viewport-derived geometry stay in sync.
   private rebuildStaticLayers(): void {
     this.drawBackground()
     this.drawNowLine()
     this.keyboardRenderer.build(this.viewport, this.viewport.rollHeight)
+    this.rebuildExternalLayers()
   }
 
   private drawBackground(): void {
@@ -307,6 +320,16 @@ export class PianoRollRenderer {
     this.renderStaticFrame(0)
   }
 
+  // Public reads of renderer internals for Learn-mode overlays that compute
+  // their own geometry (celebration swell position, target-zone color).
+  // Kept narrow — exercises shouldn't need more than these.
+  get currentTheme(): Theme {
+    return this.theme
+  }
+  get currentViewport(): Viewport {
+    return this.viewport
+  }
+
   attachClock(clock: MasterClock): void {
     this.app.ticker.add(this.onTick.bind(this, clock))
   }
@@ -316,7 +339,12 @@ export class PianoRollRenderer {
     const hasLive =
       (this.liveNoteStore?.hasRenderableNotes ?? false) ||
       (this.loopNoteStore?.hasRenderableNotes ?? false)
-    if (!this.midi && !hasLive) return
+    // Skip the render pass only when there is genuinely nothing to draw.
+    // An external layer registered via `addLayer` may want a per-frame
+    // update (animated target zone, countdown bar, staff cursor) even when
+    // no MIDI or live notes are active — gating that out would freeze learn
+    // overlays on the hub screen.
+    if (!this.midi && !hasLive && this.externalLayers.length === 0) return
     this.renderFrame(clock.currentTime, ticker.deltaMS / 1000, clock.playing)
   }
 
@@ -458,7 +486,19 @@ export class PianoRollRenderer {
         if (!held.has(pitch)) this.liveEmitNext.delete(pitch)
       }
 
-      this.liveNoteRenderer.draw(this.liveNoteStore, this.loopNoteStore, currentTime, this.viewport)
+      if (this.liveNotesVisible) {
+        this.liveNoteRenderer.draw(
+          this.liveNoteStore,
+          this.loopNoteStore,
+          currentTime,
+          this.viewport,
+        )
+      } else {
+        // Keyboard highlight (above) still uses `held` — we only suppress
+        // the floating-up sprites. Learn mode uses this so user input
+        // registers on the keyboard without polluting the piano roll.
+        this.liveNoteRenderer.clear()
+      }
     } else {
       this.liveNoteRenderer.clear()
       if (this.liveEmitNext.size > 0) this.liveEmitNext.clear()
@@ -466,6 +506,49 @@ export class PianoRollRenderer {
 
     this.keyboardRenderer.drawActiveKeys(activeColors, this.viewport)
     this.particles.update(dt)
+
+    if (this.externalLayers.length > 0) {
+      const ctx: RenderContext = {
+        viewport: this.viewport,
+        theme: this.theme,
+        time: currentTime,
+        dt,
+      }
+      for (const layer of this.externalLayers) layer.update?.(ctx)
+    }
+  }
+
+  // Register an additive visual layer on top of the built-in scene. Layers are
+  // drawn in `zIndex` order; callers are expected to pick a z that matches the
+  // intended stacking (see RenderLayer for the conventional zones). Registering
+  // the same layer twice is a no-op.
+  addLayer(layer: RenderLayer): void {
+    if (this.externalLayers.includes(layer)) return
+    layer.mount(this.app.stage)
+    this.externalLayers.push(layer)
+    this.externalLayers.sort((a, b) => a.zIndex - b.zIndex)
+    layer.rebuild?.(this.makeLayerCtx(0))
+    // Re-present so a layer added while the clock is paused paints immediately
+    // instead of waiting for the next tick (which may never come in home mode).
+    this.renderStaticFrame(0)
+  }
+
+  removeLayer(layer: RenderLayer): void {
+    const i = this.externalLayers.indexOf(layer)
+    if (i < 0) return
+    this.externalLayers.splice(i, 1)
+    layer.unmount()
+    this.renderStaticFrame(0)
+  }
+
+  private makeLayerCtx(time: number): RenderContext {
+    return { viewport: this.viewport, theme: this.theme, time, dt: 0 }
+  }
+
+  private rebuildExternalLayers(): void {
+    if (this.externalLayers.length === 0) return
+    const ctx = this.makeLayerCtx(0)
+    for (const layer of this.externalLayers) layer.rebuild?.(ctx)
   }
 
   burstParticleAt(pitch: number): void {
@@ -477,6 +560,16 @@ export class PianoRollRenderer {
 
   setLiveNoteStore(store: LiveNoteStore): void {
     this.liveNoteStore = store
+  }
+
+  // Suppress (or restore) the upward-floating live-note sprites without
+  // touching the keyboard-highlight path. A mode that wants the keyboard
+  // to highlight presses without streaking notes up the roll (e.g. a
+  // practice surface) flips this off on enter and restores on exit.
+  setLiveNotesVisible(visible: boolean): void {
+    if (this.liveNotesVisible === visible) return
+    this.liveNotesVisible = visible
+    if (!visible) this.liveNoteRenderer.clear()
   }
 
   setLoopNoteStore(store: LiveNoteStore | null): void {

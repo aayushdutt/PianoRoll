@@ -152,7 +152,7 @@ export const icons = {
       'aria-hidden="true"',
     ),
 
-  modeFile: (size: Size = 12): string =>
+  modePlay: (size: Size = 12): string =>
     `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="2" y="3.5" width="7" height="2.2" rx="0.8"/><rect x="2" y="7" width="12" height="2.2" rx="0.8"/><rect x="2" y="10.5" width="5" height="2.2" rx="0.8"/></svg>`,
 
   modeLive: (size: Size = 13): string =>
