@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run test",
     "icons": "node scripts/build-icons.mjs",
-    "preview:serp": "node scripts/preview-serp.mjs"
+    "preview:serp": "node scripts/preview-serp.mjs",
+    "bench": "npx vite build && node scripts/bench.mjs",
+    "bench:update": "npx vite build && node scripts/bench.mjs --update"
   },
   "dependencies": {
     "@t3-oss/env-core": "^0.13.11",
@@ -42,9 +44,10 @@
     "@solidjs/testing-library": "^0.8.10",
     "jsdom": "^25.0.1",
     "marked": "^18.0.2",
+    "playwright": "^1.59.1",
     "typescript": "^5.4.0",
-    "vite": "^5.2.0",
+    "vite": "^8.0.0",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.0"
   }
 }
