@@ -35,11 +35,15 @@ import { ChordOverlay } from './ui/ChordOverlay'
 import { Controls } from './ui/Controls'
 import { CustomizeMenu } from './ui/CustomizeMenu'
 import { DropZone } from './ui/DropZone'
-import { ExportModal, type ExportResolution, type ExportSettings } from './ui/ExportModal'
+// Modal classes that the user only reaches on demand (Record button, file
+// picker, post-session card) are dynamic-imported in ensureXModal() helpers
+// below so their JSX stays out of the initial bundle. The static side keeps
+// the type imports for signatures.
+import type { ExportModal, ExportResolution, ExportSettings } from './ui/ExportModal'
 import { InstrumentMenu } from './ui/InstrumentMenu'
 import { KeyboardResizer } from './ui/KeyboardResizer'
-import { MidiPickerModal } from './ui/MidiPickerModal'
-import { PostSessionModal, type SessionAction } from './ui/PostSessionModal'
+import type { MidiPickerModal } from './ui/MidiPickerModal'
+import type { PostSessionModal, SessionAction } from './ui/PostSessionModal'
 import { showError, showSuccess } from './ui/Toast'
 import { TrackPanel } from './ui/TrackPanel'
 import { installViewportClassSync } from './ui/utils'
@@ -56,15 +60,23 @@ export class App {
   private liveLooper!: LiveLooper
   private metronome = new Metronome()
   private sessionRec!: SessionRecorder
-  private postSessionModal!: PostSessionModal
+  // Lazy modals: nullable until first open. The paired `*Load` promise gates
+  // concurrent ensures so we never construct twice.
+  private postSessionModal: PostSessionModal | null = null
+  private postSessionModalLoad: Promise<PostSessionModal> | null = null
   private pendingSession: { events: CapturedEvent[]; duration: number } | null = null
   private instrumentMenu!: InstrumentMenu
   private activeMouseNote: number | null = null
   dropzone!: DropZone
-  private midiPicker!: MidiPickerModal
+  private midiPicker: MidiPickerModal | null = null
+  private midiPickerLoad: Promise<MidiPickerModal> | null = null
   private controls!: Controls
   trackPanel!: TrackPanel
-  private exportModal!: ExportModal
+  private exportModal: ExportModal | null = null
+  private exportModalLoad: Promise<ExportModal> | null = null
+  // Captured in init() so the lazy ensureXModal() helpers can construct
+  // without re-querying the DOM.
+  private overlay!: HTMLElement
   private kbdResizer!: KeyboardResizer
   private chordOverlay!: ChordOverlay
   private customizeMenu!: CustomizeMenu
@@ -131,6 +143,7 @@ export class App {
   async init(): Promise<void> {
     const canvas = document.querySelector<HTMLCanvasElement>('#pianoroll')!
     const overlay = document.querySelector<HTMLElement>('#ui-overlay')!
+    this.overlay = overlay
 
     // Flip `body.is-touch` / `body.is-narrow` so CSS can adapt (bottom-sheet
     // popovers, touch-friendly hit targets, etc.).
@@ -224,7 +237,7 @@ export class App {
         // First-time vs repeat opens are derivable in PostHog funnels via
         // "first occurrence per user" — no need for a duplicate event.
         track('export_opened', { has_midi: this.store.state.loadedMidi !== null })
-        this.exportModal.open()
+        void this.openExportModal()
       },
       onOpenFile: () => this.openFilePicker(),
       onModeRequest: (mode) => this.requestMode(mode),
@@ -326,17 +339,10 @@ export class App {
     this.instrumentMenu.setLoading(this.synth.loadingInstrument.value)
     this.controls.setInstrumentLoading(this.synth.loadingInstrument.value !== null)
 
-    this.exportModal = new ExportModal(overlay)
-    this.exportModal.onStart = (settings) => void this.startExport(settings)
-    this.exportModal.onCancel = () => this.cancelExport()
-
-    this.postSessionModal = new PostSessionModal(overlay)
-    this.postSessionModal.onAction = (action) => this.handleSessionAction(action)
-
-    // Single source of truth for "open a MIDI" — drop, file picker, samples.
-    // Callers thread their own loaders so the modal stays mode-neutral; the
-    // dispatch in `openFilePicker` routes to play vs learn.
-    this.midiPicker = new MidiPickerModal(overlay)
+    // ExportModal / PostSessionModal / MidiPickerModal are constructed lazily
+    // (see ensureXModal helpers further down) — none of them are visible at
+    // boot, and keeping them out of the initial chunk shaves ~835 LOC of JSX
+    // off the first-paint bundle.
 
     this.kbdResizer = new KeyboardResizer(
       overlay,
@@ -388,13 +394,22 @@ export class App {
 
     // Kick off piano sample download in the background — safe at boot since
     // we don't touch AudioContext yet. Makes the first note feel instant.
+    // Modal chunks ride along on the same idle pass so first-open is
+    // friction-free without paying for them at first paint.
     const w = window as unknown as {
       requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void
     }
+    const warmModalChunks = (): void => {
+      void import('./ui/ExportModal')
+      void import('./ui/PostSessionModal')
+      void import('./ui/MidiPickerModal')
+    }
     if (typeof w.requestIdleCallback === 'function') {
       w.requestIdleCallback(() => this.synth.preloadDefault(), { timeout: 2000 })
+      w.requestIdleCallback(warmModalChunks, { timeout: 4000 })
     } else {
       setTimeout(() => this.synth.preloadDefault(), 600)
+      setTimeout(warmModalChunks, 1200)
     }
 
     this.controls.updateMidiStatus(this.midiInput.status.value, '')
@@ -872,6 +887,11 @@ export class App {
   private async startExport(settings: ExportSettings): Promise<void> {
     const midi = this.store.state.loadedMidi
     if (!midi || this.store.state.mode !== 'play') return
+    // startExport only fires from ExportModal's onStart callback, so the
+    // modal exists. Capture the live ref once so progress/close calls below
+    // don't need optional-chaining ceremony.
+    const exportModal = this.exportModal
+    if (!exportModal) return
 
     const exportStartedAt = performance.now()
     track('export_started', {
@@ -890,7 +910,7 @@ export class App {
     if (settings.output === 'midi') {
       const bytes = midiFileToBytes(midi)
       triggerMidiDownload(bytes, `${sanitiseFilename(midi.name)}.mid`)
-      this.exportModal.close()
+      exportModal.close()
       this.showSuccess(`↓ ${sanitiseFilename(midi.name)}.mid`)
       track('export_completed', {
         output: 'midi',
@@ -953,7 +973,7 @@ export class App {
         // Load without VideoExporter: that chunk embeds Mediabunny (~tens of kB
         // parsed) and must not run before / in parallel with offline audio setup.
         const { renderAudioOffline } = await import('./audio/OfflineAudioRenderer')
-        this.exportModal.updateProgress('Rendering audio', 0)
+        exportModal.updateProgress('Rendering audio', 0)
         try {
           // Per-stage progress: pct flows straight through. The bar resets
           // between stages; the stage label makes that explicit.
@@ -961,8 +981,8 @@ export class App {
             midi,
             instrumentId: INSTRUMENTS[this.instrumentIndex]!.id,
             volume: this.store.state.volume,
-            onRenderAudioProgressMode: (d) => this.exportModal.setRenderAudioProgressMode(d),
-            onProgress: (pct) => this.exportModal.updateProgress('Rendering audio', pct),
+            onRenderAudioProgressMode: (d) => exportModal.setRenderAudioProgressMode(d),
+            onProgress: (pct) => exportModal.updateProgress('Rendering audio', pct),
           })
         } catch (err) {
           console.error('Offline audio render failed:', err)
@@ -990,9 +1010,9 @@ export class App {
         ...(exportAudio ? { audio: exportAudio } : {}),
         onSeek: (t) => this.clock.seek(t),
         onRenderFrame: (t, dt) => this.renderer.renderManualFrame(t, dt),
-        onProgress: (stage, pct) => this.exportModal.updateProgress(stage, pct),
+        onProgress: (stage, pct) => exportModal.updateProgress(stage, pct),
       })
-      this.exportModal.close()
+      exportModal.close()
       this.showSuccess(`↓ ${t('toast.export.ready', { filename })}`)
       track('export_completed', {
         output: settings.output,
@@ -1011,7 +1031,7 @@ export class App {
         resolution: settings.resolution,
         elapsed_ms: Math.round(performance.now() - exportStartedAt),
       })
-      this.exportModal.close()
+      exportModal.close()
     } finally {
       this.currentExporter = null
       if (resized) {
@@ -1040,22 +1060,71 @@ export class App {
   // the unified `MidiPickerModal` (drop / file picker / samples) and dispatches
   // selections by current mode so Learn keeps its MIDI isolated from Play's.
   openFilePicker(): void {
-    this.midiPicker.open({
-      onFile: (file) => {
-        if (this.store.state.mode === 'learn') {
-          void this.learnController.loadMidiFromFile(file, 'picker')
-        } else {
-          void this.loadMidi(file, 'picker')
-        }
-      },
-      onSample: (id) => {
-        if (this.store.state.mode === 'learn') {
-          void this.learnController.loadSample(id)
-        } else {
-          void this.loadSample(id)
-        }
-      },
+    void this.ensureMidiPicker().then((modal) => {
+      modal.open({
+        onFile: (file) => {
+          if (this.store.state.mode === 'learn') {
+            void this.learnController.loadMidiFromFile(file, 'picker')
+          } else {
+            void this.loadMidi(file, 'picker')
+          }
+        },
+        onSample: (id) => {
+          if (this.store.state.mode === 'learn') {
+            void this.learnController.loadSample(id)
+          } else {
+            void this.loadSample(id)
+          }
+        },
+      })
     })
+  }
+
+  // Lazy modal helpers. Each one dynamic-imports the module (cached after
+  // first call), constructs the modal once, wires its callbacks, and caches
+  // the synchronous reference. The Promise field gates concurrent ensures so
+  // a click + idle-warm race never produces two instances.
+  private ensureExportModal(): Promise<ExportModal> {
+    if (this.exportModal) return Promise.resolve(this.exportModal)
+    if (!this.exportModalLoad) {
+      this.exportModalLoad = import('./ui/ExportModal').then(({ ExportModal }) => {
+        const m = new ExportModal(this.overlay)
+        m.onStart = (settings) => void this.startExport(settings)
+        m.onCancel = () => this.cancelExport()
+        this.exportModal = m
+        return m
+      })
+    }
+    return this.exportModalLoad
+  }
+
+  private ensurePostSessionModal(): Promise<PostSessionModal> {
+    if (this.postSessionModal) return Promise.resolve(this.postSessionModal)
+    if (!this.postSessionModalLoad) {
+      this.postSessionModalLoad = import('./ui/PostSessionModal').then(({ PostSessionModal }) => {
+        const m = new PostSessionModal(this.overlay)
+        m.onAction = (action) => this.handleSessionAction(action)
+        this.postSessionModal = m
+        return m
+      })
+    }
+    return this.postSessionModalLoad
+  }
+
+  private ensureMidiPicker(): Promise<MidiPickerModal> {
+    if (this.midiPicker) return Promise.resolve(this.midiPicker)
+    if (!this.midiPickerLoad) {
+      this.midiPickerLoad = import('./ui/MidiPickerModal').then(({ MidiPickerModal }) => {
+        const m = new MidiPickerModal(this.overlay)
+        this.midiPicker = m
+        return m
+      })
+    }
+    return this.midiPickerLoad
+  }
+
+  private openExportModal(): void {
+    void this.ensureExportModal().then((m) => m.open())
   }
 
   // Play-mode sample loader. Learn has its own via LearnController.loadSample.
@@ -1152,13 +1221,14 @@ export class App {
     // a .mid, flipping into file mode to visualize + export MP4, or tossing it.
     this.pendingSession = { events, duration }
     const noteCount = events.reduce((n, e) => n + (e.type === 'on' ? 1 : 0), 0)
-    this.postSessionModal.open(duration, noteCount)
+    void this.ensurePostSessionModal().then((m) => m.open(duration, noteCount))
     track('session_recorded', { duration_s: Math.round(duration), notes: noteCount })
   }
 
   private handleSessionAction(action: SessionAction): void {
     const pending = this.pendingSession
-    this.postSessionModal.close()
+    // onAction only fires from inside the modal; if it ran, the modal exists.
+    this.postSessionModal?.close()
     if (!pending) return
 
     track('session_action', { action, duration_s: Math.round(pending.duration) })

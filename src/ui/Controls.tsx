@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { createStore, type SetStoreFunction } from 'solid-js/store'
 import { render } from 'solid-js/web'
 import type { AppServices } from '../core/services'
 import { ENABLE_LEARN_MODE } from '../env'
@@ -14,6 +15,18 @@ export const ZOOM_MIN = 80
 export const ZOOM_MAX = 600
 export const ZOOM_DEFAULT = 200
 const IDLE_MS = 2500
+
+// Grouped UI state with field-level reactivity. Each top-level key is read
+// individually in JSX so updates fan out only to the views that actually
+// depend on the changed field.
+interface UiStoreShape {
+  context: { kicker: string; title: string }
+  midi: { status: MidiDeviceStatus; deviceName: string }
+  session: { recording: boolean; elapsed: number }
+  loop: { state: LiveLooperState; layerCount: number; progressDeg: number }
+  metro: { running: boolean; bpm: number }
+  hudOffset: { dx: number; dy: number }
+}
 
 export interface ControlsOptions {
   container: HTMLElement
@@ -682,9 +695,7 @@ export class Controls {
   private metroBeatEl!: HTMLElement
   private tracksBtn!: HTMLButtonElement
 
-  private disposeTop: (() => void) | null = null
-  private disposeHud: (() => void) | null = null
-  private disposeKey: (() => void) | null = null
+  private disposeRoot: (() => void) | null = null
 
   private idleTimer: ReturnType<typeof setTimeout> | null = null
   private hudActivityLock = false
@@ -700,36 +711,24 @@ export class Controls {
   private hudDragOriginY = 0
   private unsubs: Array<() => void> = []
 
-  // Reactive state — drives the three JSX views.
+  // Reactive state — drives the three JSX views. The six grouped fields
+  // (context/midi/session/loop/metro/hudOffset) live on a single `createStore`
+  // so partial writes (e.g. updating just `loop.progressDeg` at 60 Hz) only
+  // re-fire JSX getters that read that exact field. The remaining flat
+  // signals are independent flags whose updates don't fan out.
+  private uiStore!: UiStoreShape
+  private setUi!: SetStoreFunction<UiStoreShape>
   private readonly setDimTopStrip: (v: boolean) => void
-  private readonly setContext: (v: { kicker: string; title: string }) => void
-  private readonly setMidi: (v: { status: MidiDeviceStatus; deviceName: string }) => void
-  private readonly readMidi: () => { status: MidiDeviceStatus; deviceName: string }
   private readonly setHudIdle: (v: boolean) => void
   private readonly setHudDragging: (v: boolean) => void
   private readonly sigHudPinned: () => boolean
   private readonly setHudPinnedSig: (v: boolean) => void
   private readonly setInstrumentLoadingSig: (v: boolean) => void
-  private readonly setSession: (v: { recording: boolean; elapsed: number }) => void
-  private readonly setLoop: (v: {
-    state: LiveLooperState
-    layerCount: number
-    progressDeg: number
-  }) => void
-  private readonly setMetro: (v: { running: boolean; bpm: number }) => void
   private readonly setKeyHintCollapsed: (v: boolean) => void
   private readonly setOctave: (v: number) => void
-  private readonly setHudOffset: (v: { dx: number; dy: number }) => void
-  private readonly readHudOffset: () => { dx: number; dy: number }
   private readonly setVolume: (v: number) => void
   private readonly setSpeed: (v: number) => void
   private readonly setZoom: (v: number) => void
-  private readonly readLoop: () => {
-    state: LiveLooperState
-    layerCount: number
-    progressDeg: number
-  }
-  private readonly readMetro: () => { running: boolean; bpm: number }
 
   // Document-level listeners bound at construction.
   private onMouseMoveDoc = (): void => {
@@ -747,225 +746,194 @@ export class Controls {
     const [status, setStatus] = createSignal<string>(store.state.status)
     const [hasFile, setHasFile] = createSignal<boolean>(store.state.loadedMidi !== null)
     const [dimTopStrip, setDimTopStrip] = createSignal(false)
-    const [context, setContext] = createSignal<{ kicker: string; title: string }>({
-      kicker: 'Ready',
-      title: 'Open MIDI or play live',
-    })
-    const [midi, setMidi] = createSignal<{ status: MidiDeviceStatus; deviceName: string }>({
-      status: 'disconnected',
-      deviceName: '',
-    })
     const [hudIdle, setHudIdle] = createSignal(false)
     const [hudDragging, setHudDragging] = createSignal(false)
     const [hudPinned, setHudPinned] = createSignal(false)
     const [instrumentLoading, setInstrumentLoading] = createSignal(false)
-    const [session, setSession] = createSignal<{ recording: boolean; elapsed: number }>({
-      recording: false,
-      elapsed: 0,
-    })
-    const [loop, setLoop] = createSignal<{
-      state: LiveLooperState
-      layerCount: number
-      progressDeg: number
-    }>({ state: 'idle', layerCount: 0, progressDeg: 0 })
-    const [metro, setMetro] = createSignal<{ running: boolean; bpm: number }>({
-      running: false,
-      bpm: 120,
-    })
     const [keyHintCollapsed, setKeyHintCollapsed] = createSignal(loadKeyHintHidden())
     const [octave, setOctave] = createSignal(4)
-    const [hudOffset, setHudOffset] = createSignal<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
     const [volume, setVolumeSig] = createSignal(store.state.volume ?? 0.8)
     const [speed, setSpeedSig] = createSignal(store.state.speed ?? 1)
     const [zoom, setZoomSig] = createSignal(ZOOM_DEFAULT)
 
+    const [uiStore, setUi] = createStore<UiStoreShape>({
+      context: { kicker: 'Ready', title: 'Open MIDI or play live' },
+      midi: { status: 'disconnected', deviceName: '' },
+      session: { recording: false, elapsed: 0 },
+      loop: { state: 'idle', layerCount: 0, progressDeg: 0 },
+      metro: { running: false, bpm: 120 },
+      hudOffset: { dx: 0, dy: 0 },
+    })
+    this.uiStore = uiStore
+    this.setUi = setUi
+
     void mode
     this.setDimTopStrip = setDimTopStrip
-    this.setContext = setContext
-    this.setMidi = setMidi
-    this.readMidi = midi
     this.setHudIdle = setHudIdle
     this.setHudDragging = setHudDragging
     this.sigHudPinned = hudPinned
     this.setHudPinnedSig = setHudPinned
     this.setInstrumentLoadingSig = setInstrumentLoading
-    this.setSession = setSession
-    this.setLoop = setLoop
-    this.setMetro = setMetro
     this.setKeyHintCollapsed = setKeyHintCollapsed
     this.setOctave = setOctave
-    this.setHudOffset = setHudOffset
-    this.readHudOffset = hudOffset
     this.setVolume = setVolumeSig
     this.setSpeed = setSpeedSig
     this.setZoom = setZoomSig
-    this.readLoop = loop
-    this.readMetro = metro
 
-    // Mount the three views into the container. TopStrip first so it defines
-    // DOM order; HUD and KeyHint below.
-    const topWrap = document.createElement('div')
-    topWrap.style.display = 'contents'
-    opts.container.appendChild(topWrap)
-    this.disposeTop = render(
+    // One Solid root hosts the three sibling views (TopStrip, HUD, KeyHint).
+    // Single owner tree, single error-boundary scope, single schedule cycle —
+    // and the views still render as DOM siblings under `opts.container`
+    // because the wrapper uses `display: contents`.
+    const rootWrap = document.createElement('div')
+    rootWrap.style.display = 'contents'
+    opts.container.appendChild(rootWrap)
+    this.disposeRoot = render(
       () => (
-        <TopStripView
-          mode={mode}
-          status={status}
-          hasFile={hasFile}
-          isLoadingFile={() => mode() === 'play' && status() === 'loading'}
-          context={context}
-          midiStatus={() => midi().status}
-          midiDeviceName={() => midi().deviceName}
-          midiPillLabel={() => getMidiPillLabel(midi().status, midi().deviceName)}
-          midiMenuLabel={() => getMidiMenuLabel(midi().status, midi().deviceName)}
-          dim={dimTopStrip}
-          onHome={() => opts.onHome?.()}
-          onMode={(m) => opts.onModeRequest?.(m)}
-          onOpenFile={() => opts.onOpenFile?.()}
-          onTracks={() => opts.onOpenTracks?.()}
-          onMidi={() => opts.onMidiConnect?.()}
-          onRecord={() => opts.onRecord?.()}
-          registerEl={(el) => {
-            this.topStripEl = el
-          }}
-          registerTracksBtn={(el) => {
-            this.tracksBtn = el
-          }}
-        />
+        <>
+          <TopStripView
+            mode={mode}
+            status={status}
+            hasFile={hasFile}
+            isLoadingFile={() => mode() === 'play' && status() === 'loading'}
+            context={() => uiStore.context}
+            midiStatus={() => uiStore.midi.status}
+            midiDeviceName={() => uiStore.midi.deviceName}
+            midiPillLabel={() => getMidiPillLabel(uiStore.midi.status, uiStore.midi.deviceName)}
+            midiMenuLabel={() => getMidiMenuLabel(uiStore.midi.status, uiStore.midi.deviceName)}
+            dim={dimTopStrip}
+            onHome={() => opts.onHome?.()}
+            onMode={(m) => opts.onModeRequest?.(m)}
+            onOpenFile={() => opts.onOpenFile?.()}
+            onTracks={() => opts.onOpenTracks?.()}
+            onMidi={() => opts.onMidiConnect?.()}
+            onRecord={() => opts.onRecord?.()}
+            registerEl={(el) => {
+              this.topStripEl = el
+            }}
+            registerTracksBtn={(el) => {
+              this.tracksBtn = el
+            }}
+          />
+          <HudView
+            mode={mode}
+            status={status}
+            showPlayHud={() => mode() === 'play' && hasFile() && status() !== 'loading'}
+            showLiveHud={() => mode() === 'live'}
+            idle={hudIdle}
+            dragging={hudDragging}
+            pinned={hudPinned}
+            playing={() => status() === 'playing'}
+            instrumentLoading={instrumentLoading}
+            sessionRecording={() => uiStore.session.recording}
+            sessionLabel={() =>
+              uiStore.session.recording ? formatMMSS(uiStore.session.elapsed) : 'Record'
+            }
+            loopState={() => uiStore.loop.state}
+            loopLabel={() => loopLabel(uiStore.loop.state, uiStore.loop.layerCount)}
+            loopProgressDeg={() => uiStore.loop.progressDeg}
+            loopActive={() => {
+              const s = uiStore.loop.state
+              return s !== 'idle' && s !== 'armed'
+            }}
+            loopSaveVisible={() =>
+              uiStore.loop.state === 'playing' || uiStore.loop.state === 'overdubbing'
+            }
+            loopUndoVisible={() => {
+              const { state, layerCount } = uiStore.loop
+              return state === 'overdubbing' || (state === 'playing' && layerCount >= 1)
+            }}
+            metroRunning={() => uiStore.metro.running}
+            metroBpm={() => uiStore.metro.bpm}
+            hudDx={() => uiStore.hudOffset.dx}
+            hudDy={() => uiStore.hudOffset.dy}
+            onPlay={() => this.handlePlayClick()}
+            onSkipBack={() => this.handleSkip(-SKIP_SECONDS)}
+            onSkipFwd={() => this.handleSkip(SKIP_SECONDS)}
+            onVolume={(v) => {
+              this.setVolume(v)
+              store.setState('volume', v)
+            }}
+            onSpeed={(v) => {
+              this.setSpeed(v)
+              store.setState('speed', v)
+            }}
+            onZoom={(v) => {
+              this.setZoom(v)
+              opts.onZoom?.(v)
+            }}
+            onMetroToggle={() => opts.onMetronomeToggle?.()}
+            onBpmDec={() => this.bumpBpm(-1)}
+            onBpmInc={() => this.bumpBpm(+1)}
+            onBpmWheel={(e) => {
+              const dir = e.deltaY < 0 ? 1 : -1
+              const step = e.shiftKey ? 10 : 1
+              this.bumpBpm(dir * step)
+            }}
+            onSession={() => opts.onSessionToggle?.()}
+            onLoop={() => opts.onLoopToggle?.()}
+            onLoopUndo={() => opts.onLoopUndo?.()}
+            onLoopSave={() => opts.onLoopSave?.()}
+            onLoopClear={() => opts.onLoopClear?.()}
+            onPin={() => this.togglePin()}
+            onHudDragStart={(e) => this.startHudDrag(e)}
+            onScrubberDown={() => {
+              this.isScrubbing = true
+              this.wakeUp()
+            }}
+            onScrubberTouch={() => {
+              this.isScrubbing = true
+            }}
+            onScrubberInput={() => {
+              const t = parseFloat(this.scrubber.value)
+              this.timeDisplay.textContent = formatTime(t)
+              this.updateFill(t)
+            }}
+            onScrubberChange={() => {
+              this.isScrubbing = false
+              const t = parseFloat(this.scrubber.value)
+              this.invalidateTimeCache()
+              opts.services.clock.seek(t)
+              opts.onSeek?.(t)
+            }}
+            registerHud={(el) => {
+              this.hudEl = el
+            }}
+            registerScrubber={(el) => {
+              this.scrubber = el
+            }}
+            registerTime={(el) => {
+              this.timeDisplay = el
+            }}
+            registerDuration={(el) => {
+              this.durationEl = el
+            }}
+            registerMetroBeat={(el) => {
+              this.metroBeatEl = el
+            }}
+            volume={volume}
+            speed={speed}
+            speedLabel={() => formatSpeed(speed())}
+            zoom={zoom}
+          />
+          <KeyHintView
+            visible={() => mode() === 'live'}
+            idle={hudIdle}
+            collapsed={keyHintCollapsed}
+            octave={octave}
+            onOctaveDown={() => opts.onOctaveShift?.(-1)}
+            onOctaveUp={() => opts.onOctaveShift?.(+1)}
+            onClose={() => {
+              this.setKeyHintCollapsed(true)
+              saveKeyHintHidden(true)
+            }}
+            onReopen={() => {
+              this.setKeyHintCollapsed(false)
+              saveKeyHintHidden(false)
+            }}
+          />
+        </>
       ),
-      topWrap,
-    )
-
-    const hudWrap = document.createElement('div')
-    hudWrap.style.display = 'contents'
-    opts.container.appendChild(hudWrap)
-    this.disposeHud = render(
-      () => (
-        <HudView
-          mode={mode}
-          status={status}
-          showPlayHud={() => mode() === 'play' && hasFile() && status() !== 'loading'}
-          showLiveHud={() => mode() === 'live'}
-          idle={hudIdle}
-          dragging={hudDragging}
-          pinned={hudPinned}
-          playing={() => status() === 'playing'}
-          instrumentLoading={instrumentLoading}
-          sessionRecording={() => session().recording}
-          sessionLabel={() => (session().recording ? formatMMSS(session().elapsed) : 'Record')}
-          loopState={() => loop().state}
-          loopLabel={() => loopLabel(loop().state, loop().layerCount)}
-          loopProgressDeg={() => loop().progressDeg}
-          loopActive={() => {
-            const s = loop().state
-            return s !== 'idle' && s !== 'armed'
-          }}
-          loopSaveVisible={() => loop().state === 'playing' || loop().state === 'overdubbing'}
-          loopUndoVisible={() => {
-            const { state, layerCount } = loop()
-            return state === 'overdubbing' || (state === 'playing' && layerCount >= 1)
-          }}
-          metroRunning={() => metro().running}
-          metroBpm={() => metro().bpm}
-          hudDx={() => hudOffset().dx}
-          hudDy={() => hudOffset().dy}
-          onPlay={() => this.handlePlayClick()}
-          onSkipBack={() => this.handleSkip(-SKIP_SECONDS)}
-          onSkipFwd={() => this.handleSkip(SKIP_SECONDS)}
-          onVolume={(v) => {
-            this.setVolume(v)
-            store.setState('volume', v)
-          }}
-          onSpeed={(v) => {
-            this.setSpeed(v)
-            store.setState('speed', v)
-          }}
-          onZoom={(v) => {
-            this.setZoom(v)
-            opts.onZoom?.(v)
-          }}
-          onMetroToggle={() => opts.onMetronomeToggle?.()}
-          onBpmDec={() => this.bumpBpm(-1)}
-          onBpmInc={() => this.bumpBpm(+1)}
-          onBpmWheel={(e) => {
-            const dir = e.deltaY < 0 ? 1 : -1
-            const step = e.shiftKey ? 10 : 1
-            this.bumpBpm(dir * step)
-          }}
-          onSession={() => opts.onSessionToggle?.()}
-          onLoop={() => opts.onLoopToggle?.()}
-          onLoopUndo={() => opts.onLoopUndo?.()}
-          onLoopSave={() => opts.onLoopSave?.()}
-          onLoopClear={() => opts.onLoopClear?.()}
-          onPin={() => this.togglePin()}
-          onHudDragStart={(e) => this.startHudDrag(e)}
-          onScrubberDown={() => {
-            this.isScrubbing = true
-            this.wakeUp()
-          }}
-          onScrubberTouch={() => {
-            this.isScrubbing = true
-          }}
-          onScrubberInput={() => {
-            const t = parseFloat(this.scrubber.value)
-            this.timeDisplay.textContent = formatTime(t)
-            this.updateFill(t)
-          }}
-          onScrubberChange={() => {
-            this.isScrubbing = false
-            const t = parseFloat(this.scrubber.value)
-            this.invalidateTimeCache()
-            opts.services.clock.seek(t)
-            opts.onSeek?.(t)
-          }}
-          registerHud={(el) => {
-            this.hudEl = el
-          }}
-          registerScrubber={(el) => {
-            this.scrubber = el
-          }}
-          registerTime={(el) => {
-            this.timeDisplay = el
-          }}
-          registerDuration={(el) => {
-            this.durationEl = el
-          }}
-          registerMetroBeat={(el) => {
-            this.metroBeatEl = el
-          }}
-          volume={volume}
-          speed={speed}
-          speedLabel={() => formatSpeed(speed())}
-          zoom={zoom}
-        />
-      ),
-      hudWrap,
-    )
-
-    const keyWrap = document.createElement('div')
-    keyWrap.style.display = 'contents'
-    opts.container.appendChild(keyWrap)
-    this.disposeKey = render(
-      () => (
-        <KeyHintView
-          visible={() => mode() === 'live'}
-          idle={hudIdle}
-          collapsed={keyHintCollapsed}
-          octave={octave}
-          onOctaveDown={() => opts.onOctaveShift?.(-1)}
-          onOctaveUp={() => opts.onOctaveShift?.(+1)}
-          onClose={() => {
-            this.setKeyHintCollapsed(true)
-            saveKeyHintHidden(true)
-          }}
-          onReopen={() => {
-            this.setKeyHintCollapsed(false)
-            saveKeyHintHidden(false)
-          }}
-        />
-      ),
-      keyWrap,
+      rootWrap,
     )
 
     // Sync store → reactive signals.
@@ -1054,17 +1022,19 @@ export class Controls {
   }
 
   updateSessionRecording(recording: boolean, elapsedSec: number): void {
-    this.setSession({ recording, elapsed: elapsedSec })
+    this.setUi('session', { recording, elapsed: elapsedSec })
   }
 
+  // Hot path: fires every animation frame while a loop is recording / playing.
+  // Field-level write so JSX getters that read `loop.state` / `layerCount`
+  // don't re-fire on every frame — only `loopProgressDeg` does.
   updateLoopProgress(fraction: number): void {
     const deg = Math.max(0, Math.min(1, fraction)) * 360
-    const prev = this.loopSnapshot()
-    this.setLoop({ state: prev.state, layerCount: prev.layerCount, progressDeg: deg })
+    this.setUi('loop', 'progressDeg', deg)
   }
 
   updateMetronome(running: boolean, bpm: number): void {
-    this.setMetro({ running, bpm })
+    this.setUi('metro', { running, bpm })
   }
 
   // Called once per beat from Metronome; triggers a brief visual pulse on the
@@ -1090,8 +1060,8 @@ export class Controls {
   }
 
   updateLoopState(state: LiveLooperState, layerCount: number): void {
-    const prev = this.loopSnapshot()
-    this.setLoop({ state, layerCount, progressDeg: prev.progressDeg })
+    // Merge — leaves `progressDeg` alone so per-frame writes don't race.
+    this.setUi('loop', { state, layerCount })
   }
 
   setInstrumentLoading(loading: boolean): void {
@@ -1099,7 +1069,7 @@ export class Controls {
   }
 
   updateMidiStatus(status: MidiDeviceStatus, deviceName: string): void {
-    this.setMidi({ status, deviceName })
+    this.setUi('midi', { status, deviceName })
     this.refreshUi()
   }
 
@@ -1125,19 +1095,11 @@ export class Controls {
     document.removeEventListener('pointerup', this.onPointerUpDoc)
     window.removeEventListener('resize', this.onWindowResize)
     this.clearIdle()
-    this.disposeTop?.()
-    this.disposeHud?.()
-    this.disposeKey?.()
-    this.disposeTop = null
-    this.disposeHud = null
-    this.disposeKey = null
+    this.disposeRoot?.()
+    this.disposeRoot = null
   }
 
   // ── Private helpers ─────────────────────────────────────────────────
-
-  private loopSnapshot(): { state: LiveLooperState; layerCount: number; progressDeg: number } {
-    return this.readLoop()
-  }
 
   private handlePlayClick(): void {
     const { store, clock } = this.opts.services
@@ -1241,7 +1203,7 @@ export class Controls {
   }
 
   private bumpBpm(delta: number): void {
-    const current = this.readMetro().bpm
+    const current = this.uiStore.metro.bpm
     this.opts.onMetronomeBpmChange?.(current + delta)
   }
 
@@ -1264,15 +1226,15 @@ export class Controls {
   }
 
   private renderContext(mode: AppMode, fileName: string | null): void {
-    const midi = this.readMidi()
+    const midi = this.uiStore.midi
 
     if (mode === 'play' && this.opts.services.store.state.status === 'loading') {
-      this.setContext({ kicker: 'Loading', title: 'Opening MIDI' })
+      this.setUi('context', { kicker: 'Loading', title: 'Opening MIDI' })
       return
     }
 
     if (mode === 'live') {
-      this.setContext({
+      this.setUi('context', {
         kicker: 'Live',
         title:
           midi.status === 'connected'
@@ -1283,12 +1245,12 @@ export class Controls {
     }
 
     if (mode === 'play') {
-      this.setContext({ kicker: 'Now playing', title: fileName ?? 'Open MIDI' })
+      this.setUi('context', { kicker: 'Now playing', title: fileName ?? 'Open MIDI' })
       return
     }
 
     if (mode === 'learn') {
-      this.setContext({
+      this.setUi('context', {
         kicker: ENABLE_LEARN_MODE ? 'Learn' : 'Coming soon',
         title: ENABLE_LEARN_MODE
           ? 'Exercises, ear training, sight reading'
@@ -1297,7 +1259,7 @@ export class Controls {
       return
     }
 
-    this.setContext({ kicker: 'Ready', title: 'Open MIDI or play live' })
+    this.setUi('context', { kicker: 'Ready', title: 'Open MIDI or play live' })
   }
 
   private wakeUp(): void {
@@ -1336,7 +1298,7 @@ export class Controls {
     this.isDraggingHud = true
     this.hudDragStartX = e.clientX
     this.hudDragStartY = e.clientY
-    const off = this.readHudOffset()
+    const off = this.uiStore.hudOffset
     this.hudDragOriginX = off.dx
     this.hudDragOriginY = off.dy
     this.setHudDragging(true)
@@ -1346,7 +1308,7 @@ export class Controls {
 
   private handleHudDragMove(e: PointerEvent): void {
     if (!this.isDraggingHud) return
-    this.setHudOffset({
+    this.setUi('hudOffset', {
       dx: this.hudDragOriginX + (e.clientX - this.hudDragStartX),
       dy: this.hudDragOriginY + (e.clientY - this.hudDragStartY),
     })
@@ -1376,11 +1338,11 @@ export class Controls {
     const maxLeft = Math.max(minLeft, window.innerWidth - hudRect.width - 12)
     const minTop = Math.max(topStripBottom + 12, 12)
     const maxTop = Math.max(minTop, window.innerHeight - keyboardHeight - hudRect.height - 12)
-    const { dx, dy } = this.readHudOffset()
+    const { dx, dy } = this.uiStore.hudOffset
     const nextLeft = clamp(defaultLeft + dx, minLeft, maxLeft)
     const nextTop = clamp(defaultTop + dy, minTop, maxTop)
 
-    this.setHudOffset({ dx: nextLeft - defaultLeft, dy: nextTop - defaultTop })
+    this.setUi('hudOffset', { dx: nextLeft - defaultLeft, dy: nextTop - defaultTop })
   }
 
   private updateFill(t: number): void {
