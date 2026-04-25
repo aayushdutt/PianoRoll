@@ -5,6 +5,9 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, statSync } from 'node:fs'
 import { resolve, join, relative } from 'node:path'
 import { marked } from 'marked'
+import { renderPosthogSnippet } from './posthog-snippet.mjs'
+
+const posthogSnippet = renderPosthogSnippet()
 
 const root = process.cwd()
 const contentDir = resolve(root, 'content')
@@ -195,6 +198,7 @@ function render(mdPath) {
     .replaceAll('{{appHrefBrand}}', appHref(data.path, 'brand'))
     .replaceAll('{{appHrefNav}}',   appHref(data.path, 'nav'))
     .replaceAll('{{appHrefCta}}',   appHref(data.path, 'cta_end'))
+    .replaceAll('{{posthogSnippet}}', posthogSnippet)
 
   const outDir = resolve(distDir, '.' + data.path)
   ensureDir(outDir)
@@ -252,6 +256,7 @@ function writeBlogIndex(results) {
     .replaceAll('{{appHrefBrand}}', appHref(indexData.path, 'brand'))
     .replaceAll('{{appHrefNav}}',   appHref(indexData.path, 'nav'))
     .replaceAll('{{appHrefCta}}',   appHref(indexData.path, 'cta_end'))
+    .replaceAll('{{posthogSnippet}}', posthogSnippet)
 
   ensureDir(resolve(distDir, 'blog'))
   writeFileSync(resolve(distDir, 'blog', 'index.html'), page, 'utf8')
