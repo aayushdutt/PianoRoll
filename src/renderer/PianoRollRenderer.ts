@@ -572,6 +572,14 @@ export class PianoRollRenderer {
     if (!visible) this.liveNoteRenderer.clear()
   }
 
+  // Hide/show the entire stage. Skips per-frame draw work (stage.visible=false
+  // short-circuits child rendering in Pixi) and hides the underlying canvas so
+  // nothing leaks through DOM layers above. Layout is preserved.
+  setVisible(visible: boolean): void {
+    this.app.stage.visible = visible
+    this.app.canvas.style.visibility = visible ? '' : 'hidden'
+  }
+
   setLoopNoteStore(store: LiveNoteStore | null): void {
     this.loopNoteStore = store
   }

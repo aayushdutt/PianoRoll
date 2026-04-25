@@ -13,7 +13,7 @@ The first version of midee's MP4 export pipeline worked like this: capture the c
 
 A 60-second MIDI took 30–120 seconds to export depending on the machine. Every export re-downloaded 30 MB of WASM from unpkg. And because the browser was double-encoding (first WebM via a hardware VP9 encoder, then H.264 via WASM with no GPU access), the output quality was capped by the first pass, and then the second pass could only make things worse.
 
-After migrating to [WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API) + [mp4-muxer](https://github.com/Vanilagy/mp4-muxer), the same 60-second MIDI exports in 2–6 seconds — a 10–30× speedup — with better quality, lower memory, zero WASM, and zero runtime network fetches. This post walks through why the old pipeline was slow, how WebCodecs fixes it, and the sharp edges I ran into during the migration.
+After migrating to [WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API) plus a small in-browser MP4 muxer ([Mediabunny](https://mediabunny.dev/) today; originally [mp4-muxer](https://github.com/Vanilagy/mp4-muxer), now deprecated in favor of Mediabunny), the same 60-second MIDI exports in 2–6 seconds — a 10–30× speedup — with better quality, lower memory, zero WASM, and zero runtime network fetches. This post walks through why the old pipeline was slow, how WebCodecs fixes it, and the sharp edges I ran into during the migration.
 
 ## The old pipeline, and why it was slow
 
@@ -50,7 +50,7 @@ Which means:
 - On Chrome/Edge/Safari, that encoder is hardware-accelerated. VideoToolbox on macOS, Media Foundation on Windows, V4L2 on Linux. You don't write any GPU code — the browser does the right thing.
 - You don't get a container (no MP4, no WebM). Just raw encoded chunks. You pick a muxer.
 
-That last point is what makes WebCodecs feel different from `MediaRecorder`. `MediaRecorder` gives you a self-contained WebM/MP4 blob. WebCodecs gives you a stream of `EncodedVideoChunk`s and makes you assemble the final file yourself. For a visualizer that's fine — a 25 kB pure-JS muxer handles it.
+That last point is what makes WebCodecs feel different from `MediaRecorder`. `MediaRecorder` gives you a self-contained WebM/MP4 blob. WebCodecs gives you a stream of `EncodedVideoChunk`s and makes you assemble the final file yourself. For a visualizer that's fine — a tree-shaken ISOBMFF muxer handles it.
 
 ## The new pipeline
 
@@ -61,7 +61,7 @@ Canvas
 VideoEncoder  ── EncodedVideoChunk (H.264, hardware-accelerated) ──►
   │
   ▼
-Muxer (mp4-muxer, ~25 kB, pure JS)
+Muxer (Mediabunny MP4 output, pure TS)
   │
   ▼
 MP4 Blob → download
@@ -70,20 +70,30 @@ MP4 Blob → download
 No WASM. No transcode. Single lossy pass. Hardware accelerated. Here's the encoder setup:
 
 ```ts
-import { Muxer, ArrayBufferTarget } from 'mp4-muxer'
+import {
+  BufferTarget,
+  EncodedPacket,
+  EncodedVideoPacketSource,
+  Mp4OutputFormat,
+  Output,
+} from 'mediabunny'
 
-const muxer = new Muxer({
-  target: new ArrayBufferTarget(),
-  video: {
-    codec: 'avc',
-    width: canvas.width,
-    height: canvas.height,
-  },
-  fastStart: 'in-memory',
+const target = new BufferTarget()
+const output = new Output({
+  format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
+  target,
 })
+const videoSource = new EncodedVideoPacketSource('avc')
+output.addVideoTrack(videoSource, { frameRate: 60 })
+await output.start()
 
+let muxDrain = Promise.resolve()
 const encoder = new VideoEncoder({
-  output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+  output: (chunk, meta) => {
+    muxDrain = muxDrain.then(() =>
+      videoSource.add(EncodedPacket.fromEncodedChunk(chunk), meta),
+    )
+  },
   error: (e) => console.error(e),
 })
 
@@ -116,8 +126,10 @@ for (let i = 0; i <= totalFrames; i++) {
 }
 
 await encoder.flush()
-muxer.finalize()
-const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' })
+await muxDrain
+videoSource.close()
+await output.finalize()
+const blob = new Blob([target.buffer!], { type: 'video/mp4' })
 ```
 
 That's the whole export — ~40 lines. The ffmpeg-based version was closer to 200.
@@ -169,7 +181,7 @@ WebCodecs doesn't use `SharedArrayBuffer`. No COOP, no COEP, no cross-origin hea
 | 60s MIDI export (M1 MBP) | ~35s | ~3s |
 | 60s MIDI export (2018 Intel laptop) | ~90s | ~12s |
 | Peak memory | ~80 MB | ~48 MB |
-| Bundle size added | ~30 MB WASM at runtime | 25 kB muxer |
+| Bundle size added | ~30 MB WASM at runtime | muxer in dynamic export chunk (Mediabunny) |
 | Network fetches at export time | 2 (ffmpeg-core.js, .wasm) | 0 |
 | Double lossy pass | Yes | No |
 
@@ -199,9 +211,9 @@ Firefox was the last holdout. With 130+ shipping hardware-accelerated `VideoEnco
 ## Takeaways
 
 1. **`MediaRecorder` + re-encode is almost always a mistake.** Two lossy passes for one output is wasted CPU, wasted memory, and degraded quality. If the browser can give you the target codec directly, use it.
-2. **WebCodecs skips the container layer.** That's a feature, not a drawback — pair it with a small pure-JS muxer and you skip the 30 MB of WASM entirely.
+2. **WebCodecs skips the container layer.** That's a feature, not a drawback — pair it with a small in-browser muxer and you skip the 30 MB of WASM entirely.
 3. **Hardware acceleration matters more than any algorithmic optimization you can write.** A CPU-bound H.264 encoder in WASM with manual SIMD will still lose to the GPU's dedicated encode block by an order of magnitude. Pick the hardware path first.
-4. **Pure-JS muxers are surprisingly good.** `mp4-muxer` (25 kB gzipped) handles MP4 box structure, fragment layout, moov placement, and multi-track interleaving. You don't need to write an MP4 parser.
+4. **Pure-TS muxers are surprisingly good.** Mediabunny (and the earlier `mp4-muxer` it supersedes) handles MP4 box structure, `moov` placement, fast-start, and multi-track interleaving. You don't need to write an MP4 parser.
 
 If you're shipping a browser app that needs to produce a video file — a recorder, a visualizer, a presentation tool — WebCodecs is now the default. There's very little reason to reach for `MediaRecorder + transcode` in 2026.
 

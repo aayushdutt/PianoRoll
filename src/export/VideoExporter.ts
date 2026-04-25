@@ -1,9 +1,16 @@
-// Single-pass H.264 MP4 via WebCodecs + mp4-muxer, with an optional AAC audio
-// track muxed from a pre-rendered AudioBuffer (see OfflineAudioRenderer). The
-// muxer interleaves by timestamp, so audio is encoded up front before the
-// video loop — simpler than coordinating two parallel encoders.
+// Single-pass H.264 MP4 via WebCodecs + Mediabunny (MP4 mux), with an optional AAC
+// audio track muxed from a pre-rendered AudioBuffer (see OfflineAudioRenderer).
+// Audio is encoded up front before the video loop — simpler than coordinating
+// two parallel encoders.
 
-import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
+import {
+  BufferTarget,
+  EncodedAudioPacketSource,
+  EncodedPacket,
+  EncodedVideoPacketSource,
+  Mp4OutputFormat,
+  Output,
+} from 'mediabunny'
 
 export type ExportStage =
   | 'Rendering audio'
@@ -103,33 +110,42 @@ export class VideoExporter {
 
     const includeAudio = mode === 'av' && !!opts.audio
     const audio = includeAudio ? opts.audio! : null
-    const muxer = new Muxer({
-      target: new ArrayBufferTarget(),
-      video: { codec: plan.muxerCodec, width, height, frameRate: fps },
-      ...(audio
-        ? {
-            audio: {
-              codec: 'aac',
-              numberOfChannels: audio.numberOfChannels,
-              sampleRate: audio.sampleRate,
-            },
-          }
-        : {}),
-      fastStart: 'in-memory',
+
+    const bufferTarget = new BufferTarget()
+    const output = new Output({
+      format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
+      target: bufferTarget,
     })
+    const videoSource = new EncodedVideoPacketSource(plan.muxerCodec)
+    output.addVideoTrack(videoSource, { frameRate: fps })
+
+    let audioSource: EncodedAudioPacketSource | null = null
+    if (audio) {
+      audioSource = new EncodedAudioPacketSource('aac')
+      output.addAudioTrack(audioSource)
+    }
+
+    await output.start()
 
     // Encode audio up-front. It's typically < 1s of work for a multi-minute
     // MIDI and gives the muxer all audio chunks before video starts streaming.
-    if (audio) {
-      await this.encodeAudio(audio, muxer, opts.onProgress)
+    if (audio && audioSource) {
+      await this.encodeAudio(audio, audioSource, opts.onProgress)
+      audioSource.close()
       this.throwIfStopped(null)
     }
 
     // The video encoder error callback fires asynchronously. Capture the first
     // error so the frame loop can surface it on the next cancellation/error check.
+    // Mediabunny's track `add()` is async (backpressure); chain so chunks stay ordered.
     let encoderError: Error | null = null
+    let videoMuxDrain = Promise.resolve()
     const encoder = new VideoEncoder({
-      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+      output: (chunk, meta) => {
+        videoMuxDrain = videoMuxDrain.then(() =>
+          videoSource.add(EncodedPacket.fromEncodedChunk(chunk), meta),
+        )
+      },
       error: (e) => {
         encoderError ??= e as Error
       },
@@ -197,12 +213,16 @@ export class VideoExporter {
       opts.onProgress?.('Finalizing', 0)
       await encoder.flush()
       this.throwIfStopped(encoderError)
+      await videoMuxDrain
+      this.throwIfStopped(encoderError)
+      videoSource.close()
 
-      muxer.finalize()
       opts.onProgress?.('Finalizing', 1)
+      await output.finalize()
 
       opts.onProgress?.('Saving', 0)
-      const { buffer } = muxer.target
+      const buffer = bufferTarget.buffer
+      if (!buffer) throw new Error('Export produced no file buffer')
       const blob = new Blob([buffer], { type: 'video/mp4' })
       triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.mp4')
       opts.onProgress?.('Saving', 1)
@@ -226,25 +246,26 @@ export class VideoExporter {
       )
     }
 
-    const muxer = new Muxer({
-      target: new ArrayBufferTarget(),
-      audio: {
-        codec: 'aac',
-        numberOfChannels: audio.numberOfChannels,
-        sampleRate: audio.sampleRate,
-      },
-      fastStart: 'in-memory',
+    const bufferTarget = new BufferTarget()
+    const output = new Output({
+      format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
+      target: bufferTarget,
     })
+    const audioSource = new EncodedAudioPacketSource('aac')
+    output.addAudioTrack(audioSource)
+    await output.start()
 
-    await this.encodeAudio(audio, muxer, opts.onProgress)
+    await this.encodeAudio(audio, audioSource, opts.onProgress)
     this.throwIfStopped(null)
+    audioSource.close()
 
     opts.onProgress?.('Finalizing', 0)
-    muxer.finalize()
+    await output.finalize()
     opts.onProgress?.('Finalizing', 1)
 
     opts.onProgress?.('Saving', 0)
-    const { buffer } = muxer.target
+    const buffer = bufferTarget.buffer
+    if (!buffer) throw new Error('Export produced no file buffer')
     const blob = new Blob([buffer], { type: 'audio/mp4' })
     triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.m4a')
     opts.onProgress?.('Saving', 1)
@@ -253,7 +274,7 @@ export class VideoExporter {
 
   private async encodeAudio(
     audio: AudioBuffer,
-    muxer: Muxer<ArrayBufferTarget>,
+    audioSource: EncodedAudioPacketSource,
     onProgress: ExportProgressCallback | undefined,
   ): Promise<void> {
     if (typeof AudioEncoder === 'undefined' || typeof AudioData === 'undefined') {
@@ -264,8 +285,13 @@ export class VideoExporter {
     }
 
     let encoderError: Error | null = null
+    let audioMuxDrain = Promise.resolve()
     const encoder = new AudioEncoder({
-      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      output: (chunk, meta) => {
+        audioMuxDrain = audioMuxDrain.then(() =>
+          audioSource.add(EncodedPacket.fromEncodedChunk(chunk), meta),
+        )
+      },
       error: (e) => {
         encoderError ??= e as Error
       },
@@ -326,6 +352,7 @@ export class VideoExporter {
 
       await encoder.flush()
       if (encoderError) throw encoderError
+      await audioMuxDrain
       onProgress?.('Encoding audio', 1)
     } finally {
       if (encoder.state !== 'closed') encoder.close()

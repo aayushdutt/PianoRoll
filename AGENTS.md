@@ -30,7 +30,7 @@ Prefer `npm run check` before you call a change “done”.
 | Bundler       | `vite.config.ts`          | `vite-plugin-solid`; **`resolve.alias.events → 'events'`** because `@tonejs/piano` pulls Node’s `events` — needed for browser builds      |
 | Env           | `src/env.ts`              | `@t3-oss/env-core` + Zod; **client** vars use `VITE_` prefix (`clientPrefix`)                                                             |
 
-Dependency versions (Solid, Vite, Pixi, Tone, mp4-muxer, etc.) live in **`package.json`** — cite that file instead of duplicating pins here.
+Dependency versions (Solid, Vite, Pixi, Tone, mediabunny, etc.) live in **`package.json`** — cite that file instead of duplicating pins here.
 
 ## Stack (do not assume React / Next)
 
@@ -38,7 +38,7 @@ Dependency versions (Solid, Vite, Pixi, Tone, mp4-muxer, etc.) live in **`packag
 - **Orchestration:** `createApp()` builds the store, constructs **`App`** (`src/app.ts`), `await app.init()`, returns `{ ctx, app }` for `AppCtx` + subsystem handles (`src/createApp.ts`).
 - **State:** `src/store/` (`state.ts` store factory, `AppCtx.ts`, `watch.ts`, `eventSignal.ts`).
 - **Graphics / theory / MIDI helpers:** Pixi.js + `pixi-filters`, **tonal**, `@tonejs/midi`, `@tonejs/piano`, **tone** (synth / scheduling).
-- **MP4 export:** **`VideoEncoder` / `AudioEncoder` (WebCodecs) + `mp4-muxer`**; offline audio via **`OfflineAudioRenderer`** (`src/export/VideoExporter.ts` header comment). Heavy export modules are **dynamic-imported** from `App` so they stay out of the initial bundle (`src/app.ts` comment near `VideoExporter`).
+- **MP4 export:** **`VideoEncoder` / `AudioEncoder` (WebCodecs) + Mediabunny** (`mediabunny`); offline audio via **`OfflineAudioRenderer`** (`src/export/VideoExporter.ts` header comment). Heavy export modules are **dynamic-imported** from `App` so they stay out of the initial bundle (`src/app.ts` comment near `VideoExporter`).
 
 ## Where things live (verified paths)
 

@@ -80,7 +80,7 @@ When you click Start, midee:
 2. At each frame, renders the piano-roll scene onto an HTML canvas (PixiJS does the heavy lifting via WebGL).
 3. Hands the canvas to the browser's [WebCodecs `VideoEncoder`](https://developer.mozilla.org/en-US/docs/Web/API/VideoEncoder), which encodes it to H.264 — using your GPU's hardware encoder when available.
 4. In parallel, renders the audio through [Tone.js](https://tonejs.github.io/)'s offline audio context — which runs ~30× faster than realtime, so audio is done before video usually finishes.
-5. Muxes the video and audio streams into an MP4 container using [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) — a 25 kB pure-JavaScript muxer.
+5. Muxes the video and audio streams into an MP4 container using [Mediabunny](https://mediabunny.dev/) (ISOBMFF / MP4 writer; tree-shaken in the export path).
 6. Offers the finished MP4 as a download.
 
 All of this happens in your browser tab. No server sees your MIDI, your rendered frames, or the final video. The entire pipeline is local, hardware-accelerated, and open source.

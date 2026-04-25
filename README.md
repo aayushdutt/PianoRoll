@@ -113,7 +113,7 @@ audio/     Tone.js + sampled instruments + offline render
 renderer/  PixiJS scene, particles, beat grid, keyboard
 midi/      Web MIDI input, loop engine, session recorder
 ui/        vanilla TS + CSS shell (controls, modals, menus)
-export/    WebCodecs encoder + mp4-muxer
+export/    WebCodecs encoder + Mediabunny (MP4 mux)
 i18n/      string tables (en bundled, others lazy-loaded)
 store/     tiny Signal<T> reactive primitive
 ```
@@ -126,7 +126,7 @@ stays flat as the song grows.
 **MIDI parse** — [@tonejs/midi](https://github.com/Tonejs/Midi), normalized
 through a local type layer so nothing downstream depends on it directly.
 
-**Video export** — [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) +
+**Video export** — [Mediabunny](https://mediabunny.dev/) (successor to mp4-muxer) +
 WebCodecs `VideoEncoder`. Frames are driven by the render clock, not wall
 time, so export is deterministic and matches live playback bit-for-bit.
 

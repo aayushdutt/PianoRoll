@@ -8,10 +8,10 @@ import { booleanPersisted, indexPersisted, numberPersisted } from './core/persis
 import { fetchSampleMidi, getSample } from './core/samples'
 import type { AppServices } from './core/services'
 import { ENABLE_LEARN_MODE } from './env'
-// VideoExporter + OfflineAudioRenderer pull in mp4-muxer and an offline Tone
-// context (~60 KB combined). They're only reachable via the Export button, so
-// we dynamic-import them in startExport() and let Vite split them out of the
-// main chunk. Types stay as type-only imports — no runtime cost.
+// VideoExporter pulls Mediabunny; OfflineAudioRenderer pulls Tone + instruments.
+// Both are dynamic-imported from startExport(). Import order matters: load the
+// offline-audio module first when audio is needed — do not block Tone on the
+// heavy VideoExporter chunk (see Promise.all removal below).
 import type { VideoExporter } from './export/VideoExporter'
 import { setLocale, t } from './i18n'
 import { ComputerKeyboardInput } from './midi/ComputerKeyboardInput'
@@ -38,6 +38,7 @@ import { DropZone } from './ui/DropZone'
 import { ExportModal, type ExportResolution, type ExportSettings } from './ui/ExportModal'
 import { InstrumentMenu } from './ui/InstrumentMenu'
 import { KeyboardResizer } from './ui/KeyboardResizer'
+import { MidiPickerModal } from './ui/MidiPickerModal'
 import { PostSessionModal, type SessionAction } from './ui/PostSessionModal'
 import { showError, showSuccess } from './ui/Toast'
 import { TrackPanel } from './ui/TrackPanel'
@@ -60,6 +61,7 @@ export class App {
   private instrumentMenu!: InstrumentMenu
   private activeMouseNote: number | null = null
   dropzone!: DropZone
+  private midiPicker!: MidiPickerModal
   private controls!: Controls
   trackPanel!: TrackPanel
   private exportModal!: ExportModal
@@ -330,6 +332,11 @@ export class App {
 
     this.postSessionModal = new PostSessionModal(overlay)
     this.postSessionModal.onAction = (action) => this.handleSessionAction(action)
+
+    // Single source of truth for "open a MIDI" — drop, file picker, samples.
+    // Callers thread their own loaders so the modal stays mode-neutral; the
+    // dispatch in `openFilePicker` routes to play vs learn.
+    this.midiPicker = new MidiPickerModal(overlay)
 
     this.kbdResizer = new KeyboardResizer(
       overlay,
@@ -940,18 +947,12 @@ export class App {
 
     const filename = settings.output === 'audio-only' ? 'midee.m4a' : 'midee.mp4'
 
-    // Lazy-load the export chunk — first export pays a ~60 KB one-time cost;
-    // users who never export don't pay it at all.
-    const [{ VideoExporter }, { renderAudioOffline }] = await Promise.all([
-      import('./export/VideoExporter'),
-      import('./audio/OfflineAudioRenderer'),
-    ])
-    const exporter = new VideoExporter(this.renderer.canvas)
-    this.currentExporter = exporter
-
     try {
       let audioBuffer: AudioBuffer | undefined
       if (needsAudio) {
+        // Load without VideoExporter: that chunk embeds Mediabunny (~tens of kB
+        // parsed) and must not run before / in parallel with offline audio setup.
+        const { renderAudioOffline } = await import('./audio/OfflineAudioRenderer')
         this.exportModal.updateProgress('Rendering audio', 0)
         try {
           // Per-stage progress: pct flows straight through. The bar resets
@@ -970,6 +971,10 @@ export class App {
           this.showError(t('error.audio.renderFailed'))
         }
       }
+
+      const { VideoExporter } = await import('./export/VideoExporter')
+      const exporter = new VideoExporter(this.renderer.canvas)
+      this.currentExporter = exporter
 
       const exportAudio =
         audioBuffer && settings.output === 'av'
@@ -1031,11 +1036,26 @@ export class App {
   }
 
   // Entry point for every "open MIDI" action — top strip button, track panel,
-  // mode-transition fallbacks. Samples already live on the home card, so the
-  // button goes straight to the native file picker instead of routing through
-  // a redundant modal.
+  // play-mode entry without a loaded file, learn-hub upload CTA. Routes through
+  // the unified `MidiPickerModal` (drop / file picker / samples) and dispatches
+  // selections by current mode so Learn keeps its MIDI isolated from Play's.
   openFilePicker(): void {
-    this.dropzone.openFilePicker()
+    this.midiPicker.open({
+      onFile: (file) => {
+        if (this.store.state.mode === 'learn') {
+          void this.learnController.loadMidiFromFile(file, 'picker')
+        } else {
+          void this.loadMidi(file, 'picker')
+        }
+      },
+      onSample: (id) => {
+        if (this.store.state.mode === 'learn') {
+          void this.learnController.loadSample(id)
+        } else {
+          void this.loadSample(id)
+        }
+      },
+    })
   }
 
   // Play-mode sample loader. Learn has its own via LearnController.loadSample.

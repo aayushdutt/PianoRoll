@@ -30,7 +30,7 @@ function PostSessionView(props: ViewProps) {
       >
         {/* biome-ignore-end lint/a11y/useKeyWithClickEvents: — */}
         {/* biome-ignore-end lint/a11y/noStaticElementInteractions: — */}
-        <div class="post-session-card">
+        <div class="post-session-card modal-scroll">
           <header class="export-header">
             <div class="export-card-icon" innerHTML={icons.waveform()} />
             <div class="export-header-text">

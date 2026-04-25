@@ -90,7 +90,7 @@ function ExportView(props: ViewProps) {
       >
         {/* biome-ignore-end lint/a11y/useKeyWithClickEvents: — */}
         {/* biome-ignore-end lint/a11y/noStaticElementInteractions: — */}
-        <div class="export-card">
+        <div class="export-card modal-scroll">
           <div class="export-phase" classList={{ hidden: props.phase() !== 'settings' }}>
             <header class="export-header">
               <div class="export-card-icon" innerHTML={icons.film()} />

@@ -116,6 +116,7 @@ export class LearnController {
     this.unsubs = []
     this.hub.unmount()
     this.unmountHostElements()
+    this.ctx.services.renderer.setVisible(true)
     if (this.overlay) {
       this.ctx.services.renderer.removeLayer(this.overlay)
       this.overlay = null
@@ -299,6 +300,10 @@ export class LearnController {
     // exiting exercise (or a prior Play-mode session) left on the renderer so
     // the background stays quiet behind the hub chrome.
     this.ctx.services.renderer.clearMidi()
+    // Hide the Pixi stage (notes lane + keyboard strip) while the catalog is
+    // showing — exercise mount restores it. stage.visible=false also skips
+    // per-frame draw work, not just compositing.
+    this.ctx.services.renderer.setVisible(false)
   }
 
   private showExerciseView(): void {
@@ -306,6 +311,7 @@ export class LearnController {
     this.hubHost.classList.add('learn-host--hidden')
     this.exerciseHost.classList.remove('learn-host--hidden')
     this.view.set('exercise')
+    this.ctx.services.renderer.setVisible(true)
   }
 
   // App opens the shared file picker, but the file's destination is

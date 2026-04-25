@@ -21,9 +21,7 @@ export function ExerciseCardView(props: CardOptions) {
       onClick={() => props.onLaunch(props.descriptor)}
     >
       <Show when={props.icon}>
-        <span class="ex-card__icon" aria-hidden="true">
-          {props.icon}
-        </span>
+        {(icon) => <span class="ex-card__icon" aria-hidden="true" innerHTML={icon()} />}
       </Show>
       <span class="ex-card__title">{props.descriptor.title}</span>
       <span class="ex-card__blurb">{props.descriptor.blurb}</span>
@@ -63,9 +61,7 @@ export function ComingSoonCardView(props: ComingSoonProps) {
   return (
     <div class="ex-card ex-card--coming" data-category={props.category}>
       <Show when={props.icon}>
-        <span class="ex-card__icon" aria-hidden="true">
-          {props.icon}
-        </span>
+        {(icon) => <span class="ex-card__icon" aria-hidden="true" innerHTML={icon()} />}
       </Show>
       <span class="ex-card__title">{props.label}</span>
       <span class="ex-card__blurb">Coming soon</span>

@@ -3,6 +3,7 @@ import { inject } from '@vercel/analytics'
 import posthog from 'posthog-js'
 import { render } from 'solid-js/web'
 import { AppRoot } from './AppRoot'
+import { benchFixtureFromUrl, runBench } from './bench/runner'
 import { createApp } from './createApp'
 import { env } from './env'
 import { currentLocaleNativeName, initI18n, shouldShowLocaleHint, t } from './i18n'
@@ -50,6 +51,16 @@ async function boot(): Promise<void> {
   // Subtle one-time onboarding for users whose browser language was
   // auto-detected to a non-English locale.
   if (shouldShowLocaleHint()) showLocaleHint()
+
+  const fixture = benchFixtureFromUrl()
+  if (fixture) {
+    try {
+      window.__BENCH_RESULT = await runBench(fixture, ctx.services, ctx.store)
+    } catch (err) {
+      window.__BENCH_ERROR = err instanceof Error ? err.message : String(err)
+      console.error('[bench]', err)
+    }
+  }
 }
 
 function showLocaleHint(): void {
