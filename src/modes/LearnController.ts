@@ -6,6 +6,7 @@ import type { ExerciseDescriptor } from '../learn/core/Exercise'
 import { ExerciseRunner } from '../learn/core/ExerciseRunner'
 import { createLearnState, type LearnState, type LearnStatus } from '../learn/core/LearnState'
 import { createLearnProgressStore, type LearnProgressStore } from '../learn/core/progress'
+import { findExercise } from '../learn/hub/catalog'
 import { LearnHub } from '../learn/hub/LearnHub'
 import { LearnOverlay } from '../learn/overlays/LearnOverlay'
 import { SessionSummary } from '../learn/ui/SessionSummary'
@@ -243,10 +244,8 @@ export class LearnController {
   private relaunchById(id: string): void {
     // Thin helper so the summary's "Again" button can re-enter the last
     // exercise without reaching into the catalog from UI code.
-    import('../learn/hub/catalog').then(({ findExercise }) => {
-      const d = findExercise(id)
-      if (d) void this.launchExercise(d)
-    })
+    const d = findExercise(id)
+    if (d) void this.launchExercise(d)
   }
 
   // ── Internal ────────────────────────────────────────────────────────────

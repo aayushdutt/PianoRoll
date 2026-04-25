@@ -1,5 +1,4 @@
 import { App } from './app'
-import { ENABLE_LEARN_MODE } from './env'
 import { AppCtx as _AppCtx, type AppCtxValue } from './store/AppCtx'
 import { createAppStore } from './store/state'
 
@@ -20,9 +19,6 @@ import { createAppStore } from './store/state'
 // T2b has been removed; the store is now constructed here and threaded in.
 export async function createApp(): Promise<{ ctx: AppCtxValue; app: App }> {
   const store = createAppStore()
-  if (!ENABLE_LEARN_MODE && store.state.mode === 'learn') {
-    store.setState('mode', 'home')
-  }
   const app = new App(store)
   await app.init()
   return {

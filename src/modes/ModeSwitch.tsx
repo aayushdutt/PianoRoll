@@ -1,7 +1,8 @@
-import { createEffect, ErrorBoundary, Match, Switch } from 'solid-js'
+import { ErrorBoundary, Match, Switch } from 'solid-js'
 import { ENABLE_LEARN_MODE } from '../env'
 import { useApp } from '../store/AppCtx'
 import { HomeMode } from './HomeMode'
+import { LearnComingSoon } from './LearnComingSoon'
 import { LearnMode } from './LearnMode'
 import { LiveMode } from './LiveMode'
 import { ModeError } from './ModeError'
@@ -11,11 +12,6 @@ import { PlayMode } from './PlayMode'
 // renders <ModeError/> with a retry button that resets the boundary.
 export function ModeSwitch() {
   const { store } = useApp()
-  createEffect(() => {
-    if (!ENABLE_LEARN_MODE && store.state.mode === 'learn') {
-      store.setState('mode', 'home')
-    }
-  })
   return (
     <ErrorBoundary fallback={(err, retry) => <ModeError err={err} onRetry={retry} />}>
       <Switch>
@@ -28,8 +24,11 @@ export function ModeSwitch() {
         <Match when={store.state.mode === 'live'}>
           <LiveMode />
         </Match>
-        <Match when={ENABLE_LEARN_MODE && store.state.mode === 'learn'}>
+        <Match when={store.state.mode === 'learn' && ENABLE_LEARN_MODE}>
           <LearnMode />
+        </Match>
+        <Match when={store.state.mode === 'learn' && !ENABLE_LEARN_MODE}>
+          <LearnComingSoon />
         </Match>
       </Switch>
     </ErrorBoundary>

@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js'
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import type { AppServices } from '../core/services'
 import { ENABLE_LEARN_MODE } from '../env'
@@ -65,8 +65,7 @@ interface TopStripProps {
 function TopStripView(props: TopStripProps) {
   const activeMode = (): string => {
     const m = props.mode()
-    if (m === 'play' || m === 'live') return m
-    if (ENABLE_LEARN_MODE && m === 'learn') return 'learn'
+    if (m === 'play' || m === 'live' || m === 'learn') return m
     return 'none'
   }
   return (
@@ -125,21 +124,19 @@ function TopStripView(props: TopStripProps) {
           <span class="ts-mode-icon" aria-hidden="true" innerHTML={icons.modeLive()} />
           <span class="ts-mode-label">Live</span>
         </button>
-        <Show when={ENABLE_LEARN_MODE}>
-          <button
-            class="ts-mode-seg"
-            classList={{ 'is-active': props.mode() === 'learn' }}
-            id="ts-mode-learn"
-            type="button"
-            role="tab"
-            aria-selected={props.mode() === 'learn' ? 'true' : 'false'}
-            data-tip={t('topStrip.modeLearn')}
-            onClick={() => props.onMode('learn')}
-          >
-            <span class="ts-mode-icon" aria-hidden="true" innerHTML={icons.practice()} />
-            <span class="ts-mode-label">Learn</span>
-          </button>
-        </Show>
+        <button
+          class="ts-mode-seg"
+          classList={{ 'is-active': props.mode() === 'learn' }}
+          id="ts-mode-learn"
+          type="button"
+          role="tab"
+          aria-selected={props.mode() === 'learn' ? 'true' : 'false'}
+          data-tip={t('topStrip.modeLearn')}
+          onClick={() => props.onMode('learn')}
+        >
+          <span class="ts-mode-icon" aria-hidden="true" innerHTML={icons.practice()} />
+          <span class="ts-mode-label">Learn</span>
+        </button>
         <span class="ts-mode-thumb" aria-hidden="true" />
       </div>
 
@@ -1290,10 +1287,12 @@ export class Controls {
       return
     }
 
-    if (ENABLE_LEARN_MODE && mode === 'learn') {
+    if (mode === 'learn') {
       this.setContext({
-        kicker: 'Learn',
-        title: 'Exercises, ear training, sight reading',
+        kicker: ENABLE_LEARN_MODE ? 'Learn' : 'Coming soon',
+        title: ENABLE_LEARN_MODE
+          ? 'Exercises, ear training, sight reading'
+          : 'Learn mode is on the way',
       })
       return
     }

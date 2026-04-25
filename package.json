@@ -17,8 +17,8 @@
     "check": "npm run typecheck && npm run lint && npm run test",
     "icons": "node scripts/build-icons.mjs",
     "preview:serp": "node scripts/preview-serp.mjs",
-    "bench": "npx vite build && node scripts/bench.mjs",
-    "bench:update": "npx vite build && node scripts/bench.mjs --update"
+    "bench": "VITE_ENABLE_BENCH=1 npx vite build && node scripts/bench.mjs",
+    "bench:update": "VITE_ENABLE_BENCH=1 npx vite build && node scripts/bench.mjs --update"
   },
   "dependencies": {
     "@t3-oss/env-core": "^0.13.11",

@@ -1095,7 +1095,8 @@ export class App {
       return
     }
     if (mode === 'learn') {
-      if (!ENABLE_LEARN_MODE) return
+      // When VITE_ENABLE_LEARN_MODE is off, ModeSwitch shows the
+      // <LearnComingSoon/> marketing surface instead of <LearnMode/>.
       this.store.setState('mode', 'learn')
       return
     }
@@ -1313,6 +1314,18 @@ export class App {
     this.sessionRec.cancel()
     this.metronome.stop()
     this.synth.liveReleaseAll()
+    this.closeTransientOverlays()
+  }
+
+  // Dismiss every modal-style overlay so mode switches and fresh-load flows
+  // don't leave a stale picker / export / post-session card floating over the
+  // new surface. Idempotent — `.close()` is a no-op when the modal is already
+  // hidden. Popovers (instrument menu, customize) close themselves on the
+  // outside click that triggered the transition.
+  private closeTransientOverlays(): void {
+    this.exportModal?.close()
+    this.postSessionModal?.close()
+    this.midiPicker?.close()
   }
 
   primeInteractiveAudio(): void {

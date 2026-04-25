@@ -3,7 +3,6 @@ import { inject } from '@vercel/analytics'
 import posthog from 'posthog-js'
 import { render } from 'solid-js/web'
 import { AppRoot } from './AppRoot'
-import { benchFixtureFromUrl, runBench } from './bench/runner'
 import { createApp } from './createApp'
 import { env } from './env'
 import { currentLocaleNativeName, initI18n, shouldShowLocaleHint, t } from './i18n'
@@ -52,13 +51,22 @@ async function boot(): Promise<void> {
   // auto-detected to a non-English locale.
   if (shouldShowLocaleHint()) showLocaleHint()
 
-  const fixture = benchFixtureFromUrl()
-  if (fixture) {
-    try {
-      window.__BENCH_RESULT = await runBench(fixture, ctx.services, ctx.store)
-    } catch (err) {
-      window.__BENCH_ERROR = err instanceof Error ? err.message : String(err)
-      console.error('[bench]', err)
+  // Bench runner is a build-time opt-in. `npm run bench` sets
+  // VITE_ENABLE_BENCH=1; public prod builds don't, so Vite constant-folds the
+  // condition to `false` and tree-shakes both the dynamic import and the
+  // branch — `bench/runner.ts` never reaches the public bundle, and
+  // `?bench=...` URLs are inert in prod. Read `import.meta.env` directly (not
+  // through env.ts) so the value is statically inlined for the dead-code pass.
+  if (import.meta.env.VITE_ENABLE_BENCH) {
+    const { benchFixtureFromUrl, runBench } = await import('./bench/runner')
+    const fixture = benchFixtureFromUrl()
+    if (fixture) {
+      try {
+        window.__BENCH_RESULT = await runBench(fixture, ctx)
+      } catch (err) {
+        window.__BENCH_ERROR = err instanceof Error ? err.message : String(err)
+        console.error('[bench]', err)
+      }
     }
   }
 }

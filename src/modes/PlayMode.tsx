@@ -28,7 +28,15 @@ export function PlayMode() {
       //      surface a "play_mode_entered" event for a mode we're still
       //      loading into — matches pre-port semantics of analytics firing
       //      only on explicit mode navigation.
-      if (status !== 'loading') openFilePicker()
+      if (status === 'loading') return
+      // Halt any prior surface (Live looper / sessionRec / metronome / etc.)
+      // BEFORE opening the picker so audio doesn't ghost through while the
+      // user chooses a file.
+      resetInteractionState()
+      trackPanel.close()
+      dropzone.hide()
+      keyboardInput.enable()
+      openFilePicker()
       return
     }
     resetInteractionState()

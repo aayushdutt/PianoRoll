@@ -3887,7 +3887,8 @@ body {
   }
 }
 
-body.is-touch #kbd-resizer {
+body.is-touch #kbd-resizer,
+body.canvas-hidden #kbd-resizer {
   display: none;
 }
 
@@ -4985,10 +4986,8 @@ body.is-touch #kbd-resizer {
   z-index: 90;
   background: transparent;
   pointer-events: none;
-  padding: calc(16px + env(safe-area-inset-top, 0px))
-    calc(16px + env(safe-area-inset-right, 0px))
-    calc(16px + env(safe-area-inset-bottom, 0px))
-    calc(16px + env(safe-area-inset-left, 0px));
+  padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
+    calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   transition:
     background 0.28s,
     backdrop-filter 0.28s;
@@ -5140,6 +5139,182 @@ body.is-touch #kbd-resizer {
 
 .midi-picker-samples-mount {
   display: contents;
+}
+
+/* ─────────────────────────────────────────
+   LEARN — COMING SOON
+───────────────────────────────────────── */
+
+.learn-soon {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+  z-index: 5;
+  isolation: isolate;
+  animation: learn-soon-fade 0.6s var(--ease-out);
+}
+
+@keyframes learn-soon-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Slow drifting aurora — single accent + a hint of cool to keep it from
+   reading as a flat orange wash. Soft, deliberate motion (no shimmer, no
+   sparkle) — the page should feel like it's holding its breath. */
+.learn-soon__aurora {
+  position: absolute;
+  inset: -25%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      720px 460px at 50% 30%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(560px 360px at 30% 70%, rgba(120, 140, 255, 0.1), transparent 60%);
+  filter: blur(2px) saturate(1.1);
+  animation: learn-soon-drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes learn-soon-drift {
+  0% {
+    transform: translate(-1.5%, -1%) scale(1);
+  }
+  100% {
+    transform: translate(1.5%, 1.5%) scale(1.06);
+  }
+}
+
+/* Faint film-grain so the gradients don't read as banded on flat displays. */
+.learn-soon__grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>");
+}
+
+.learn-soon__center {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+  padding: 32px 24px;
+  max-width: 540px;
+  animation: learn-soon-rise 0.8s var(--ease-out) both;
+}
+
+@keyframes learn-soon-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* "Coming soon" pill — pulsing dot + label inside an accented chip. Intentional
+   noun-pill, not a progress indicator: the static border + filled label removes
+   any "this is loading" ambiguity. The ring on the dot is the only motion cue. */
+.learn-soon__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 14px 6px 12px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.learn-soon__badge-text {
+  font: 600 11px / 1 var(--font);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.learn-soon__pulse {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+}
+
+.learn-soon__pulse-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.learn-soon__pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  animation: learn-soon-pulse 2.6s ease-out infinite;
+}
+
+@keyframes learn-soon-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  80%,
+  100% {
+    transform: scale(5);
+    opacity: 0;
+  }
+}
+
+.learn-soon__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(48px, 8vw, 88px);
+  letter-spacing: -0.02em;
+  line-height: 0.96;
+  color: var(--text);
+}
+
+.learn-soon__title em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.learn-soon__sub {
+  margin: 0;
+  font: 400 14px / 1.55 var(--font);
+  color: var(--text-muted);
+  max-width: 440px;
+}
+
+@media (max-width: 640px) {
+  .learn-soon__center {
+    padding: 24px 18px;
+    gap: 14px;
+  }
 }
 
 /* ─────────────────────────────────────────

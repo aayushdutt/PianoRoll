@@ -28,4 +28,7 @@ TODO.md
 docs/
 .internal/
 public/local/
-bench/
+# Bench results (latest.json / baseline.json written by scripts/bench.mjs).
+# Leading slash anchors to repo root so `src/bench/` (the runner source) is
+# NOT ignored — without the slash this would match any directory named bench.
+/bench/
