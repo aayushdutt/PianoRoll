@@ -20,7 +20,11 @@ export interface AppCtxValue {
   dropzone: DropZone
   keyboardInput: ComputerKeyboardInput
   midiInput: MidiInputManager
-  learnController: LearnController
+  // LearnController is dynamic-imported on first Learn entry so its module
+  // graph (LearnHub, LearnState, ExerciseRunner, IntervalsEngine, etc.)
+  // stays out of the initial bundle. Resolves the same instance on repeat
+  // calls.
+  ensureLearnController: () => Promise<LearnController>
   resetInteractionState: () => void
   openFilePicker: () => void
   primeInteractiveAudio: () => void

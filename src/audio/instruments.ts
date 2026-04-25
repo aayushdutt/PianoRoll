@@ -1,7 +1,17 @@
-// Factories only touch the current Tone context via `Tone.getDestination()`,
+// Factories only touch the current Tone context via `getDestination()`,
 // so they work identically inside `Tone.Offline(...)` for export rendering.
 
-import * as Tone from 'tone'
+import {
+  Chorus,
+  Filter,
+  FMSynth,
+  getContext,
+  getDestination,
+  PolySynth,
+  Reverb,
+  Sampler,
+  Synth,
+} from 'tone'
 
 export type InstrumentId =
   | 'piano'
@@ -127,7 +137,7 @@ async function createPiano(): Promise<InstrumentRuntime> {
 }
 
 function createTriangleFallback(): InstrumentRuntime {
-  const synth = new Tone.PolySynth(Tone.Synth, {
+  const synth = new PolySynth(Synth, {
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.005, decay: 0.08, sustain: 0.55, release: 0.5 },
   }).toDestination()
@@ -135,7 +145,7 @@ function createTriangleFallback(): InstrumentRuntime {
 }
 
 function createRhodes(): InstrumentRuntime {
-  const synth = new Tone.PolySynth(Tone.FMSynth, {
+  const synth = new PolySynth(FMSynth, {
     harmonicity: 3.2,
     modulationIndex: 6,
     oscillator: { type: 'sine' },
@@ -143,39 +153,39 @@ function createRhodes(): InstrumentRuntime {
     modulation: { type: 'sine' },
     modulationEnvelope: { attack: 0.004, decay: 0.6, sustain: 0.05, release: 0.4 },
   })
-  const chorus = new Tone.Chorus(0.8, 2.5, 0.35).start()
-  synth.chain(chorus, Tone.getDestination())
+  const chorus = new Chorus(0.8, 2.5, 0.35).start()
+  synth.chain(chorus, getDestination())
   return wrapPolySynth(synth)
 }
 
 function createPad(): InstrumentRuntime {
-  const synth = new Tone.PolySynth(Tone.Synth, {
+  const synth = new PolySynth(Synth, {
     oscillator: { type: 'fatsawtooth', count: 3, spread: 24 },
     envelope: { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6 },
   })
   synth.volume.value = -10
-  const filter = new Tone.Filter({ frequency: 1600, type: 'lowpass', rolloff: -12 })
-  const reverb = new Tone.Reverb({ decay: 3.5, wet: 0.35 })
-  synth.chain(filter, reverb, Tone.getDestination())
+  const filter = new Filter({ frequency: 1600, type: 'lowpass', rolloff: -12 })
+  const reverb = new Reverb({ decay: 3.5, wet: 0.35 })
+  synth.chain(filter, reverb, getDestination())
   return wrapPolySynth(synth)
 }
 
 function createPluck(): InstrumentRuntime {
-  const synth = new Tone.PolySynth(Tone.Synth, {
+  const synth = new PolySynth(Synth, {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.002, decay: 0.18, sustain: 0, release: 0.9 },
   })
   synth.volume.value = -6
-  const filter = new Tone.Filter({ frequency: 3800, type: 'highpass', rolloff: -12, Q: 0.5 })
-  const lowpass = new Tone.Filter({ frequency: 6500, type: 'lowpass', rolloff: -24 })
-  synth.chain(filter, lowpass, Tone.getDestination())
+  const filter = new Filter({ frequency: 3800, type: 'highpass', rolloff: -12, Q: 0.5 })
+  const lowpass = new Filter({ frequency: 6500, type: 'lowpass', rolloff: -24 })
+  synth.chain(filter, lowpass, getDestination())
   return wrapPolySynth(synth)
 }
 
 function createMarimba(): InstrumentRuntime {
   // Bright FM mallet — high harmonicity for crisp "wood" partials, punchy
   // attack with zero sustain so notes pop and die quickly.
-  const synth = new Tone.PolySynth(Tone.FMSynth, {
+  const synth = new PolySynth(FMSynth, {
     harmonicity: 4.2,
     modulationIndex: 12,
     oscillator: { type: 'sine' },
@@ -184,8 +194,8 @@ function createMarimba(): InstrumentRuntime {
     modulationEnvelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.08 },
   })
   synth.volume.value = -4
-  const reverb = new Tone.Reverb({ decay: 1.2, wet: 0.2 })
-  synth.chain(reverb, Tone.getDestination())
+  const reverb = new Reverb({ decay: 1.2, wet: 0.2 })
+  synth.chain(reverb, getDestination())
   return wrapPolySynth(synth)
 }
 
@@ -193,7 +203,7 @@ function createBells(): InstrumentRuntime {
   // Near-integer harmonicity offset gives the inharmonic overtone stack that
   // reads as "bell". Long modulation + carrier decay lets each strike ring
   // out through the reverb tail.
-  const synth = new Tone.PolySynth(Tone.FMSynth, {
+  const synth = new PolySynth(FMSynth, {
     harmonicity: 3.01,
     modulationIndex: 8,
     oscillator: { type: 'sine' },
@@ -202,35 +212,35 @@ function createBells(): InstrumentRuntime {
     modulationEnvelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 1.8 },
   })
   synth.volume.value = -8
-  const reverb = new Tone.Reverb({ decay: 4.0, wet: 0.4 })
-  synth.chain(reverb, Tone.getDestination())
+  const reverb = new Reverb({ decay: 4.0, wet: 0.4 })
+  synth.chain(reverb, getDestination())
   return wrapPolySynth(synth)
 }
 
 function createStrings(): InstrumentRuntime {
   // Slow-attack fat sawtooth ensemble + lowpass + reverb reads as a section
   // of bowed strings. Detune + spread gives the "many players" feel.
-  const synth = new Tone.PolySynth(Tone.Synth, {
+  const synth = new PolySynth(Synth, {
     oscillator: { type: 'fatsawtooth', count: 5, spread: 40 },
     envelope: { attack: 0.35, decay: 0.25, sustain: 0.85, release: 1.4 },
   })
   synth.volume.value = -12
-  const filter = new Tone.Filter({ frequency: 2400, type: 'lowpass', rolloff: -12 })
-  const reverb = new Tone.Reverb({ decay: 2.4, wet: 0.32 })
-  synth.chain(filter, reverb, Tone.getDestination())
+  const filter = new Filter({ frequency: 2400, type: 'lowpass', rolloff: -12 })
+  const reverb = new Reverb({ decay: 2.4, wet: 0.32 })
+  synth.chain(filter, reverb, getDestination())
   return wrapPolySynth(synth)
 }
 
 function createBass(): InstrumentRuntime {
   // Triangle core with a lowpass emphasis — round and pillowy even when
   // played in the middle register. Shorter release keeps fast bass lines tight.
-  const synth = new Tone.PolySynth(Tone.Synth, {
+  const synth = new PolySynth(Synth, {
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.005, decay: 0.3, sustain: 0.75, release: 0.35 },
   })
   synth.volume.value = -4
-  const filter = new Tone.Filter({ frequency: 1200, type: 'lowpass', rolloff: -24, Q: 0.8 })
-  synth.chain(filter, Tone.getDestination())
+  const filter = new Filter({ frequency: 1200, type: 'lowpass', rolloff: -24, Q: 0.8 })
+  synth.chain(filter, getDestination())
   return wrapPolySynth(synth)
 }
 
@@ -238,7 +248,7 @@ function createBass(): InstrumentRuntime {
 //
 // Samples sourced from the MIT-licensed nbrosowsky/tonejs-instruments project
 // and committed into `public/instrument-samples/` so the app doesn't depend on
-// any upstream CDN remaining online. Each call builds a Tone.Sampler from the
+// any upstream CDN remaining online. Each call builds a Sampler from the
 // instrument's sample map; Tone interpolates between the sampled pitches to
 // cover the full piano range. If a fetch still fails (e.g. offline), the
 // caller falls through to a synth patch so the app never silently drops notes.
@@ -256,7 +266,7 @@ interface SampleSpec {
 
 // Filename convention: 'As3.mp3' = A#3, 'Cs4.mp3' = C#4 (lowercase 's' for
 // sharp since '#' isn't URL-safe). Target only the exact sharp pattern
-// `<A-G>s<digit>` so malformed filenames fail loud at Tone.Sampler setup
+// `<A-G>s<digit>` so malformed filenames fail loud at Sampler setup
 // instead of being silently mangled by a loose global replace.
 function filenameToNote(file: string): string {
   const raw = file.replace(/\.mp3$/, '')
@@ -284,7 +294,7 @@ async function loadFolderBuffers(spec: SampleSpec): Promise<Map<string, AudioBuf
       const folder = existing ?? new Map<string, AudioBuffer>()
       // Decode against the live online context. AudioBuffers returned here
       // remain valid when passed into a later OfflineContext Sampler.
-      const ctx = Tone.getContext()
+      const ctx = getContext()
       await Promise.all(
         spec.files.map(async (file) => {
           if (folder.has(file)) return
@@ -313,7 +323,7 @@ async function loadFolderBuffers(spec: SampleSpec): Promise<Map<string, AudioBuf
 
 async function createSampled(
   spec: SampleSpec,
-  chain?: (sampler: Tone.Sampler) => void,
+  chain?: (sampler: Sampler) => void,
 ): Promise<InstrumentRuntime> {
   const buffers = await loadFolderBuffers(spec)
 
@@ -324,7 +334,7 @@ async function createSampled(
     urls[filenameToNote(file)] = buf
   }
 
-  const sampler = new Tone.Sampler({
+  const sampler = new Sampler({
     urls,
     release: spec.release ?? 1,
     attack: spec.attack ?? 0,
@@ -333,7 +343,7 @@ async function createSampled(
   if (chain) chain(sampler)
   else sampler.toDestination()
 
-  // Buffers are already decoded and passed by reference, so Tone.Sampler has
+  // Buffers are already decoded and passed by reference, so Sampler has
   // nothing async to wait on — no Tone.loaded() race needed.
 
   return {
@@ -452,8 +462,8 @@ const SAMPLED_SPECS: Partial<Record<InstrumentId, SampleSpec>> = {
 async function createViolin(): Promise<InstrumentRuntime> {
   try {
     return await createSampled(SAMPLED_SPECS.violin!, (s) => {
-      const reverb = new Tone.Reverb({ decay: 1.8, wet: 0.22 })
-      s.chain(reverb, Tone.getDestination())
+      const reverb = new Reverb({ decay: 1.8, wet: 0.22 })
+      s.chain(reverb, getDestination())
     })
   } catch (err) {
     console.warn('Violin samples unavailable, falling back to synth strings', err)
@@ -464,8 +474,8 @@ async function createViolin(): Promise<InstrumentRuntime> {
 async function createFlute(): Promise<InstrumentRuntime> {
   try {
     return await createSampled(SAMPLED_SPECS.flute!, (s) => {
-      const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.18 })
-      s.chain(reverb, Tone.getDestination())
+      const reverb = new Reverb({ decay: 1.4, wet: 0.18 })
+      s.chain(reverb, getDestination())
     })
   } catch (err) {
     console.warn('Flute samples unavailable, falling back to synth', err)
@@ -477,14 +487,14 @@ async function createFlute(): Promise<InstrumentRuntime> {
 
 async function createUpright(): Promise<InstrumentRuntime> {
   try {
-    // Eight well-spaced samples (one per octave plus C8) — Tone.Sampler
+    // Eight well-spaced samples (one per octave plus C8) — Sampler
     // interpolates the semitones between. Piano interpolation sounds clean
     // because timbre doesn't change much within an octave.
     return await createSampled(SAMPLED_SPECS.upright!, (s) => {
       // Slight room reverb — the upright sits "in the room" vs the Grand's
       // concert stage, but neither wants heavy ambience.
-      const reverb = new Tone.Reverb({ decay: 1.4, wet: 0.15 })
-      s.chain(reverb, Tone.getDestination())
+      const reverb = new Reverb({ decay: 1.4, wet: 0.15 })
+      s.chain(reverb, getDestination())
     })
   } catch (err) {
     console.warn('Upright samples unavailable, falling back to Grand', err)
@@ -496,7 +506,7 @@ function createDigitalPiano(): InstrumentRuntime {
   // Clean stage-piano voice: a near-unity-harmonicity FM patch gives a subtle
   // bell attack over a mostly sine body — reads as "digital Yamaha-style"
   // rather than acoustic grand. Gentle chorus widens the stereo image.
-  const synth = new Tone.PolySynth(Tone.FMSynth, {
+  const synth = new PolySynth(FMSynth, {
     harmonicity: 1.0,
     modulationIndex: 2.6,
     oscillator: { type: 'sine' },
@@ -505,9 +515,9 @@ function createDigitalPiano(): InstrumentRuntime {
     modulationEnvelope: { attack: 0.003, decay: 0.35, sustain: 0, release: 0.3 },
   })
   synth.volume.value = -6
-  const chorus = new Tone.Chorus(1.1, 2.0, 0.2).start()
-  const reverb = new Tone.Reverb({ decay: 1.1, wet: 0.14 })
-  synth.chain(chorus, reverb, Tone.getDestination())
+  const chorus = new Chorus(1.1, 2.0, 0.2).start()
+  const reverb = new Reverb({ decay: 1.1, wet: 0.14 })
+  synth.chain(chorus, reverb, getDestination())
   return wrapPolySynth(synth)
 }
 
@@ -516,8 +526,8 @@ async function createGuitar(): Promise<InstrumentRuntime> {
     // Guitar has a dense sample map (every semitone A2..G#4), so interpolation
     // artefacts are minimal and the plucked attack reads cleanly.
     return await createSampled(SAMPLED_SPECS.guitar!, (s) => {
-      const reverb = new Tone.Reverb({ decay: 1.2, wet: 0.14 })
-      s.chain(reverb, Tone.getDestination())
+      const reverb = new Reverb({ decay: 1.2, wet: 0.14 })
+      s.chain(reverb, getDestination())
     })
   } catch (err) {
     console.warn('Guitar samples unavailable, falling back to synth pluck', err)

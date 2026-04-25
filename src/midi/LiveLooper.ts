@@ -1,4 +1,4 @@
-import * as Tone from 'tone'
+import { getContext } from 'tone'
 import type { MasterClock } from '../core/clock/MasterClock'
 import { createEventSignal } from '../store/eventSignal'
 import type { CapturedEvent } from './MidiEncoding'
@@ -120,7 +120,7 @@ export class LiveLooper {
     // and ghost visuals would stick until the user clears manually.
     const popped = this.soundingByLayer.pop()
     if (popped) {
-      const now = Tone.getContext().currentTime
+      const now = getContext().currentTime
       for (const pitch of popped) this.callbacks.onPlaybackNoteOff(pitch, now)
     }
     this.layerCount.set(this.layers.length)
@@ -128,7 +128,7 @@ export class LiveLooper {
 
   captureNoteOn(pitch: number, velocity: number, clockTime: number): void {
     if (this.state.value === 'armed') {
-      this.recordStartCtxTime = Tone.getContext().currentTime
+      this.recordStartCtxTime = getContext().currentTime
       this.state.set('recording')
     }
     if (this.state.value === 'recording') {
@@ -136,7 +136,7 @@ export class LiveLooper {
         type: 'on',
         pitch,
         velocity,
-        time: Math.max(0, Tone.getContext().currentTime - this.recordStartCtxTime),
+        time: Math.max(0, getContext().currentTime - this.recordStartCtxTime),
       })
       return
     }
@@ -159,7 +159,7 @@ export class LiveLooper {
         type: 'off',
         pitch,
         velocity: 0,
-        time: Math.max(0, Tone.getContext().currentTime - this.recordStartCtxTime),
+        time: Math.max(0, getContext().currentTime - this.recordStartCtxTime),
       })
       return
     }
@@ -206,14 +206,14 @@ export class LiveLooper {
     // silence the user left (e.g. a chord ringing out) is preserved. Using
     // `last.time` instead would clip the tail and make the loop retrigger
     // immediately on note-off.
-    const raw = Math.max(0.1, Tone.getContext().currentTime - this.recordStartCtxTime)
+    const raw = Math.max(0.1, getContext().currentTime - this.recordStartCtxTime)
     this.loopDuration = this.quantizeDuration ? Math.max(0.1, this.quantizeDuration(raw)) : raw
     this.closeOrphans(this.recordBuffer, this.loopDuration)
     this.layers = [this.recordBuffer]
     this.recordBuffer = []
     this.layerCursors = [{ cycle: 0, idx: 0 }]
     this.soundingByLayer = [new Set()]
-    this.loopStartCtxTime = Tone.getContext().currentTime
+    this.loopStartCtxTime = getContext().currentTime
     this.layerCount.set(1)
     this.state.set('playing')
     this.startSchedulers()
@@ -262,14 +262,14 @@ export class LiveLooper {
 
   private cyclePosNow(): number {
     if (this.loopDuration <= 0) return 0
-    const elapsed = Tone.getContext().currentTime - this.loopStartCtxTime
+    const elapsed = getContext().currentTime - this.loopStartCtxTime
     const mod = elapsed - Math.floor(elapsed / this.loopDuration) * this.loopDuration
     return Math.max(0, Math.min(this.loopDuration, mod))
   }
 
   private cycleIndexNow(): number {
     if (this.loopDuration <= 0) return 0
-    return Math.floor((Tone.getContext().currentTime - this.loopStartCtxTime) / this.loopDuration)
+    return Math.floor((getContext().currentTime - this.loopStartCtxTime) / this.loopDuration)
   }
 
   private firstIndexAtOrAfter(events: LoopEvent[], time: number): number {
@@ -298,7 +298,7 @@ export class LiveLooper {
   private schedulePoll = (): void => {
     if (this.state.value !== 'playing' && this.state.value !== 'overdubbing') return
 
-    const ctx = Tone.getContext()
+    const ctx = getContext()
     const horizon = ctx.currentTime + LOOKAHEAD_SEC
 
     for (let li = 0; li < this.layers.length; li++) {
@@ -339,7 +339,7 @@ export class LiveLooper {
   // clear — without it, layers being torn down mid-note would leave both
   // audio and visuals stuck until the user triggered the pitch again.
   private releaseAllSounding(): void {
-    const now = Tone.getContext().currentTime
+    const now = getContext().currentTime
     for (const set of this.soundingByLayer) {
       for (const pitch of set) this.callbacks.onPlaybackNoteOff(pitch, now)
       set.clear()

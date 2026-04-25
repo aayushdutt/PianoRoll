@@ -1,29 +1,48 @@
 import './styles/main.css'
-import { inject } from '@vercel/analytics'
-import posthog from 'posthog-js'
+// Self-hosted fonts via @fontsource. Each CSS import emits a `@font-face`
+// rule into the main stylesheet bundle and ships its woff2 file to
+// `dist/assets/` as a long-cacheable hashed asset. Compared to
+// fonts.googleapis.com + fonts.gstatic.com, this saves the cross-origin
+// DNS+TLS chain Lighthouse measures as ~360 ms render-blocking on first
+// load. `latin-` subsets cover en/es/fr/pt-BR — our shipped locales.
+import '@fontsource/inter/latin-400.css'
+import '@fontsource/inter/latin-500.css'
+import '@fontsource/inter/latin-600.css'
+import '@fontsource/inter/latin-700.css'
+import '@fontsource/instrument-serif/latin-400.css'
+import '@fontsource/instrument-serif/latin-400-italic.css'
+import '@fontsource/jetbrains-mono/latin-400.css'
+import '@fontsource/jetbrains-mono/latin-500.css'
+import '@fontsource/jetbrains-mono/latin-600.css'
 import { render } from 'solid-js/web'
 import { AppRoot } from './AppRoot'
 import { createApp } from './createApp'
 import { env } from './env'
 import { currentLocaleNativeName, initI18n, shouldShowLocaleHint, t } from './i18n'
 import { AppCtx } from './store/AppCtx'
-import { registerAnalyticsContext } from './telemetry'
+import { loadPostHog, registerAnalyticsContext } from './telemetry'
+import { whenIdle } from './whenIdle'
 
-// Privacy-friendly page-view + custom event tracking. Only active once the
-// script has been served with a real Vercel project id — in dev or on forks
-// it's a no-op that logs to the console. `mode: 'auto'` defers to the Vercel
-// environment (production vs. preview).
-inject()
-
+// Both analytics SDKs are loaded on idle so they don't sit in the initial
+// bundle. PostHog alone is ~70 KB gz with autocapture / session_recording /
+// feature_flags; @vercel/analytics is small but still a deferrable import.
+// Buffered events fire once the SDK lands — see telemetry.ts → `loadPostHog`.
 const posthogKey = env.VITE_POSTHOG_KEY
 if (posthogKey) {
-  posthog.init(posthogKey, {
-    api_host: env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com',
-    defaults: '2026-01-30',
-    person_profiles: 'always',
-  })
+  // Snapshot context props at boot time even though the SDK isn't loaded
+  // yet — they get queued and replayed in order on first init.
   registerAnalyticsContext()
 }
+whenIdle(() => {
+  if (posthogKey) {
+    void loadPostHog(posthogKey, {
+      api_host: env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+      defaults: '2026-01-30',
+      person_profiles: 'always',
+    })
+  }
+  void import('@vercel/analytics').then(({ inject }) => inject())
+})
 
 // Load the right locale before constructing UI so the first paint is already
 // translated — avoids an English-then-French flash. Adds ~5–15ms for the

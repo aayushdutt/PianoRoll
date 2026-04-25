@@ -1,4 +1,4 @@
-import * as Tone from 'tone'
+import { getContext, Synth, start as toneStart } from 'tone'
 import { createEventSignal } from '../store/eventSignal'
 
 // Simple click-track metronome. Look-ahead scheduling keeps timing tight
@@ -24,17 +24,17 @@ export class Metronome {
   // we fire this via setTimeout aligned to the scheduled AudioContext time.
   readonly beatCount = createEventSignal<number>(0)
 
-  private synth: Tone.Synth | null = null
+  private synth: Synth | null = null
   private nextBeatTime = 0
   private beatCounter = 0
   private pollHandle: ReturnType<typeof setTimeout> | null = null
 
   start(): void {
     if (this.running.value) return
-    void Tone.start()
+    void toneStart()
     this.ensureSynth()
     this.beatCounter = 0
-    this.nextBeatTime = Tone.getContext().currentTime + 0.05
+    this.nextBeatTime = getContext().currentTime + 0.05
     this.running.set(true)
     this.poll()
   }
@@ -66,7 +66,7 @@ export class Metronome {
 
   private ensureSynth(): void {
     if (this.synth) return
-    this.synth = new Tone.Synth({
+    this.synth = new Synth({
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 },
     }).toDestination()
@@ -75,7 +75,7 @@ export class Metronome {
 
   private poll = (): void => {
     if (!this.running.value) return
-    const ctx = Tone.getContext()
+    const ctx = getContext()
     const horizon = ctx.currentTime + LOOKAHEAD_SEC
     const secPerBeat = 60 / this.bpm.value
 

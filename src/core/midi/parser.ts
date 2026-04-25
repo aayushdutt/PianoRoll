@@ -1,5 +1,15 @@
-import { Midi } from '@tonejs/midi'
 import type { MidiFile, MidiNote, MidiTrack } from './types'
+
+// `@tonejs/midi` is ~25 KB gz and only used inside this module + MidiEncoding.
+// Both entry points (file picker, record export) are user-driven and already
+// async, so dynamic-importing on first use keeps the SDK out of the initial
+// bundle. The Promise is module-level cached so concurrent calls share one
+// network/parse cost.
+let midiModuleLoad: Promise<typeof import('@tonejs/midi')> | null = null
+export function loadMidiModule(): Promise<typeof import('@tonejs/midi')> {
+  if (!midiModuleLoad) midiModuleLoad = import('@tonejs/midi')
+  return midiModuleLoad
+}
 
 // Thrown when the parser succeeds structurally but produces no playable notes.
 // loadMidi() catches this alongside @tonejs/midi's own parse failures and
@@ -27,6 +37,7 @@ const TRACK_COLORS = [
 
 export async function parseMidiFile(source: File | ArrayBuffer, name?: string): Promise<MidiFile> {
   const buffer = source instanceof ArrayBuffer ? source : await source.arrayBuffer()
+  const { Midi } = await loadMidiModule()
   const midi = new Midi(buffer)
 
   const tracks: MidiTrack[] = midi.tracks

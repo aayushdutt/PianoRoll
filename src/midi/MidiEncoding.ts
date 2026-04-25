@@ -1,4 +1,4 @@
-import { Midi } from '@tonejs/midi'
+import { loadMidiModule } from '../core/midi/parser'
 import type { MidiFile } from '../core/midi/types'
 
 // Shared note-event format used by both LiveLooper and SessionRecorder.
@@ -19,10 +19,11 @@ export interface EncodeOptions {
   midiName?: string
 }
 
-export function encodeCapturedEvents(
+export async function encodeCapturedEvents(
   events: readonly CapturedEvent[],
   opts: EncodeOptions = {},
-): Uint8Array {
+): Promise<Uint8Array> {
+  const { Midi } = await loadMidiModule()
   const bpm = opts.bpm ?? 120
   const trackName = opts.trackName ?? 'Performance'
   const midiName = opts.midiName ?? 'midee capture'
@@ -76,7 +77,8 @@ export function encodeCapturedEvents(
 // Re-encode an internal MidiFile (parsed or synthesised) back to .mid bytes.
 // Preserves every track and its note set so the DAW sees the same structure
 // the app was playing.
-export function midiFileToBytes(source: MidiFile): Uint8Array {
+export async function midiFileToBytes(source: MidiFile): Promise<Uint8Array> {
+  const { Midi } = await loadMidiModule()
   const midi = new Midi()
   midi.header.setTempo(source.bpm)
   midi.name = source.name

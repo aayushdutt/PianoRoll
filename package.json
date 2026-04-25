@@ -21,7 +21,12 @@
     "bench:update": "VITE_ENABLE_BENCH=1 npx vite build && node scripts/bench.mjs --update"
   },
   "dependencies": {
+    "@fontsource/instrument-serif": "^5.2.8",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@t3-oss/env-core": "^0.13.11",
+    "@tonaljs/chord": "^6.1.2",
+    "@tonaljs/midi": "^4.10.2",
     "@tonejs/midi": "^2.0.28",
     "@tonejs/piano": "^0.2.1",
     "@vercel/analytics": "^2.0.1",
@@ -31,15 +36,11 @@
     "pixi.js": "^8.4.0",
     "posthog-js": "^1.369.3",
     "solid-js": "^1.9.12",
-    "tonal": "^6.4.3",
     "tone": "^14.7.77",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
-    "@fontsource/instrument-serif": "^5.2.8",
-    "@fontsource/inter": "^5.2.8",
-    "@fontsource/jetbrains-mono": "^5.2.8",
     "@resvg/resvg-js": "^2.6.2",
     "@solidjs/testing-library": "^0.8.10",
     "jsdom": "^25.0.1",

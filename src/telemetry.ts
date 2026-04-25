@@ -1,4 +1,4 @@
-import posthog from 'posthog-js'
+import type { PostHog, PostHogConfig } from 'posthog-js'
 import type { AppMode } from './store/state'
 
 // Thin wrapper around posthog-js + a typed event registry. Kept as a single
@@ -10,8 +10,39 @@ import type { AppMode } from './store/state'
 // Event-name convention: snake_case, past tense. Don't rename existing event
 // names without dual-firing for at least two weeks (see play_mode_entered /
 // file_mode_entered for the pattern).
+//
+// posthog-js is dynamic-imported on idle (see `loadPostHog`) so it doesn't
+// block the initial bundle (~70 KB gz at the time of writing). Calls made
+// before the SDK loads are queued and replayed in-order on `loadPostHog`.
 
-const enabled = (): boolean => posthog.__loaded === true
+let ph: PostHog | null = null
+let phLoadFailed = false
+const queue: Array<(client: PostHog) => void> = []
+
+// Drain any calls made while the SDK was still loading. Order matters —
+// `register*` should land before any `capture` that depends on those props.
+// If the SDK never loads (CSP, ad-blocker, offline), we drop the call rather
+// than grow the queue unbounded.
+function enqueue(fn: (client: PostHog) => void): void {
+  if (ph) fn(ph)
+  else if (!phLoadFailed) queue.push(fn)
+}
+
+export async function loadPostHog(key: string, config: Partial<PostHogConfig>): Promise<void> {
+  try {
+    const mod = await import('posthog-js')
+    mod.default.init(key, config)
+    ph = mod.default
+    for (const fn of queue) fn(ph)
+    queue.length = 0
+  } catch (err) {
+    // Likely CSP / ad-blocker / offline. Mark failed so the queue stops
+    // growing; existing entries are dropped to free memory.
+    phLoadFailed = true
+    queue.length = 0
+    console.warn('[telemetry] posthog-js failed to load', err)
+  }
+}
 
 // Fired at key funnel points: midi_loaded → first_play → playback_milestone
 // → export_opened → export_started → export_completed. The live funnel runs
@@ -19,8 +50,7 @@ const enabled = (): boolean => posthog.__loaded === true
 // session_recorded. Keep names stable — they're the join key between product
 // and analytics.
 export function track(event: string, properties?: Record<string, unknown>): void {
-  if (!enabled()) return
-  posthog.capture(event, properties)
+  enqueue((client) => client.capture(event, properties))
 }
 
 // Set once at boot. These attach to *every* subsequent event so we can
@@ -30,7 +60,9 @@ export function track(event: string, properties?: Record<string, unknown>): void
 // built-in $referrer captures the referrer at each event, which isn't the
 // same thing and doesn't answer "where did this user originally come from?"
 export function registerAnalyticsContext(): void {
-  if (!enabled()) return
+  // Snapshot DOM/window reads NOW (not inside the deferred closure) — the
+  // viewport state at boot is what we want to attach to events, even if the
+  // user resizes before the SDK loads.
   const w = window.innerWidth
   const h = window.innerHeight
   const deviceType = w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop'
@@ -39,22 +71,29 @@ export function registerAnalyticsContext(): void {
     ? 'portrait'
     : 'landscape'
   const isPwa = window.matchMedia?.('(display-mode: standalone)').matches ?? false
-  posthog.register({
-    device_type: deviceType,
-    pointer,
-    orientation,
-    is_pwa: isPwa,
-    viewport_w: w,
-    viewport_h: h,
-  })
-
   const url = new URL(window.location.href)
-  posthog.register_once({
-    landing_path: url.pathname,
-    landing_referrer: document.referrer || '(direct)',
-    landing_utm_source: url.searchParams.get('utm_source') ?? null,
-    landing_utm_medium: url.searchParams.get('utm_medium') ?? null,
-    landing_utm_campaign: url.searchParams.get('utm_campaign') ?? null,
+  const landingPath = url.pathname
+  const landingReferrer = document.referrer || '(direct)'
+  const landingUtmSource = url.searchParams.get('utm_source') ?? null
+  const landingUtmMedium = url.searchParams.get('utm_medium') ?? null
+  const landingUtmCampaign = url.searchParams.get('utm_campaign') ?? null
+
+  enqueue((client) => {
+    client.register({
+      device_type: deviceType,
+      pointer,
+      orientation,
+      is_pwa: isPwa,
+      viewport_w: w,
+      viewport_h: h,
+    })
+    client.register_once({
+      landing_path: landingPath,
+      landing_referrer: landingReferrer,
+      landing_utm_source: landingUtmSource,
+      landing_utm_medium: landingUtmMedium,
+      landing_utm_campaign: landingUtmCampaign,
+    })
   })
 }
 
@@ -64,7 +103,8 @@ export function registerAnalyticsContext(): void {
 // instead of OR-ing three events together on every query.
 const ACTIVATED_KEY = 'midee.activated'
 export function trackActivation(trigger: 'playback_30s' | 'live_note' | 'export_started'): void {
-  if (!enabled()) return
+  // Dedupe synchronously against localStorage — we want this to no-op on the
+  // 2nd-and-later calls regardless of whether the SDK has loaded yet.
   try {
     if (localStorage.getItem(ACTIVATED_KEY)) return
     localStorage.setItem(ACTIVATED_KEY, '1')
@@ -73,7 +113,7 @@ export function trackActivation(trigger: 'playback_30s' | 'live_note' | 'export_
     // reloads, but firing the event multiple times is still better than
     // missing it entirely.
   }
-  posthog.capture('user_activated', { trigger })
+  enqueue((client) => client.capture('user_activated', { trigger }))
 }
 
 // Bucket MIDI device names into a short vendor enum. The raw device name

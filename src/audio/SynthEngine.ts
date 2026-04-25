@@ -1,4 +1,12 @@
-import * as Tone from 'tone'
+import {
+  gainToDb,
+  getContext,
+  getDestination,
+  getTransport,
+  immediate,
+  Part,
+  start as toneStart,
+} from 'tone'
 import type { MidiFile } from '../core/midi/types'
 import { createEventSignal } from '../store/eventSignal'
 import type { AudioEngine } from './AudioEngine'
@@ -112,12 +120,12 @@ export class SynthEngine implements AudioEngine {
     if (!this.midi) return
     const gen = ++this.playGeneration
     await this.readyPromise
-    await Tone.start()
+    await toneStart()
     // A pause() or a newer play() happened during the awaits — abandon this
     // invocation so we don't resurrect transport audio against user intent.
     if (gen !== this.playGeneration) return
 
-    const transport = Tone.getTransport()
+    const transport = getTransport()
     if (transport.state === 'paused' && Math.abs(fromTime - this.scheduledFromTime) < 0.05) {
       transport.start()
       return
@@ -168,8 +176,11 @@ export class SynthEngine implements AudioEngine {
       }
     }
 
+    // Tone's Part type wants events with a `time` field, but the runtime also
+    // accepts `[time, payload]` tuples — cheaper for our 2-key payload. Cast
+    // at the boundary; the named import still tree-shakes unused synths.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const part = new (Tone as any).Part((time: number, ev: NoteEvent) => {
+    const part = new (Part as any)((time: number, ev: NoteEvent) => {
       // Re-resolve the instrument each tick so mid-playback switches take
       // effect without rebuilding the Part. setInstrument() releases the old
       // voice so overlapping notes from the previous instrument don't linger.
@@ -187,28 +198,28 @@ export class SynthEngine implements AudioEngine {
     // Bump the generation so any in-flight `play()` aborts before it can
     // reach `transport.start()` and resurrect audio after the pause.
     this.playGeneration++
-    Tone.getTransport().pause()
+    getTransport().pause()
     this.releaseAllInstruments()
   }
 
   seek(time: number): void {
-    const wasPlaying = Tone.getTransport().state === 'started'
+    const wasPlaying = getTransport().state === 'started'
     // Same latest-wins guard — a concurrent play() racing with a seek would
     // otherwise restart transport at a stale fromTime.
     this.playGeneration++
-    Tone.getTransport().stop()
+    getTransport().stop()
     this.clearScheduled()
     this.releaseAllInstruments()
     if (wasPlaying) void this.play(time)
   }
 
   setVolume(v: number): void {
-    Tone.getDestination().volume.value = Tone.gainToDb(v)
+    getDestination().volume.value = gainToDb(v)
   }
 
   setSpeed(s: number): void {
     this._speed = s
-    Tone.getTransport().bpm.value = (this.midi?.bpm ?? 120) * s
+    getTransport().bpm.value = (this.midi?.bpm ?? 120) * s
   }
 
   // ── Live MIDI keyboard input ───────────────────────────────────────────
@@ -216,7 +227,7 @@ export class SynthEngine implements AudioEngine {
   primeLiveInput(): void {
     if (this.liveWarmupStarted) return
     this.liveWarmupStarted = true
-    void Tone.start().catch(() => undefined)
+    void toneStart().catch(() => undefined)
     void this.ensureInstrument(this.currentId).catch(() => undefined)
   }
 
@@ -224,13 +235,13 @@ export class SynthEngine implements AudioEngine {
     this.primeLiveInput()
     const inst = this.instruments.get(this.currentId)
     if (!inst) return // still loading — first notes may drop, acceptable tradeoff
-    inst.triggerAttack(midiToNoteName(pitch), Tone.immediate(), velocity)
+    inst.triggerAttack(midiToNoteName(pitch), immediate(), velocity)
   }
 
   liveNoteOff(pitch: number): void {
     const inst = this.instruments.get(this.currentId)
     if (!inst) return
-    inst.triggerRelease(midiToNoteName(pitch), Tone.immediate())
+    inst.triggerRelease(midiToNoteName(pitch), immediate())
   }
 
   liveReleaseAll(): void {
@@ -255,7 +266,7 @@ export class SynthEngine implements AudioEngine {
   // Exposed so non-audio modules (UI, visuals) can convert AudioContext time
   // into a setTimeout delay without pulling Tone into their imports.
   get audioContextTime(): number {
-    return Tone.getContext().currentTime
+    return getContext().currentTime
   }
 
   // ── Scheduled playback (internal) ──────────────────────────────────────
@@ -275,7 +286,7 @@ export class SynthEngine implements AudioEngine {
 
   dispose(): void {
     this.clearScheduled()
-    Tone.getTransport().stop()
+    getTransport().stop()
     for (const inst of this.instruments.values()) inst.dispose()
     this.instruments.clear()
   }

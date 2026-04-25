@@ -7,7 +7,7 @@
 // thread and compete with Tone's, which on weaker systems is audible as
 // dropouts under main-thread pressure.
 
-import * as Tone from 'tone'
+import { getContext, start as toneStart } from 'tone'
 
 type ClockListener = (time: number) => void
 
@@ -20,7 +20,7 @@ export class MasterClock {
   private rafId: number | null = null
 
   private get contextTime(): number {
-    return Tone.getContext().currentTime
+    return getContext().currentTime
   }
 
   get currentTime(): number {
@@ -47,9 +47,9 @@ export class MasterClock {
   }
 
   prime(): void {
-    const ctx = Tone.getContext().rawContext as AudioContext
+    const ctx = getContext().rawContext as AudioContext
     if (ctx.state === 'suspended') {
-      void Tone.start()
+      void toneStart()
     }
   }
 

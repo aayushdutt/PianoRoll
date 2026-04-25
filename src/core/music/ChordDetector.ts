@@ -1,4 +1,5 @@
-import { Chord, Midi } from 'tonal'
+import { detect as detectChordSymbol } from '@tonaljs/chord'
+import { midiToNoteName } from '@tonaljs/midi'
 
 export interface ChordReading {
   // Best-guess chord symbol — "Cmaj7", "Dm/F", "C5". `null` when no chord
@@ -45,7 +46,7 @@ export function detectChord(pitches: Iterable<number>): ChordReading {
   const seen = new Set<string>()
   const pitchClasses: string[] = []
   for (const midi of sorted) {
-    const pc = Midi.midiToNoteName(midi, { pitchClass: true, sharps: true })
+    const pc = midiToNoteName(midi, { pitchClass: true, sharps: true })
     if (seen.has(pc)) continue
     seen.add(pc)
     pitchClasses.push(pc)
@@ -56,7 +57,7 @@ export function detectChord(pitches: Iterable<number>): ChordReading {
     return { name: tonic, tonic, quality: '', pitchClasses }
   }
 
-  const candidates = Chord.detect(pitchClasses, {
+  const candidates = detectChordSymbol(pitchClasses, {
     assumePerfectFifth: true,
   })
 

@@ -22,7 +22,7 @@ import { encodeCapturedEvents, midiFileToBytes, triggerMidiDownload } from './mi
 import { MidiInputManager } from './midi/MidiInputManager'
 import { SessionRecorder } from './midi/SessionRecorder'
 import { sessionToMidiFile } from './midi/SessionToMidi'
-import { LearnController } from './modes/LearnController'
+import type { LearnController } from './modes/LearnController'
 import { setNextLiveOpts } from './modes/LiveMode'
 import { MODE_CAPTURES_LIVE, type ModeContext } from './modes/ModeController'
 import { PARTICLE_STYLES } from './renderer/ParticleSystem'
@@ -47,6 +47,7 @@ import type { PostSessionModal, SessionAction } from './ui/PostSessionModal'
 import { showError, showSuccess } from './ui/Toast'
 import { TrackPanel } from './ui/TrackPanel'
 import { installViewportClassSync } from './ui/utils'
+import { whenIdle } from './whenIdle'
 
 export class App {
   private clock = new MasterClock()
@@ -91,10 +92,13 @@ export class App {
     this.store = store
   }
   // Learn owns enough lifecycle state (hub, runner, overlay layer) that a
-  // long-lived instance is cheapest. Exposed publicly so <LearnMode/> can
-  // call enter/exit from onMount/onCleanup, and App's DropZone callbacks
-  // can reach loadMidiFromFile/loadSample.
-  learnController!: LearnController
+  // long-lived instance is cheapest. But constructing it pulls the entire
+  // Learn module graph (LearnHub, ExerciseRunner, IntervalsEngine, …) into
+  // the bundle, so we defer construction to first use. The mode context is
+  // captured at boot so the lazy constructor doesn't need to re-derive it.
+  private learnController: LearnController | null = null
+  private learnControllerLoad: Promise<LearnController> | null = null
+  private modeContext!: ModeContext
   private loadingEl: HTMLElement | null = null
   private currentExporter: VideoExporter | null = null
   // Throttle chord recomputation: only run when at least this many ms have
@@ -207,7 +211,7 @@ export class App {
       overlay,
       (file, source) => {
         if (this.store.state.mode === 'learn') {
-          void this.learnController.loadMidiFromFile(file, source)
+          void this.ensureLearnController().then((c) => c.loadMidiFromFile(file, source))
         } else {
           void this.loadMidi(file, source)
         }
@@ -215,7 +219,7 @@ export class App {
       () => this.enterLiveMode(),
       (sampleId) => {
         if (this.store.state.mode === 'learn') {
-          void this.learnController.loadSample(sampleId)
+          void this.ensureLearnController().then((c) => c.loadSample(sampleId))
         } else {
           void this.loadSample(sampleId)
         }
@@ -250,7 +254,7 @@ export class App {
         this.liveLooper.clear()
         if (layers > 0) track('loop_cleared', { layers })
       },
-      onLoopSave: () => this.saveLoopAsMidi(),
+      onLoopSave: () => void this.saveLoopAsMidi(),
       onLoopUndo: () => {
         const before = this.liveLooper.layerCount.value
         this.liveLooper.undo()
@@ -392,24 +396,24 @@ export class App {
     this.applyInstrument()
     this.applyParticleStyle()
 
-    // Kick off piano sample download in the background — safe at boot since
-    // we don't touch AudioContext yet. Makes the first note feel instant.
-    // Modal chunks ride along on the same idle pass so first-open is
-    // friction-free without paying for them at first paint.
-    const w = window as unknown as {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void
-    }
-    const warmModalChunks = (): void => {
+    // Idle-time warmups. None of these affect first paint — they trade
+    // background bandwidth for "feels instant" on first-click flows. All
+    // share the default deadline; on a typical browser they fire in the
+    // same idle frame ~150-300 ms after boot, kicking off network fetches
+    // in parallel.
+    //   • synth piano samples → first-note latency
+    //   • @tonejs/midi → sample-card click + record-export
+    //   • modal chunks → first export / file-picker / post-session click
+    //   • LearnController (only when Learn is enabled) → first Learn entry
+    whenIdle(() => this.synth.preloadDefault())
+    whenIdle(() => void import('@tonejs/midi'))
+    whenIdle(() => {
       void import('./ui/ExportModal')
       void import('./ui/PostSessionModal')
       void import('./ui/MidiPickerModal')
-    }
-    if (typeof w.requestIdleCallback === 'function') {
-      w.requestIdleCallback(() => this.synth.preloadDefault(), { timeout: 2000 })
-      w.requestIdleCallback(warmModalChunks, { timeout: 4000 })
-    } else {
-      setTimeout(() => this.synth.preloadDefault(), 600)
-      setTimeout(warmModalChunks, 1200)
+    })
+    if (ENABLE_LEARN_MODE) {
+      whenIdle(() => void this.ensureLearnController())
     }
 
     this.controls.updateMidiStatus(this.midiInput.status.value, '')
@@ -540,7 +544,7 @@ export class App {
     window.addEventListener('pointerdown', this.onFirstPointerDown, { passive: true })
     window.addEventListener('keydown', this.onFirstKeyDown, { passive: true })
 
-    const modeContext: ModeContext = {
+    this.modeContext = {
       services: this.services,
       overlay,
       trackPanel: this.trackPanel,
@@ -551,7 +555,6 @@ export class App {
       openFilePicker: () => this.openFilePicker(),
       primeInteractiveAudio: () => this.primeInteractiveAudio(),
     }
-    this.learnController = new LearnController(modeContext)
 
     // Start in home. <HomeMode/>'s onMount handles the side effects.
     this.services.store.enterHome()
@@ -908,7 +911,7 @@ export class App {
     // loaded MidiFile to .mid bytes. Especially useful after "Open in file
     // mode" from a live session, where the raw .mid was never downloaded.
     if (settings.output === 'midi') {
-      const bytes = midiFileToBytes(midi)
+      const bytes = await midiFileToBytes(midi)
       triggerMidiDownload(bytes, `${sanitiseFilename(midi.name)}.mid`)
       exportModal.close()
       this.showSuccess(`↓ ${sanitiseFilename(midi.name)}.mid`)
@@ -1064,20 +1067,36 @@ export class App {
       modal.open({
         onFile: (file) => {
           if (this.store.state.mode === 'learn') {
-            void this.learnController.loadMidiFromFile(file, 'picker')
+            void this.ensureLearnController().then((c) => c.loadMidiFromFile(file, 'picker'))
           } else {
             void this.loadMidi(file, 'picker')
           }
         },
         onSample: (id) => {
           if (this.store.state.mode === 'learn') {
-            void this.learnController.loadSample(id)
+            void this.ensureLearnController().then((c) => c.loadSample(id))
           } else {
             void this.loadSample(id)
           }
         },
       })
     })
+  }
+
+  // Lazy LearnController. Pulls the whole Learn module graph (LearnHub,
+  // exercises, runners, overlay) only when the user actually enters Learn
+  // for the first time. Same Promise-gating pattern as the modal ensures so
+  // a Solid onMount + DropZone race resolves to one instance.
+  ensureLearnController(): Promise<LearnController> {
+    if (this.learnController) return Promise.resolve(this.learnController)
+    if (!this.learnControllerLoad) {
+      this.learnControllerLoad = import('./modes/LearnController').then(({ LearnController }) => {
+        const c = new LearnController(this.modeContext)
+        this.learnController = c
+        return c
+      })
+    }
+    return this.learnControllerLoad
   }
 
   // Lazy modal helpers. Each one dynamic-imports the module (cached after
@@ -1103,7 +1122,7 @@ export class App {
     if (!this.postSessionModalLoad) {
       this.postSessionModalLoad = import('./ui/PostSessionModal').then(({ PostSessionModal }) => {
         const m = new PostSessionModal(this.overlay)
-        m.onAction = (action) => this.handleSessionAction(action)
+        m.onAction = (action) => void this.handleSessionAction(action)
         this.postSessionModal = m
         return m
       })
@@ -1225,7 +1244,7 @@ export class App {
     track('session_recorded', { duration_s: Math.round(duration), notes: noteCount })
   }
 
-  private handleSessionAction(action: SessionAction): void {
+  private async handleSessionAction(action: SessionAction): Promise<void> {
     const pending = this.pendingSession
     // onAction only fires from inside the modal; if it ran, the modal exists.
     this.postSessionModal?.close()
@@ -1239,7 +1258,7 @@ export class App {
     }
 
     if (action === 'download') {
-      const bytes = encodeCapturedEvents(pending.events, {
+      const bytes = await encodeCapturedEvents(pending.events, {
         bpm: this.metronomeBpm(),
         closeOrphansAt: pending.duration,
         midiName: 'midee session',
@@ -1280,10 +1299,10 @@ export class App {
     document.title = `${midi.name} · midee`
   }
 
-  private saveLoopAsMidi(): void {
+  private async saveLoopAsMidi(): Promise<void> {
     const snap = this.liveLooper.snapshot()
     if (snap.events.length === 0) return
-    const bytes = encodeCapturedEvents(snap.events, {
+    const bytes = await encodeCapturedEvents(snap.events, {
       bpm: this.metronomeBpm(),
       closeOrphansAt: snap.duration,
       midiName: 'midee loop',

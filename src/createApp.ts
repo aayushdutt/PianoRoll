@@ -29,7 +29,7 @@ export async function createApp(): Promise<{ ctx: AppCtxValue; app: App }> {
       dropzone: app.dropzone,
       keyboardInput: app.keyboardInput,
       midiInput: app.midiInput,
-      learnController: app.learnController,
+      ensureLearnController: () => app.ensureLearnController(),
       resetInteractionState: () => app.resetInteractionState(),
       openFilePicker: () => app.openFilePicker(),
       primeInteractiveAudio: () => app.primeInteractiveAudio(),

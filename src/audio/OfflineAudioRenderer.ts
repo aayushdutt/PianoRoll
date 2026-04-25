@@ -8,7 +8,15 @@
 // API pauses the render at a specified render-time point and yields back to
 // the main thread; we report progress, then `resume()` to continue.
 
-import * as Tone from 'tone'
+import {
+  gainToDb,
+  getContext,
+  getDestination,
+  getTransport,
+  OfflineContext,
+  Part,
+  setContext,
+} from 'tone'
 import type { MidiFile } from '../core/midi/types'
 import {
   createInstrument,
@@ -90,22 +98,23 @@ export async function renderAudioOffline(opts: OfflineRenderOptions): Promise<Au
   // context as its first constructor arg and uses it directly, so `rawContext`
   // ends up being the native one with `suspend` available.
   const rawContext = new OfflineAudioContext(2, Math.ceil(renderDuration * sampleRate), sampleRate)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const offline = new (Tone as any).OfflineContext(rawContext)
-  const prevContext = Tone.getContext()
-  Tone.setContext(offline)
+  const offline = new OfflineContext(rawContext)
+  const prevContext = getContext()
+  setContext(offline)
 
   try {
     opts.onRenderAudioProgressMode?.(typeof rawContext.suspend === 'function')
 
     const inst = await createInstrument(instrumentId)
-    Tone.getDestination().volume.value = Tone.gainToDb(volume)
+    getDestination().volume.value = gainToDb(volume)
 
-    const transport = Tone.getTransport()
+    const transport = getTransport()
     transport.bpm.value = midi.bpm
 
+    // See SynthEngine — Tone.Part accepts tuple form at runtime, but its types
+    // only cover the object form. Narrow cast keeps the named import shakeable.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const part = new (Tone as any).Part(
+    const part = new (Part as any)(
       (time: number, ev: NoteEvent) => {
         inst.triggerAttackRelease(ev.note, ev.duration, time, ev.velocity)
       },
@@ -142,6 +151,6 @@ export async function renderAudioOffline(opts: OfflineRenderOptions): Promise<Au
     if (!raw) throw new Error('Offline audio render produced no buffer')
     return raw
   } finally {
-    Tone.setContext(prevContext)
+    setContext(prevContext)
   }
 }
