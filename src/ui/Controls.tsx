@@ -9,6 +9,7 @@ import type { MidiDeviceStatus } from '../midi/MidiInputManager'
 import type { AppMode } from '../store/state'
 import { watch } from '../store/watch'
 import { icons } from './icons'
+import { LearnCoachmark } from './LearnCoachmark'
 
 const SKIP_SECONDS = 10
 export const ZOOM_MIN = 80
@@ -838,6 +839,11 @@ export class Controls {
             registerTracksBtn={(el) => {
               this.tracksBtn = el
             }}
+          />
+          <LearnCoachmark
+            eligible={() =>
+              mode() === 'play' && hasFile() && status() !== 'loading' && status() !== 'exporting'
+            }
           />
           <HudView
             mode={mode}

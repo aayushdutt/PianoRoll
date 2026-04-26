@@ -6240,6 +6240,107 @@ body.canvas-hidden #kbd-resizer {
    APPEARANCE  (theme · particles · chord)
 ───────────────────────────────────────── */
 
+/* ─── Learn coachmark — first-encounter pointer tooltip, anchored under
+   the topbar Learn pill. Surfaces once per profile (localStorage-gated)
+   ~8 s after the user lands in Play with a loaded file. Brand language:
+   the same frosted dark surface used elsewhere in the app, with the orange
+   accent reserved for the title (echoes how `.ts-pill--on` colors the
+   active topbar pill). No amber, no warm-cream — those belong to the
+   loop-band visual family inside the Play-Along HUD. */
+.learn-coachmark {
+  position: fixed;
+  z-index: 9999;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: max-content;
+  max-width: 268px;
+  padding: 11px 32px 11px 13px;
+  background: var(--surface-hi);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid var(--border-hi);
+  border-radius: 10px;
+  /* Layered shadow: a soft black drop for elevation, plus a hairline accent
+     glow on the inside so the bubble visually "ties" to the Learn pill it
+     points at without leaning on a heavy colored border. */
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 0 0 1px var(--accent-glow);
+  color: var(--text);
+  pointer-events: auto;
+  animation: learn-coachmark-in 220ms var(--ease-out) both;
+}
+.learn-coachmark__arrow {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  background: inherit;
+  border-top: 1px solid var(--border-hi);
+  border-left: 1px solid var(--border-hi);
+  transform: translateX(-50%) rotate(45deg);
+}
+.learn-coachmark__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 12px / 1.2 var(--font);
+  color: var(--accent);
+  letter-spacing: -0.005em;
+}
+.learn-coachmark__title::before {
+  /* Tiny orange dot — picks up the brand accent without making the title
+     itself shout. Matches the topbar `.ts-status-dot` motif. */
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.learn-coachmark__body {
+  font: 500 11.5px / 1.4 var(--font);
+  color: var(--text-muted);
+  letter-spacing: -0.005em;
+}
+.learn-coachmark__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font: 500 15px / 1 var(--font);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.learn-coachmark__close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+@keyframes learn-coachmark-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 /* ── Trigger pill ─────────────────────────────────────────────────────── */
 /* Wider, label-bearing pill so the active theme name is always visible
    and the affordance reads as "open the appearance picker", not "click
