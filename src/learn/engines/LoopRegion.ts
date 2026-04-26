@@ -14,23 +14,6 @@ export interface LoopRegion {
   end: number
 }
 
-export interface LoopPreset {
-  // Display name — used by HUD tooltips / chip labels.
-  label: string
-  // Bars the preset spans from the current playhead. `null` means "full
-  // piece" (caller supplies that range directly).
-  bars: number | null
-}
-
-// Default cycle used by the `L` keyboard shortcut: off → last 4 bars → last
-// 8 → full piece → off. Callers can override with their own preset list when
-// a piece-specific layout needs different defaults.
-export const DEFAULT_LOOP_PRESETS: readonly LoopPreset[] = [
-  { label: '4 bars', bars: 4 },
-  { label: '8 bars', bars: 8 },
-  { label: 'Full piece', bars: null },
-]
-
 // Bars → seconds using 4 beats/bar. Caller supplies BPM — this module
 // doesn't bind a specific time-signature because today's content library is
 // 4/4. When we ship pieces in 3/4 or 7/8 the numerator comes in as an arg.

@@ -16,14 +16,20 @@ const RESUME_NUDGE_SEC = 0.006
 // next tick would re-engage on the same step.
 const REARM_BUFFER_SEC = 0.003
 
-// Engage wait-mode slightly BEFORE the scheduled step time. The synth
-// scheduler (Tone.js / Tone context lookAhead) schedules note-ons ~100 ms in
-// advance. If we engage at step.time exactly, the synth has already scheduled
-// the upcoming chord's note-ons into the WebAudio graph — pausing the clock
-// can't cancel them, so the player hears the "answer" before they press a key.
-// Engaging 150 ms early closes the window: the scheduler hasn't reached the
-// step yet, so synth.pause() prevents the note-ons from ever being scheduled.
-const ENGAGE_LEAD_SEC = 0.15
+// Engage wait-mode slightly BEFORE the scheduled step time. Tone's scheduler
+// pre-schedules note-ons into the WebAudio graph up to `lookAhead` seconds
+// ahead; pausing the clock at exactly `step.time` doesn't recall already-
+// queued events, so the player would hear the "answer" before pressing a key.
+// The lead must stay > lookAhead.
+//
+// 10 ms pairs with `getContext().lookAhead = 0.005` set inside
+// `PlayAlongExercise.start()` — 5 ms of safety margin. The aggressive pair
+// keeps the perceived "wait engaged" gap to a single frame at 60 Hz, matching
+// what Synthesia-class apps feel like. The override is scoped to the
+// Play-Along session lifecycle so Play / Live keep Tone's default headroom
+// (which is more forgiving on weaker machines) — see
+// `PlayAlongExercise.start/stop` in `play-along/index.ts`.
+const ENGAGE_LEAD_SEC = 0.01
 
 export interface PracticeStep {
   // Start time of the chord step (seconds).
@@ -71,6 +77,21 @@ export interface PracticeCallbacks {
   onWaitEnd(resumeTime: number): void
 }
 
+// Outcome of `notePressed`. `articulationMs` is wall-clock between the FIRST
+// and LAST pending pitch on the cleared step — single-note steps are always
+// 0 (perfect). `clearedStep` lets hosts drive the legato bonus without
+// poking at engine private state.
+//
+// `'duplicate'` is split out from `'rejected'` because re-strikes of an
+// already-accepted pitch (MIDI bounce, octave doubling) shouldn't bump an
+// error counter — the user already played that note. Hosts treat
+// `'duplicate'` as a no-op; `'rejected'` is a wrong-pitch press.
+export type PressOutcome =
+  | { kind: 'advanced'; articulationMs: number; clearedStep: PracticeStep }
+  | { kind: 'accepted' }
+  | { kind: 'duplicate' }
+  | { kind: 'rejected' }
+
 // Synthesia-style "wait mode". When enabled, playback halts at every chord
 // onset and resumes only after the player presses the right pitches. The
 // engine watches the clock + emits intent through `onWaitStart` / `onWaitEnd`;
@@ -92,6 +113,14 @@ export class PracticeEngine {
   // advanced past this. Set when releasing the wait so the very next tick
   // doesn't re-engage on the step we just satisfied.
   private earliestRearmTime = -Infinity
+  // Wall-clock (ms) when the FIRST pending pitch of the current step landed.
+  // Captured on the first `notePressed` of a step, read when the step clears
+  // to compute articulationMs. Field is mutable so tests can swap in a
+  // deterministic clock via reflection — there's no production caller that
+  // needs to override.
+  private chordStartMs: number | null = null
+  private nowMs: () => number = () =>
+    typeof performance !== 'undefined' ? performance.now() : Date.now()
 
   private visibleTrackIds: Set<string> | null = null
 
@@ -148,25 +177,35 @@ export class PracticeEngine {
     return this.waiting
   }
 
-  // Called from the App's live note-on handler. Returns:
-  //   'advanced' — press satisfied the last required pitch; clock released
-  //   'accepted' — press was correct but the chord still has pending pitches
-  //   'rejected' — press was wrong (not pending) or engine isn't waiting
-  // The tri-state matters because partial-correct presses must not be counted
-  // as misses; treating "not advanced" as "wrong" double-punishes the user
-  // mid-chord.
-  notePressed(pitch: number): 'advanced' | 'accepted' | 'rejected' {
-    if (!this.enabled || !this.waiting) return 'rejected'
-    if (!this.pending.has(pitch)) return 'rejected'
+  // See `PressOutcome` for the four kinds and what they signal.
+  notePressed(pitch: number): PressOutcome {
+    if (!this.enabled || !this.waiting) return { kind: 'rejected' }
+    if (this.accepted.has(pitch)) return { kind: 'duplicate' }
+    if (!this.pending.has(pitch)) return { kind: 'rejected' }
+    // Articulation timer starts on the FIRST accepted pitch of the step;
+    // span from first to last is what we grade.
+    if (this.accepted.size === 0) {
+      this.chordStartMs = this.nowMs()
+    }
     this.pending.delete(pitch)
     this.accepted.add(pitch)
     if (this.pending.size === 0) {
+      const startedMs = this.chordStartMs ?? this.nowMs()
+      const articulationMs = Math.max(0, this.nowMs() - startedMs)
+      // Snapshot the step BEFORE `advancePastCurrentStep` moves the cursor.
+      const clearedStep = this.steps[this.nextStepIdx] ?? null
       this.advancePastCurrentStep()
       this.publish()
-      return 'advanced'
+      if (clearedStep) {
+        return { kind: 'advanced', articulationMs, clearedStep }
+      }
+      // Should be unreachable (we were waiting, so a step existed) but the
+      // type system can't see that — fall back to "rejected" so callers
+      // never need to defend a nullish step on the advanced branch.
+      return { kind: 'rejected' }
     }
     this.publish()
-    return 'accepted'
+    return { kind: 'accepted' }
   }
 
   // App calls this whenever the user seeks (scrubber, skip-back/-fwd, etc.)
@@ -214,6 +253,7 @@ export class PracticeEngine {
     this.waiting = false
     this.pending = new Set()
     this.accepted = new Set()
+    this.chordStartMs = null
     this.callbacks.onWaitEnd(resumeAt)
   }
 
@@ -221,6 +261,7 @@ export class PracticeEngine {
     this.waiting = false
     this.pending = new Set()
     this.accepted = new Set()
+    this.chordStartMs = null
   }
 
   private recomputeNextStep(time: number): void {
@@ -253,7 +294,11 @@ export class PracticeEngine {
       if (track.isDrum) continue
       if (this.visibleTrackIds && !this.visibleTrackIds.has(track.id)) continue
       for (const note of track.notes) {
-        onsets.push({ time: note.time, pitch: note.pitch, end: note.time + note.duration })
+        onsets.push({
+          time: note.time,
+          pitch: note.pitch,
+          end: note.time + note.duration,
+        })
       }
     }
     onsets.sort((a, b) => a.time - b.time)

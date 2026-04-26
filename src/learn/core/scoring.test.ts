@@ -1,24 +1,53 @@
 import { describe, expect, it } from 'vitest'
-import { accuracy, classifyTiming, computeXp, matchChord } from './scoring'
+import { accuracy, classifyArticulation, classifyTiming, computeXp, matchChord } from './scoring'
 
 describe('classifyTiming', () => {
-  it('returns hit inside the ±window', () => {
-    expect(classifyTiming(1.0, 1.0)).toBe('hit')
-    expect(classifyTiming(1.099, 1.0)).toBe('hit')
-    expect(classifyTiming(0.901, 1.0)).toBe('hit')
+  it('returns "perfect" for presses inside ±50 ms of the scheduled time', () => {
+    expect(classifyTiming(1.0, 1.0)).toBe('perfect')
+    expect(classifyTiming(1.049, 1.0)).toBe('perfect')
+    expect(classifyTiming(0.951, 1.0)).toBe('perfect')
   })
 
-  it('flags too-early presses', () => {
-    expect(classifyTiming(0.85, 1.0)).toBe('early')
+  it('returns "good" between ±50 ms and ±150 ms', () => {
+    expect(classifyTiming(1.099, 1.0)).toBe('good')
+    expect(classifyTiming(0.901, 1.0)).toBe('good')
   })
 
-  it('flags too-late presses', () => {
-    expect(classifyTiming(1.15, 1.0)).toBe('late')
+  it('flags directional misses inside the late-hit window but past "good"', () => {
+    expect(classifyTiming(0.8, 1.0)).toBe('early') // 200 ms early
+    expect(classifyTiming(1.25, 1.0)).toBe('late') // 250 ms late
   })
 
-  it('respects a custom window', () => {
-    expect(classifyTiming(1.05, 1.0, 0.02)).toBe('late')
-    expect(classifyTiming(1.05, 1.0, 0.06)).toBe('hit')
+  it('returns "miss" past the late-hit window', () => {
+    expect(classifyTiming(1.5, 1.0)).toBe('miss')
+    expect(classifyTiming(0.5, 1.0)).toBe('miss')
+  })
+
+  it('respects custom windows', () => {
+    expect(classifyTiming(1.05, 1.0, { perfectWindow: 0.02 })).toBe('good')
+    expect(classifyTiming(1.05, 1.0, { perfectWindow: 0.06 })).toBe('perfect')
+    // Tight late window collapses what was "early"/"late" into a flat miss.
+    expect(classifyTiming(0.8, 1.0, { lateWindow: 0.18 })).toBe('miss')
+  })
+})
+
+describe('classifyArticulation', () => {
+  it('returns "perfect" for cohesive chord articulation (≤80 ms)', () => {
+    expect(classifyArticulation(0)).toBe('perfect')
+    expect(classifyArticulation(50)).toBe('perfect')
+    expect(classifyArticulation(80)).toBe('perfect')
+  })
+
+  it('returns "good" for slower articulation', () => {
+    expect(classifyArticulation(81)).toBe('good')
+    expect(classifyArticulation(200)).toBe('good')
+    // Wait-mode never punishes below "good" — even a 2 s stagger is "good".
+    expect(classifyArticulation(2000)).toBe('good')
+  })
+
+  it('respects a custom perfect threshold', () => {
+    expect(classifyArticulation(50, { perfectMs: 30 })).toBe('good')
+    expect(classifyArticulation(50, { perfectMs: 60 })).toBe('perfect')
   })
 })
 

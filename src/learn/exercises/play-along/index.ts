@@ -1,12 +1,21 @@
+import { getContext } from 'tone'
 import type { BusNoteEvent } from '../../../core/input/InputBus'
 import { watch } from '../../../store/watch'
 import type { Exercise, ExerciseDescriptor } from '../../core/Exercise'
 import type { ExerciseContext } from '../../core/ExerciseContext'
 import type { ExerciseResult } from '../../core/Result'
 import { computeXp } from '../../core/scoring'
-import { DEFAULT_LOOP_PRESETS } from '../../engines/LoopRegion'
 import { DEFAULT_SPEED_PRESETS, PlayAlongEngine } from './engine'
 import { PlayAlongHud } from './hud'
+
+// Aggressive Tone scheduler headroom while Play-Along is active — 5 ms,
+// roughly an order of magnitude below Tone's 100 ms default. Pairs with
+// `ENGAGE_LEAD_SEC = 0.01` in `PracticeEngine.ts` (5 ms of safety margin)
+// to keep the visible "wait engaged" gap to ~one frame. Snapshot + restore
+// around the session so Play / Live keep the default headroom — they don't
+// need the tight pairing and the default is more forgiving on weaker
+// machines under CPU pressure.
+const PLAY_ALONG_LOOK_AHEAD_SEC = 0.005
 
 export const playAlongDescriptor: ExerciseDescriptor = {
   id: 'play-along',
@@ -27,7 +36,10 @@ class PlayAlongExercise implements Exercise {
   readonly descriptor = playAlongDescriptor
   private engine: PlayAlongEngine
   private hud: PlayAlongHud
-  private loopPresetIdx = -1 // -1 = loop off
+  // Snapshot of `getContext().lookAhead` taken on `start()` and restored on
+  // `stop()`. Null means "no override active right now". Stored so a
+  // mid-session error doesn't leak the tighter value into Play / Live.
+  private prevLookAhead: number | null = null
   // Signal subscriptions owned for the lifetime of a single mount → stop
   // cycle. Flushed on stop so a relaunch doesn't accumulate dangling refs
   // to a previous overlay / engine.
@@ -42,7 +54,7 @@ class PlayAlongExercise implements Exercise {
     this.hud = new PlayAlongHud({
       engine: this.engine,
       onCloseExercise: () => this.ctx.onClose('abandoned'),
-      onCycleLoop: () => this.cycleLoop(),
+      onMarkLoop: () => this.markLoop(),
       onClearLoop: () => this.clearLoop(),
     })
   }
@@ -61,6 +73,16 @@ class PlayAlongExercise implements Exercise {
   }
 
   start(): void {
+    // Tighten Tone scheduler headroom for this session only — see the
+    // PracticeEngine comment on ENGAGE_LEAD_SEC. Try/catch is defensive in
+    // case a future Tone version exposes lookAhead read-only.
+    try {
+      const ctx = getContext()
+      this.prevLookAhead = ctx.lookAhead
+      ctx.lookAhead = PLAY_ALONG_LOOK_AHEAD_SEC
+    } catch {
+      this.prevLookAhead = null
+    }
     const midi = this.ctx.learnState.state.loadedMidi
     this.engine.attach(midi)
     // Wait mode is default-on for Play-Along.
@@ -103,6 +125,17 @@ class PlayAlongExercise implements Exercise {
     for (const off of this.unsubs) off()
     this.unsubs = []
     this.engine.detach()
+    // Restore Tone lookAhead so Play / Live get back their default scheduling
+    // headroom. Skipped (with the null check) when start() couldn't read it
+    // in the first place, e.g. a non-browser test harness.
+    if (this.prevLookAhead !== null) {
+      try {
+        getContext().lookAhead = this.prevLookAhead
+      } catch {
+        // Best effort.
+      }
+      this.prevLookAhead = null
+    }
   }
 
   unmount(): void {
@@ -119,10 +152,16 @@ class PlayAlongExercise implements Exercise {
     }
   }
 
+  onNoteOff(evt: BusNoteEvent): void {
+    // Routed so the engine can maintain its `pressedPitches` set for the
+    // legato held-tick bonus. No score side-effect on its own.
+    this.engine.onNoteOff(evt)
+  }
+
   result(): ExerciseResult | null {
-    const hits = this.engine.state.hits
-    const misses = this.engine.state.misses
-    const attempts = hits + misses
+    const { perfect, good, errors } = this.engine.state
+    const hits = perfect + good
+    const attempts = hits + errors
     // No meaningful session without attempts — runner will still count the
     // time against abandonment analytics but won't commit progress.
     if (attempts === 0) return null
@@ -149,7 +188,7 @@ class PlayAlongExercise implements Exercise {
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
     if (e.code === 'KeyL') {
       e.preventDefault()
-      this.cycleLoop()
+      this.markLoop()
     } else if (e.code === 'BracketLeft') {
       e.preventDefault()
       this.stepSpeed(-1)
@@ -159,26 +198,14 @@ class PlayAlongExercise implements Exercise {
     }
   }
 
-  private cycleLoop(): void {
-    const midi = this.ctx.learnState.state.loadedMidi
-    if (!midi) return
-    // Advance through presets; one past the end disables.
-    this.loopPresetIdx = (this.loopPresetIdx + 1) % (DEFAULT_LOOP_PRESETS.length + 1)
-    if (this.loopPresetIdx === DEFAULT_LOOP_PRESETS.length) {
-      this.engine.clearLoop()
-      return
-    }
-    const preset = DEFAULT_LOOP_PRESETS[this.loopPresetIdx]!
-    this.engine.setLoopFromBars(
-      preset.bars,
-      this.ctx.services.clock.currentTime,
-      midi.duration,
-      midi.bpm,
-    )
+  // Mark-style loop: idle → mark A → mark B (loops) → clear. The HUD button
+  // and the `L` shortcut both route here so the two stay in sync.
+  private markLoop(): void {
+    if (!this.ctx.learnState.state.loadedMidi) return
+    this.engine.markLoopPoint(this.ctx.services.clock.currentTime)
   }
 
   private clearLoop(): void {
-    this.loopPresetIdx = -1
     this.engine.clearLoop()
   }
 

@@ -1244,92 +1244,6 @@ body {
 
 /* ─── Samples strip inside Learn hub ─────────────────────── */
 
-.learn-hub__samples-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.learn-hub__section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-.learn-hub__section-title {
-  font: 600 13px / 1 var(--font);
-  color: var(--text);
-}
-.learn-hub__section-hint {
-  font: 500 11px / 1 var(--font);
-  color: var(--text-dim);
-}
-.learn-hub__samples {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
-}
-.learn-sample {
-  display: grid;
-  grid-template-columns: 6px 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  transition:
-    transform 0.15s var(--ease-spring),
-    border-color 0.2s ease,
-    background 0.2s ease;
-}
-.learn-sample:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--sample-accent, var(--accent)) 50%, var(--border));
-  background: color-mix(in srgb, var(--sample-accent, var(--accent)) 7%, rgba(255, 255, 255, 0.04));
-}
-.learn-sample__accent {
-  width: 4px;
-  height: 28px;
-  border-radius: 2px;
-  background: var(--sample-accent, var(--accent));
-  opacity: 0.8;
-}
-.learn-sample__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.learn-sample__title {
-  font: 600 13px / 1.2 var(--font);
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.learn-sample__composer {
-  font: 500 11px / 1 var(--font);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.learn-sample__go {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sample-accent, var(--accent)) 25%, transparent);
-  color: var(--sample-accent, var(--accent));
-  flex-shrink: 0;
-}
-
 /* ─── Catalog grid ───────────────────────────────────────── */
 
 .learn-hub__grid-label {
@@ -1558,14 +1472,74 @@ body {
   font-weight: 500;
 }
 
-.pa-hud__scrubber {
+/* Wrapper exists so the loop band overlay can be positioned absolutely on top
+   of the slider track without fighting flex math. The wrapper inherits the
+   flex slot the input used to occupy. */
+.pa-hud__scrubber-wrap {
+  position: relative;
   flex: 1 1 120px;
+  display: flex;
+  align-items: center;
+  min-width: 80px;
+}
+
+/* Loop band overlay. The slider's track is 4px tall, centered in an 18px
+   input; we draw an absolutely-positioned strip exactly on top. Two visual
+   states feed off the same ::before:
+     --loop : fill between A and B, plus a sharp 2px tick at B (A's tick is
+              drawn by ::after, shared with the half-set state).
+     --mark : no fill, just the A tick (waiting for B).
+   The slider's thumb sits in its own stacking context (z-index: 1 below) so
+   it stays interactive above the overlay. */
+.pa-hud__scrubber-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: transparent;
+  border-radius: 999px;
+}
+.pa-hud__scrubber-wrap--loop::before {
+  background: /* B-edge tick — 1px hair, low-contrast. */
+    linear-gradient(
+      to right,
+      transparent calc(var(--loop-b-pct, 0%) - 0.5px),
+      color-mix(in srgb, #f3c36c 55%, transparent) calc(var(--loop-b-pct, 0%) - 0.5px),
+      color-mix(in srgb, #f3c36c 55%, transparent) calc(var(--loop-b-pct, 0%) + 0.5px),
+      transparent calc(var(--loop-b-pct, 0%) + 0.5px)
+    ),
+    /* Band between A and B — whisper-tint over the slider track only. */
+    linear-gradient(
+      to bottom,
+      transparent calc(50% - 2px),
+      color-mix(in srgb, #f3c36c 12%, transparent) calc(50% - 2px),
+      color-mix(in srgb, #f3c36c 12%, transparent) calc(50% + 2px),
+      transparent calc(50% + 2px)
+    ) var(--loop-a-pct, 0%) / calc(var(--loop-b-pct, 0%) - var(--loop-a-pct, 0%)) 100% no-repeat;
+}
+/* A-mark tick. Same hairline treatment for both --loop (left edge) and
+   --mark (half-set placeholder). 8px tall, no shadow — a hint, not a flag. */
+.pa-hud__scrubber-wrap--loop::after,
+.pa-hud__scrubber-wrap--mark::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1px;
+  height: 8px;
+  background: color-mix(in srgb, #f3c36c 55%, transparent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  left: var(--loop-a-pct, 0%);
+}
+
+.pa-hud__scrubber {
+  flex: 1 1 100%;
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
   height: 18px;
   cursor: pointer;
-  min-width: 80px;
+  min-width: 0;
 }
 .pa-hud__scrubber::-webkit-slider-runnable-track {
   height: 4px;
@@ -1622,6 +1596,12 @@ body {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  /* Reset <fieldset> defaults — browser ships a 2px groove border + padding
+     that bleeds through the inline-flex layout. */
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
 }
 .pa-hud__seg-label {
   font: 600 10px / 1 var(--font);
@@ -1635,7 +1615,6 @@ body {
   align-items: center;
   padding: 2px;
   background: rgba(255, 255, 255, 0.035);
-  border: 1px solid var(--border);
   border-radius: 10px;
   gap: 2px;
 }
@@ -1712,17 +1691,37 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Loop pill + attached clear button. Clear is only shown when a loop is
-   armed (.pa-hud__loop--on) — this keeps the HUD quiet when looping is off
-   instead of dangling a no-op × next to the pill. */
+/* Loop pill + attached clear button. The pill cycles through three states
+   driven by the mark-style UX:
+     idle              → "Loop"
+     half-marked (A)   → "Mark B" (amber tint, gentle pulse)
+     active (A→B set)  → "Loop · Ns" (amber tint, ×-clear visible)
+   Clear button shows in either non-idle state so the user can bail without
+   placing a second mark. */
 .pa-hud__loop {
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
-.pa-hud__loop--on .pa-hud__pill--loop {
+.pa-hud__loop--on .pa-hud__pill--loop,
+.pa-hud__loop--mark .pa-hud__pill--loop {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
+}
+.pa-hud__loop--mark .pa-hud__pill--loop {
+  /* Amber tint + slow pulse — half-set state is "you owe me a B". */
+  background: color-mix(in srgb, #f3c36c 18%, transparent);
+  border-color: color-mix(in srgb, #f3c36c 50%, transparent);
+  animation: pa-hud-loop-pulse 1.4s ease-in-out infinite;
+}
+@keyframes pa-hud-loop-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #f3c36c 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, #f3c36c 18%, transparent);
+  }
 }
 .pa-hud__loop-clear {
   display: none;
@@ -1742,7 +1741,8 @@ body {
     color 0.15s ease,
     background 0.15s ease;
 }
-.pa-hud__loop--on .pa-hud__loop-clear {
+.pa-hud__loop--on .pa-hud__loop-clear,
+.pa-hud__loop--mark .pa-hud__loop-clear {
   display: inline-flex;
 }
 .pa-hud__loop-clear:hover {
@@ -1782,28 +1782,103 @@ body {
   margin-left: auto;
 }
 
-/* Score pill — compact, tabular, quiet. The focus belongs on the roll, not
-   on "you're at 24/37". The label ("hits / total") shows up as a tooltip. */
-.pa-hud__score {
+/* Live stats panel — always visible during play. Two tiers:
+     primary (streak + accuracy) — always shown, the headline numbers.
+     breakdown (perfect / good / errors) — hides on narrow viewports.
+   Visual language: muted by default, amber on streak heat, quiet color
+   accents on perfect/error. No flashes, no animations on every tick.
+   The focus belongs on the roll, not the chips. */
+.pa-hud__stats {
   display: inline-flex;
-  align-items: baseline;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   font: 600 12px / 1 var(--font);
   color: var(--text);
   font-variant-numeric: tabular-nums;
-  padding: 5px 10px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.pa-hud__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   border-radius: 999px;
-  flex-shrink: 0;
+  color: var(--text);
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
 }
-.pa-hud__score-hits {
-  color: var(--accent);
+
+.pa-hud__stat-glyph {
+  font: 700 11px / 1 var(--font);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.pa-hud__score-sep,
-.pa-hud__score-total {
+
+.pa-hud__stat-num {
+  font: 600 12px / 1 var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+.pa-hud__stat-unit {
+  font: 500 11px / 1 var(--font);
   color: var(--text-muted);
-  font-weight: 500;
+}
+
+/* Streak heat: cold = hidden by JSX, warm = amber tint, hot = brighter
+   amber + filled background. We never animate the value change — letting
+   the count tick up silently keeps the HUD non-distracting. */
+.pa-hud__stat--streak-warm {
+  color: #f5b773;
+  border-color: color-mix(in srgb, #f5b773 32%, var(--border) 68%);
+  background: color-mix(in srgb, #f5b773 10%, transparent);
+}
+.pa-hud__stat--streak-hot {
+  color: #ffd166;
+  border-color: color-mix(in srgb, #ffd166 50%, var(--border) 50%);
+  background: color-mix(in srgb, #ffd166 16%, transparent);
+}
+
+.pa-hud__stat--accuracy {
+  /* Accuracy reads as the headline; bigger and slightly brighter than the
+     breakdown chips. */
+  font-weight: 700;
+  padding: 5px 10px;
+}
+
+.pa-hud__stats-breakdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+}
+
+.pa-hud__stat--perfect {
+  color: #7ee2b1; /* mint — the cleanest signal */
+  border-color: color-mix(in srgb, #7ee2b1 22%, var(--border) 78%);
+}
+.pa-hud__stat--good {
+  color: var(--text-muted);
+}
+.pa-hud__stat--error {
+  color: #f08aa3; /* rose — quiet, not red */
+  border-color: color-mix(in srgb, #f08aa3 22%, var(--border) 78%);
+}
+
+/* Zeroed chips fade — on first visit you see "0 0 0" muted, no shouting. */
+.pa-hud__stat.is-zero {
+  opacity: 0.45;
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: transparent;
 }
 
 /* ─── Compact layout for narrow viewports ─────────────────── */
@@ -1827,9 +1902,6 @@ body {
     align-items: center;
     flex-wrap: wrap;
   }
-  .learn-hub__samples {
-    grid-template-columns: 1fr;
-  }
   .learn-hub__grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
@@ -1843,6 +1915,12 @@ body {
   }
   .pa-hud__options {
     gap: 8px;
+  }
+  /* On phones the breakdown trio collapses; the streak + accuracy headline
+     stays readable. The HUD stays in one row and never gets pushed off
+     screen. */
+  .pa-hud__stats-breakdown {
+    display: none;
   }
 }
 
@@ -2017,6 +2095,12 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 10px;
+  /* Reset <fieldset> defaults — browser ships a 2px groove border + padding
+     that frame the answer grid we don't want. */
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
 }
 .iv-answer {
   display: flex;

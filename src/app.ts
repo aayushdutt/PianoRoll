@@ -245,6 +245,7 @@ export class App {
       },
       onOpenFile: () => this.openFilePicker(),
       onModeRequest: (mode) => this.requestMode(mode),
+      onLearnThis: () => this.enterLearnWithCurrentMidi(),
       onHome: () => this.enterHomeMode(),
       onInstrumentCycle: () => this.cycleInstrument(),
       onParticleCycle: () => this.cycleParticleStyle(),
@@ -559,6 +560,7 @@ export class App {
       resetInteractionState: () => this.resetInteractionState(),
       openFilePicker: () => this.openFilePicker(),
       primeInteractiveAudio: () => this.primeInteractiveAudio(),
+      setLearnFileName: (name) => this.controls.updateLearnFileName(name),
     }
 
     // Start in home. <HomeMode/>'s onMount handles the side effects.
@@ -1189,6 +1191,13 @@ export class App {
       return
     }
     if (mode === 'learn') {
+      // Re-clicking Learn while already inside an exercise pops back to the
+      // hub. closeActiveExercise is idempotent (no-op when no runner) so this
+      // is safe to call regardless of prior state.
+      if (this.store.state.mode === 'learn' && this.learnController) {
+        this.learnController.closeActiveExercise('abandoned')
+        return
+      }
       // When VITE_ENABLE_LEARN_MODE is off, ModeSwitch shows the
       // <LearnComingSoon/> marketing surface instead of <LearnMode/>.
       this.store.setState('mode', 'learn')
@@ -1199,6 +1208,20 @@ export class App {
       return
     }
     this.openFilePicker()
+  }
+
+  // Hands the currently-loaded Play MIDI off to Learn and switches modes.
+  // Queueing on the controller (instead of relying on Learn re-reading
+  // `loadedMidi`) keeps Learn's MIDI store decoupled from Play's — the whole
+  // reason LearnController has its own `learnState` in the first place.
+  private enterLearnWithCurrentMidi(): void {
+    const midi = this.store.state.loadedMidi
+    if (!midi) return
+    track('learn_from_play', { duration_s: Math.round(midi.duration) })
+    void this.ensureLearnController().then((c) => {
+      c.queueMidi(midi)
+      this.store.setState('mode', 'learn')
+    })
   }
 
   // Thin delegators: each flips the store and lets Solid's mode shell run

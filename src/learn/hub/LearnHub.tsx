@@ -1,6 +1,5 @@
 import { createMemo, For, onCleanup, onMount, Show } from 'solid-js'
 import { render } from 'solid-js/web'
-import { SAMPLES, type Sample } from '../../core/samples'
 import { t } from '../../i18n'
 import type { ExerciseCategory, ExerciseDescriptor } from '../core/Exercise'
 import type { LearnState } from '../core/LearnState'
@@ -18,20 +17,19 @@ export interface LearnHubOptions {
   // The hub delegates launching to the controller so it doesn't import the
   // runner directly. Kept as a thin handoff.
   launchExercise: (descriptor: ExerciseDescriptor) => void
-  // User-initiated MIDI source switches. Both route through LearnController's
-  // own loader — on success, `learnState.loadedMidi` flips and the hub
-  // re-renders its hero card.
+  // Opens the unified MIDI picker (file + bundled samples). Sample selection
+  // routes through the picker → LearnController.loadSample, which auto-launches
+  // Play-Along, so the hub doesn't need a separate sample handler anymore.
   onOpenFilePicker: () => void
-  onLoadSample: (sampleId: string) => void
 }
 
-// Category ordering on the catalog. Play-along first (the Phase 1 core), then
-// sight-reading/ear/theory/technique/reflection — matches the user-facing
-// "what would I do in a practice session?" mental model.
+// Catalog ordering. Play-along is the Hero up top so it's NOT repeated in
+// Explore. Ear-training (intervals) leads the rest — it's the only fully
+// implemented secondary exercise; sight-read/theory/etc. fall in below as
+// "coming soon" cards.
 const CATEGORY_ORDER: ExerciseCategory[] = [
-  'play-along',
-  'sight-reading',
   'ear-training',
+  'sight-reading',
   'theory',
   'technique',
   'reflection',
@@ -97,54 +95,18 @@ function Hero(props: LearnHubOptions) {
           }
         >
           {(midi) => (
-            <>
-              <button
-                class="hero-card__primary"
-                type="button"
-                onClick={() => props.launchExercise(featured)}
-              >
-                <span class="hero-card__primary-icon" aria-hidden="true" innerHTML={ICON_PLAY} />
-                <span class="hero-card__primary-label">Start · {midi().name}</span>
-              </button>
-              <button
-                class="hero-card__secondary"
-                type="button"
-                aria-label="Upload a different MIDI"
-                data-tip="Upload a different MIDI"
-                onClick={() => props.onOpenFilePicker()}
-              >
-                <span innerHTML={ICON_UPLOAD} />
-                <span>Swap MIDI</span>
-              </button>
-            </>
+            <button
+              class="hero-card__primary"
+              type="button"
+              onClick={() => props.launchExercise(featured)}
+            >
+              <span class="hero-card__primary-icon" aria-hidden="true" innerHTML={ICON_PLAY} />
+              <span class="hero-card__primary-label">Start · {midi().name}</span>
+            </button>
           )}
         </Show>
       </div>
     </div>
-  )
-}
-
-function SampleCard(props: { sample: Sample; onLoadSample: (id: string) => void }) {
-  return (
-    <button
-      type="button"
-      class="learn-sample"
-      data-sample-id={props.sample.id}
-      style={{ '--sample-accent': props.sample.accent }}
-      onClick={() => props.onLoadSample(props.sample.id)}
-    >
-      <div class="learn-sample__accent" aria-hidden="true" />
-      <div class="learn-sample__meta">
-        <div class="learn-sample__title">{props.sample.title}</div>
-        <div class="learn-sample__composer">{props.sample.composer}</div>
-      </div>
-      <div class="learn-sample__go" aria-hidden="true">
-        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
-          <title>Play</title>
-          <path d="M5 3 L12 8 L5 13 Z" />
-        </svg>
-      </div>
-    </button>
   )
 }
 
@@ -161,7 +123,7 @@ function Grid(props: { launchExercise: (d: ExerciseDescriptor) => void }) {
   return (
     <For each={CATEGORY_ORDER}>
       {(cat) => {
-        const list = (byCategory().get(cat) ?? []).filter((d) => d.id !== 'play-along')
+        const list = byCategory().get(cat) ?? []
         return (
           <Show
             when={list.length > 0}
@@ -211,17 +173,6 @@ function LearnHubView(props: LearnHubOptions) {
           <div class="learn-hub__hero">
             <Hero {...props} />
           </div>
-          <section class="learn-hub__samples-section">
-            <div class="learn-hub__section-head">
-              <span class="learn-hub__section-title">Jump in with a sample</span>
-              <span class="learn-hub__section-hint">Or upload your own MIDI above</span>
-            </div>
-            <div class="learn-hub__samples">
-              <For each={SAMPLES}>
-                {(sample) => <SampleCard sample={sample} onLoadSample={props.onLoadSample} />}
-              </For>
-            </div>
-          </section>
           <div class="learn-hub__grid-label">Explore</div>
           <div class="learn-hub__grid">
             <Grid launchExercise={props.launchExercise} />

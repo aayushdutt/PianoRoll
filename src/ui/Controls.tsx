@@ -38,6 +38,7 @@ export interface ControlsOptions {
   onOpenTracks?: () => void
   onRecord?: () => void
   onOpenFile?: () => void
+  onLearnThis?: () => void
   onModeRequest?: (mode: Exclude<AppMode, 'home'>) => void
   onHome?: () => void
   onInstrumentCycle?: () => void
@@ -71,6 +72,7 @@ interface TopStripProps {
   onTracks: () => void
   onMidi: () => void
   onRecord: () => void
+  onLearnThis: () => void
   registerEl: (el: HTMLElement) => void
   registerTracksBtn: (el: HTMLButtonElement) => void
 }
@@ -198,6 +200,23 @@ function TopStripView(props: TopStripProps) {
         >
           <span innerHTML={icons.tracks()} />
           <span>{t('topStrip.tracks')}</span>
+        </button>
+        {/* Hand the currently-loaded MIDI off to Learn → Play-Along. Same
+            visibility gate as Tracks/Export — only meaningful with a file in
+            Play. Sits next to those for muscle memory. */}
+        <button
+          class="ts-pill ts-pill--file"
+          classList={{
+            hidden: !(props.mode() === 'play' && props.hasFile() && !props.isLoadingFile()),
+          }}
+          id="ts-learn-this"
+          type="button"
+          aria-label="Learn this MIDI"
+          data-tip="Practice this piece with wait-mode"
+          onClick={() => props.onLearnThis()}
+        >
+          <span innerHTML={icons.practice()} />
+          <span>Learn</span>
         </button>
         <span id="ts-instrument-slot" />
         <div class="ts-sep" aria-hidden="true" />
@@ -700,6 +719,11 @@ export class Controls {
   private idleTimer: ReturnType<typeof setTimeout> | null = null
   private hudActivityLock = false
   private isScrubbing = false
+  // Learn mode owns its own MIDI store separate from `appStore.loadedMidi`,
+  // so the topbar context can't read it via the `store.state.loadedMidi`
+  // watch the way Play does. LearnController pushes the song name through
+  // `updateLearnFileName` whenever its loaded file changes.
+  private learnFileName: string | null = null
   // Cached values for throttling DOM writes — only update when the user would
   // actually see a difference. Cuts ~180 DOM writes/sec during playback.
   private lastDisplaySec = -1
@@ -807,6 +831,7 @@ export class Controls {
             onTracks={() => opts.onOpenTracks?.()}
             onMidi={() => opts.onMidiConnect?.()}
             onRecord={() => opts.onRecord?.()}
+            onLearnThis={() => opts.onLearnThis?.()}
             registerEl={(el) => {
               this.topStripEl = el
             }}
@@ -1073,6 +1098,16 @@ export class Controls {
     this.refreshUi()
   }
 
+  // Push the currently-loaded Learn-mode song name into the topbar context.
+  // Called by LearnController when its MIDI store changes — Learn keeps its
+  // own state to avoid disturbing Play, so this can't ride the existing
+  // `store.state.loadedMidi` watch.
+  updateLearnFileName(name: string | null): void {
+    if (this.learnFileName === name) return
+    this.learnFileName = name
+    this.refreshUi()
+  }
+
   get tracksButton(): HTMLElement {
     return this.tracksBtn
   }
@@ -1254,12 +1289,20 @@ export class Controls {
     }
 
     if (mode === 'learn') {
-      this.setUi('context', {
-        kicker: ENABLE_LEARN_MODE ? 'Learn' : 'Coming soon',
-        title: ENABLE_LEARN_MODE
-          ? 'Exercises, ear training, sight reading'
-          : 'Learn mode is on the way',
-      })
+      if (!ENABLE_LEARN_MODE) {
+        this.setUi('context', { kicker: 'Coming soon', title: 'Learn mode is on the way' })
+        return
+      }
+      // Show the loaded song name when an exercise is using one, otherwise
+      // fall back to the generic Learn label.
+      if (this.learnFileName) {
+        this.setUi('context', { kicker: 'Learning', title: this.learnFileName })
+      } else {
+        this.setUi('context', {
+          kicker: 'Learn',
+          title: 'Exercises, ear training, sight reading',
+        })
+      }
       return
     }
 

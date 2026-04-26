@@ -1,5 +1,3 @@
-# Agent instructions — midee (pianoroll)
-
 **Reality:** The product is **midee** (`package.json` → `"name": "midee"`). The repo directory on disk is often **`pianoroll`** — same codebase. Everything user-facing is a **static Vite SPA**: MIDI, audio, Pixi canvas, and MP4 export run in the **browser only**; there is no app server for core features (deploy is static assets + optional analytics keys).
 
 ## Commands (from `package.json`, repo root)
@@ -74,3 +72,7 @@ Longer plans live in **`docs/`** — open the specific doc when needed; don’t 
 ## When this file grows
 
 Add a rule only after an agent **repeats** the same mistake. Otherwise put detail in `docs/` or comments next to the tricky code.
+
+## Other rules
+
+- Never commit the code, when user asks for commit msg, just print it in code block

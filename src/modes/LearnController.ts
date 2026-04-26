@@ -6,6 +6,7 @@ import type { ExerciseDescriptor } from '../learn/core/Exercise'
 import { ExerciseRunner } from '../learn/core/ExerciseRunner'
 import { createLearnState, type LearnState, type LearnStatus } from '../learn/core/LearnState'
 import { createLearnProgressStore, type LearnProgressStore } from '../learn/core/progress'
+import { playAlongDescriptor } from '../learn/exercises/play-along'
 import { findExercise } from '../learn/hub/catalog'
 import { LearnHub } from '../learn/hub/LearnHub'
 import { LearnOverlay } from '../learn/overlays/LearnOverlay'
@@ -48,6 +49,12 @@ export class LearnController {
   private unsubs: Array<() => void> = []
   // One-shot flags reset each enter so new sessions re-fire activation events.
   private firstPlayLogged = false
+  // MIDI handed off from another mode (e.g. Play's "Learn this" button), to
+  // be loaded on the next `enter()`. Stored here instead of plumbed through
+  // ModeContext because LearnMode's onMount races the mode flip — by the
+  // time `enter()` runs, the cached MIDI is the cleanest way to hand context
+  // across the async boundary.
+  private pendingMidi: MidiFile | null = null
 
   constructor(private ctx: ModeContext) {
     this.hub = new LearnHub({
@@ -55,9 +62,6 @@ export class LearnController {
       learnState: this.learnState,
       launchExercise: (descriptor) => void this.launchExercise(descriptor),
       onOpenFilePicker: () => this.openLearnFilePicker(),
-      onLoadSample: (id) => {
-        void this.loadSample(id)
-      },
     })
   }
 
@@ -90,6 +94,10 @@ export class LearnController {
     this.hub.mount(this.hubHost!)
     this.overlay = new LearnOverlay()
     services.renderer.addLayer(this.overlay)
+
+    // Reflect any already-loaded learn song in the topbar — re-entering Learn
+    // with a piece still loaded should still show its name.
+    this.ctx.setLearnFileName(this.learnState.state.loadedMidi?.name ?? null)
     // Touch the streak so attendance counts even if the user bails before
     // finishing an exercise — "opened the app today" is still practice.
     this.progress.touchStreak()
@@ -107,6 +115,23 @@ export class LearnController {
     )
 
     if (!wasAlreadyLearn) trackEvent('learn_mode_entered', { from })
+
+    // Drain a queued hand-off (e.g. Play → "Learn this" button). Done at the
+    // very end so host elements + overlay are already mounted by the time
+    // consumeMidi → launchExercise mounts the exercise UI.
+    if (this.pendingMidi) {
+      const midi = this.pendingMidi
+      this.pendingMidi = null
+      void this.consumeMidi(midi)
+    }
+  }
+
+  // Hand-off for cross-mode launches. Caller flips `store.mode` to 'learn'
+  // separately; this just queues the MIDI for `enter()` to drain. We pass a
+  // parsed `MidiFile` rather than re-loading from a sample id / file to avoid
+  // the duplicate parse + fetch when Play already has it in memory.
+  queueMidi(midi: MidiFile): void {
+    this.pendingMidi = midi
   }
 
   exit(): void {
@@ -129,6 +154,8 @@ export class LearnController {
     this.learnState.clearMidi()
     this.runner = null
     this.view.set('hub')
+    // Drop the topbar context — we're leaving Learn, the next mode owns it.
+    this.ctx.setLearnFileName(null)
   }
 
   // ── Loaders ─────────────────────────────────────────────────────────────
@@ -191,6 +218,13 @@ export class LearnController {
       console.error('[LearnController] SynthEngine.load failed:', err)
     })
     this.learnState.completeLoad(midi)
+    // Update the topbar so the user sees what they're learning.
+    this.ctx.setLearnFileName(midi.name)
+    // Auto-launch Play-Along on every MIDI load. Loading a MIDI in Learn is
+    // a strong signal of intent ("I want to play this piece") — making the
+    // user click "Start" again afterward is friction. The runner closes
+    // gracefully if a previous exercise is still active (mode-level swap).
+    void this.launchExercise(playAlongDescriptor)
   }
 
   // ── Exercise lifecycle ──────────────────────────────────────────────────

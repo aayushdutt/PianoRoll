@@ -4,45 +4,54 @@ import type { BusNoteEvent } from '../../../core/input/InputBus'
 import type { AppServices } from '../../../core/services'
 import { watch } from '../../../store/watch'
 import type { LearnState } from '../../core/LearnState'
+import { classifyArticulation } from '../../core/scoring'
 import { type LoopRegion, makeRegionFromBars, ramp, wrapIfAtEnd } from '../../engines/LoopRegion'
 import { PracticeEngine } from '../../engines/PracticeEngine'
 
-// Runtime state for the Play-Along exercise. Composes wait-mode
-// (PracticeEngine) with a loop-region + tempo-ramp layer on top. Kept
-// separate from the UI so the state machine can be reasoned about (and
-// tested) without touching DOM.
-//
-// Lifecycle: `attach(midi)` loads the piece, `setEnabled(true)` turns wait
-// mode on, and the engine drives the clock from that point forward.
-// `detach()` releases everything back to the host (App continues playback
-// as-is when the exercise unmounts).
+// Composes wait-mode (PracticeEngine) with loop-region + tempo-ramp + a
+// graded score model. UI reads off `engine.state.*`; nothing here touches
+// the DOM. Lifecycle: `attach(midi)` then `setEnabled(true)`; `detach()` to
+// release.
 
 export type HandFilter = 'left' | 'right' | 'both'
 export const DEFAULT_SPEED_PRESETS = [60, 80, 100] as const
 
+// Held-bonus eligibility extends this far past a chord's latest scheduled
+// note-end. Past it, "still holding" stops earning ticks — the song moved
+// on and the user is just leaving fingers down.
+const HELD_GRACE_SEC = 0.05
+
 export interface EngineOptions {
   services: AppServices
-  // Learn's own transport state. The engine drives `status` here (not
-  // `services.store.status`) so Play's transport isn't disturbed while an
-  // exercise is running.
+  // Learn's own transport state, separate from `services.store` so Play's
+  // transport isn't disturbed while an exercise runs.
   learnState: LearnState
-  // Called when the user completes a clean pass of the loop region. The
-  // exercise passes this to the ramp controller and fires celebration UI.
   onCleanPass?: () => void
 }
 
 export interface PlayAlongState {
+  // Active loop region (start, end). Null = loop off.
   loopRegion: LoopRegion | null
+  // Half-set state for the mark-style UX: A has been placed at this time but
+  // B has not. The HUD renders this as a single tick on the scrubber so the
+  // user can see their pending mark before completing the pair.
+  loopMark: number | null
   speedPct: number
   hand: HandFilter
   tempoRampEnabled: boolean
   cleanPasses: number
-  hits: number
-  misses: number
-  // `userWantsToPlay` is the source of truth for the play/pause icon — it
-  // stays true across wait-mode pauses so the button doesn't flicker. The
-  // lower-level `isPlaying` (clock actually advancing) is exposed in case a
-  // future UI wants a finer-grained "waiting…" state.
+
+  // Score buckets. Wait-mode never punishes below `good` — articulation
+  // beyond `PERFECT_ARTICULATION_MS` still clears the chord, just unflashy.
+  perfect: number
+  good: number
+  errors: number
+  heldTicks: number
+  streak: number
+
+  // `userWantsToPlay` is the source of truth for the play/pause icon —
+  // stays true across wait-mode pauses so the button doesn't flicker.
+  // `isPlaying` reflects the actual clock state (false during a wait).
   userWantsToPlay: boolean
   isPlaying: boolean
   currentTime: number
@@ -60,20 +69,31 @@ export class PlayAlongEngine {
 
   private unsubs: Array<() => void> = []
   private active = false
-  // Cached MIDI so `setHand` can re-run `applyHand` without reaching into
-  // `PracticeEngine`'s internals. Cleared on `detach`.
+  // Cached so `setHand` can re-apply filters without touching PracticeEngine
+  // internals.
   private currentMidi: import('../../../core/midi/types').MidiFile | null = null
+
+  // Pitches currently held across all input sources, maintained by
+  // `onNoteOn`/`onNoteOff`. Intersection with `heldEligible` drives the
+  // legato bonus.
+  private pressedPitches = new Set<number>()
+  // pitch → song-time expiry. Populated on chord clear, pruned per tick.
+  private heldEligible = new Map<number, number>()
 
   constructor(private opts: EngineOptions) {
     this.services = opts.services
     const [state, setState] = createStore<PlayAlongState>({
       loopRegion: null,
+      loopMark: null,
       speedPct: 100,
       hand: 'both',
       tempoRampEnabled: false,
       cleanPasses: 0,
-      hits: 0,
-      misses: 0,
+      perfect: 0,
+      good: 0,
+      errors: 0,
+      heldTicks: 0,
+      streak: 0,
       userWantsToPlay: false,
       isPlaying: false,
       currentTime: 0,
@@ -127,9 +147,10 @@ export class PlayAlongEngine {
       this.setState({ duration: midi?.duration ?? 0, currentTime: initial })
     })
 
-    // Clock tick drives loop-wrap at region boundaries only (`onTick` does not
-    // write `currentTime` into the store — see docs/done/SOLID_MIGRATION_PLAN.md §2). Status watch
-    // keeps `isPlaying` aligned with Learn's transport.
+    // Clock tick drives loop-wrap at region boundaries + the held-tick
+    // legato accumulator. (`onTick` does not write `currentTime` into the
+    // store — see docs/done/SOLID_MIGRATION_PLAN.md §2.) Status watch keeps
+    // `isPlaying` aligned with Learn's transport.
     this.unsubs.push(
       services.clock.subscribe((t) => this.onTick(t)),
       watch(
@@ -142,6 +163,8 @@ export class PlayAlongEngine {
   detach(): void {
     this.active = false
     this.currentMidi = null
+    this.pressedPitches.clear()
+    this.heldEligible.clear()
     this.setState('userWantsToPlay', false)
     for (const off of this.unsubs) off()
     this.unsubs = []
@@ -181,7 +204,13 @@ export class PlayAlongEngine {
 
   seek(time: number): void {
     const clamped = Math.max(0, Math.min(this.state.duration || time, time))
-    const wasPlaying = this.state.userWantsToPlay
+    // Gate resume on the *actual* clock state, not `userWantsToPlay`. In
+    // wait-mode the clock is paused while the user holds intent-to-play; if
+    // we resumed on intent, every scrub during a wait would briefly fire
+    // `clock.play()` → `synth.play()` and bleed audio until PracticeEngine
+    // re-engaged the wait at the next chord. Tying it to clock.playing keeps
+    // wait-paused scrubs silent — the user presses Play to resume.
+    const wasPlaying = this.opts.services.clock.playing
     const { services, learnState } = this.opts
     services.clock.pause()
     learnState.setState('status', 'paused')
@@ -190,6 +219,10 @@ export class PlayAlongEngine {
     learnState.setState('currentTime', clamped)
     this.practice.notifySeek(clamped)
     this.setState('currentTime', clamped)
+    // A jump invalidates "currently held" semantics — clear the legato
+    // window so the user doesn't accumulate ticks for notes that no
+    // longer correspond to the new playhead.
+    this.heldEligible.clear()
     if (wasPlaying) {
       services.clock.play()
       learnState.setState('status', 'playing')
@@ -198,17 +231,40 @@ export class PlayAlongEngine {
 
   onNoteOn(evt: BusNoteEvent): void {
     if (!this.active) return
-    const result = this.practice.notePressed(evt.pitch)
-    if (result === 'advanced') {
-      this.setState('hits', this.state.hits + 1)
-    } else if (result === 'rejected' && this.practice.isWaiting) {
+    this.pressedPitches.add(evt.pitch)
+    const outcome = this.practice.notePressed(evt.pitch)
+    if (outcome.kind === 'advanced') {
+      const verdict = classifyArticulation(outcome.articulationMs)
+      const expireAt = outcome.clearedStep.latestEnd + HELD_GRACE_SEC
+      for (const pitch of outcome.clearedStep.pitches) {
+        this.heldEligible.set(pitch, expireAt)
+      }
+      batch(() => {
+        if (verdict === 'perfect') {
+          this.setState('perfect', this.state.perfect + 1)
+        } else {
+          this.setState('good', this.state.good + 1)
+        }
+        this.setState('streak', this.state.streak + 1)
+      })
+    } else if (outcome.kind === 'rejected' && this.practice.isWaiting) {
       batch(() => {
         this.setState({
-          misses: this.state.misses + 1,
+          errors: this.state.errors + 1,
+          streak: 0,
           cleanPasses: 0,
         })
       })
     }
+    // `'duplicate'` and `'accepted'` are no-ops by design: a re-strike of
+    // an already-cleared pitch isn't an error, and partial-chord progress
+    // surfaces via PracticeEngine's `pending`/`accepted` signal — not the
+    // score.
+  }
+
+  onNoteOff(evt: BusNoteEvent): void {
+    if (!this.active) return
+    this.pressedPitches.delete(evt.pitch)
   }
 
   setWaitEnabled(enabled: boolean): void {
@@ -237,12 +293,56 @@ export class PlayAlongEngine {
     bpm: number,
   ): LoopRegion | null {
     const region = bars === null ? null : makeRegionFromBars(playhead, bars, bpm, pieceDuration)
-    this.setState('loopRegion', region)
+    batch(() => {
+      this.setState('loopRegion', region)
+      this.setState('loopMark', null)
+    })
     return region
   }
 
+  // Mark-style loop UX: three-state cycle driven by repeated calls.
+  //   1st call: place A at `time` (sets `loopMark`, no active region yet).
+  //   2nd call: place B at `time` and activate the region (clears `loopMark`,
+  //             sets `loopRegion` to the ordered [min,max] of A and B).
+  //   3rd call: clear both (loop off, returns to idle).
+  // Returns the resulting state for callers that want to react synchronously.
+  markLoopPoint(time: number): { region: LoopRegion | null; mark: number | null } {
+    const dur = this.state.duration
+    const t = Math.max(0, dur > 0 ? Math.min(dur, time) : time)
+    if (this.state.loopRegion) {
+      // Active → clear.
+      batch(() => {
+        this.setState('loopRegion', null)
+        this.setState('loopMark', null)
+      })
+      return { region: null, mark: null }
+    }
+    if (this.state.loopMark === null) {
+      // Idle → place A.
+      this.setState('loopMark', t)
+      return { region: null, mark: t }
+    }
+    // Half-set → place B and activate. A degenerate same-spot click (within
+    // 50 ms — a double-click on the same playhead) clears instead of building
+    // a zero-length region the wrap helper would refuse anyway.
+    const a = this.state.loopMark
+    if (Math.abs(t - a) < 0.05) {
+      this.setState('loopMark', null)
+      return { region: null, mark: null }
+    }
+    const region: LoopRegion = { start: Math.min(a, t), end: Math.max(a, t) }
+    batch(() => {
+      this.setState('loopRegion', region)
+      this.setState('loopMark', null)
+    })
+    return { region, mark: null }
+  }
+
   clearLoop(): void {
-    this.setState('loopRegion', null)
+    batch(() => {
+      this.setState('loopRegion', null)
+      this.setState('loopMark', null)
+    })
   }
 
   // ── Internal ──────────────────────────────────────────────────────────
@@ -263,6 +363,10 @@ export class PlayAlongEngine {
 
   private applyHand(midi: import('../../../core/midi/types').MidiFile | null): void {
     if (!midi) return
+    // Clear stale held-eligible entries — switching hands invalidates the
+    // current chord's held window because `setVisibleTracks` rebuilds the
+    // step list against the new filter.
+    this.heldEligible.clear()
     const filter = this.state.hand
     if (filter === 'both') {
       this.practice.setVisibleTracks(null)
@@ -279,11 +383,11 @@ export class PlayAlongEngine {
   }
 
   private onTick(time: number): void {
-    // NOTE: we deliberately do NOT write `currentTime` into the store here.
-    // Writing at 60 Hz would re-fire any `createEffect` reading it. The HUD
-    // subscribes to `services.clock` directly for its imperative scrubber
-    // update (§2 rule 4), so the store copy earned nothing and cost a
-    // reactive re-run per frame. Seek() still writes once to reposition.
+    // Deliberately NOT writing `currentTime` to the store here — at 60 Hz
+    // it would re-fire every `createEffect` reading it. The HUD subscribes
+    // to `services.clock` directly for the scrubber. (Seek() still writes
+    // once to reposition.) See docs/done/SOLID_MIGRATION_PLAN.md §2 rule 4.
+    this.tickHeldBonus(time)
     const dur = this.state.duration
     if (dur > 0 && time >= dur && this.state.isPlaying) {
       this.pause()
@@ -296,9 +400,36 @@ export class PlayAlongEngine {
     if (wrapTo !== null) {
       this.opts.services.clock.seek(wrapTo)
       this.opts.services.synth.seek(wrapTo)
+      // A wrap is a seek — practice has to recompute `nextStepIdx` against
+      // the new playhead and reset `earliestRearmTime`, otherwise wait-mode
+      // never re-engages on the chords inside the loop (it still thinks
+      // it's past them). Same reason scrub calls `notifySeek`.
+      this.practice.notifySeek(wrapTo)
+      // The held-eligibility window was anchored to chords from the previous
+      // pass — invalidate it so the legato bonus doesn't accumulate ticks for
+      // notes that no longer correspond to the new playhead.
+      this.heldEligible.clear()
       this.setState('cleanPasses', this.state.cleanPasses + 1)
       this.opts.onCleanPass?.()
       if (this.state.tempoRampEnabled) this.applyRampedSpeed()
+    }
+  }
+
+  // Prune expired entries and accumulate one tick of legato bonus per
+  // still-held cleared pitch. Map size is bounded by chord size (~1–6), so
+  // the per-tick iteration is negligible.
+  private tickHeldBonus(time: number): void {
+    if (this.heldEligible.size === 0) return
+    let held = 0
+    for (const [pitch, expireAt] of this.heldEligible) {
+      if (expireAt <= time) {
+        this.heldEligible.delete(pitch)
+        continue
+      }
+      if (this.pressedPitches.has(pitch)) held++
+    }
+    if (held > 0) {
+      this.setState('heldTicks', this.state.heldTicks + held)
     }
   }
 }

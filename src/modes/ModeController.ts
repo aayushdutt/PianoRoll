@@ -18,6 +18,11 @@ export interface ModeContext {
   resetInteractionState: () => void
   openFilePicker: () => void
   primeInteractiveAudio: () => void
+  // Push the currently-loaded Learn song into the global topbar. Pass `null`
+  // to clear it (e.g., on `exit`). Implemented as a callback rather than a
+  // direct Controls reference so the import graph stays one-way (modes
+  // never reach into UI directly).
+  setLearnFileName: (name: string | null) => void
 }
 
 // Live-mode entry options. Used by `setNextLiveOpts()` in LiveMode to

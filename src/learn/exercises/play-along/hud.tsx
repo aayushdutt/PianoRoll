@@ -1,8 +1,12 @@
-import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { watch } from '../../../store/watch'
 import { icons } from '../../../ui/icons'
 import type { PlayAlongEngine } from './engine'
+
+// Streak ≥ this is "hot" — saturated chip background. Below is "warm"
+// (visible but quieter). Below 1 the chip is hidden entirely.
+const STREAK_HOT_THRESHOLD = 5
 
 function fmtTime(t: number): string {
   const s = Math.max(0, Math.floor(t))
@@ -30,7 +34,13 @@ const RAMP_GLYPH =
 export interface PlayAlongHudOptions {
   engine: PlayAlongEngine
   onCloseExercise: () => void
-  onCycleLoop: () => void
+  // One handler: drives the mark-style state machine (idle → A → B → clear).
+  // Routed through the exercise so the keyboard shortcut and the button stay
+  // in sync.
+  onMarkLoop: () => void
+  // Explicit clear (the small × that appears once a loop is active or
+  // half-marked). Same outcome as a third onMarkLoop call but lets the user
+  // bail out of a half-set state without making a second mark.
   onClearLoop: () => void
 }
 
@@ -55,6 +65,73 @@ function loadOffset(): { x: number; y: number } {
   } catch {
     return { x: 0, y: 0 }
   }
+}
+
+// Always-visible score panel. The visual language follows §1 of the Learn
+// plan ("whisper, don't shout"): muted chips, no flashes, only a tiny amber
+// tint when streaks are alive. The breakdown trio (perfect/good/errors)
+// disappears on narrow viewports — see `.pa-hud__stats` CSS.
+function LiveStats(props: { engine: PlayAlongEngine }) {
+  const { engine } = props
+  // Memo on perfect/good/errors only — NOT heldTicks. heldTicks ticks 60×/sec
+  // while the user holds a chord; pulling it into the HUD reactive path
+  // would re-render the accuracy chip every frame for no visual change.
+  const accuracyPct = createMemo(() => {
+    const hits = engine.state.perfect + engine.state.good
+    const attempts = hits + engine.state.errors
+    return attempts === 0 ? 100 : Math.round((100 * hits) / attempts)
+  })
+  const streakHot = () => engine.state.streak >= STREAK_HOT_THRESHOLD
+  const streakWarm = () => engine.state.streak >= 1 && engine.state.streak < STREAK_HOT_THRESHOLD
+  return (
+    <div class="pa-hud__stats" role="status" aria-label="Session score">
+      <Show when={engine.state.streak > 0}>
+        <span
+          class="pa-hud__stat pa-hud__stat--streak"
+          classList={{
+            'pa-hud__stat--streak-warm': streakWarm(),
+            'pa-hud__stat--streak-hot': streakHot(),
+          }}
+          data-tip="Consecutive cleared chords"
+        >
+          <span class="pa-hud__stat-glyph" aria-hidden="true">
+            🔥
+          </span>
+          <span class="pa-hud__stat-num">{engine.state.streak}</span>
+        </span>
+      </Show>
+      <span class="pa-hud__stat pa-hud__stat--accuracy" data-tip="Hits / (hits + errors)">
+        <span class="pa-hud__stat-num">{accuracyPct()}</span>
+        <span class="pa-hud__stat-unit">%</span>
+      </span>
+      <span class="pa-hud__stats-breakdown" aria-hidden="true">
+        <span
+          class="pa-hud__stat pa-hud__stat--perfect"
+          classList={{ 'is-zero': engine.state.perfect === 0 }}
+          data-tip="Perfect chord articulation (≤80 ms)"
+        >
+          <span class="pa-hud__stat-glyph">✓</span>
+          <span class="pa-hud__stat-num">{engine.state.perfect}</span>
+        </span>
+        <span
+          class="pa-hud__stat pa-hud__stat--good"
+          classList={{ 'is-zero': engine.state.good === 0 }}
+          data-tip="Cleared chord (slower articulation)"
+        >
+          <span class="pa-hud__stat-glyph">◌</span>
+          <span class="pa-hud__stat-num">{engine.state.good}</span>
+        </span>
+        <span
+          class="pa-hud__stat pa-hud__stat--error"
+          classList={{ 'is-zero': engine.state.errors === 0 }}
+          data-tip="Wrong-pitch press while waiting"
+        >
+          <span class="pa-hud__stat-glyph">×</span>
+          <span class="pa-hud__stat-num">{engine.state.errors}</span>
+        </span>
+      </span>
+    </div>
+  )
 }
 
 function PlayAlongHudView(props: PlayAlongHudOptions) {
@@ -238,6 +315,30 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
   const isWaitOn = () => engine.practice.isEnabled
   const isRampOn = () => engine.state.tempoRampEnabled
 
+  // Loop region overlay on the scrubber. Returns CSS custom props so the band
+  // (filled segment between A and B) and the two tick markers can be drawn
+  // via pseudo-elements without re-rendering on every clock tick — the
+  // values only change on mark / clear.
+  const loopBandStyle = createMemo<Record<string, string>>(() => {
+    const dur = engine.state.duration
+    if (dur <= 0) return {}
+    const region = engine.state.loopRegion
+    if (region) {
+      const aPct = (region.start / dur) * 100
+      const bPct = (region.end / dur) * 100
+      return {
+        '--loop-a-pct': `${aPct.toFixed(2)}%`,
+        '--loop-b-pct': `${bPct.toFixed(2)}%`,
+      }
+    }
+    const mark = engine.state.loopMark
+    if (mark !== null) {
+      const aPct = (mark / dur) * 100
+      return { '--loop-a-pct': `${aPct.toFixed(2)}%` }
+    }
+    return {}
+  })
+
   return (
     <div
       class="pa-hud"
@@ -284,50 +385,51 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
           <span class="pa-hud__time" ref={timeEl}>
             0:00
           </span>
-          <input
-            class="pa-hud__scrubber"
-            ref={scrubberEl}
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value="0"
-            aria-label="Scrubber"
-            data-tip="Drag to seek"
-            onPointerDown={() => {
-              scrubbing = true
+          <div
+            class="pa-hud__scrubber-wrap"
+            classList={{
+              'pa-hud__scrubber-wrap--loop': engine.state.loopRegion !== null,
+              'pa-hud__scrubber-wrap--mark':
+                engine.state.loopRegion === null && engine.state.loopMark !== null,
             }}
-            onInput={(e) => {
-              const el = e.currentTarget
-              const pct = (Number(el.value) / (Number(el.max) || 1)) * 100
-              el.style.setProperty('--pct', `${pct.toFixed(1)}%`)
-              engine.seek(Number(el.value))
-            }}
-            onPointerUp={() => {
-              scrubbing = false
-            }}
-            onPointerCancel={() => {
-              scrubbing = false
-            }}
-            onChange={() => {
-              scrubbing = false
-            }}
-          />
+            style={loopBandStyle()}
+          >
+            <input
+              class="pa-hud__scrubber"
+              ref={scrubberEl}
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0"
+              aria-label="Scrubber"
+              data-tip="Drag to seek"
+              onPointerDown={() => {
+                scrubbing = true
+              }}
+              onInput={(e) => {
+                const el = e.currentTarget
+                const pct = (Number(el.value) / (Number(el.max) || 1)) * 100
+                el.style.setProperty('--pct', `${pct.toFixed(1)}%`)
+                engine.seek(Number(el.value))
+              }}
+              onPointerUp={() => {
+                scrubbing = false
+              }}
+              onPointerCancel={() => {
+                scrubbing = false
+              }}
+              onChange={() => {
+                scrubbing = false
+              }}
+            />
+          </div>
           <span class="pa-hud__time pa-hud__time--muted">{fmtTime(engine.state.duration)}</span>
         </div>
       </div>
 
       <div class="pa-hud__meta">
-        <div
-          class="pa-hud__score"
-          data-tip="Notes hit · total attempts this session"
-          role="status"
-          aria-label="Score"
-        >
-          <span class="pa-hud__score-hits">{engine.state.hits}</span>
-          <span class="pa-hud__score-sep">/</span>
-          <span class="pa-hud__score-total">{engine.state.hits + engine.state.misses}</span>
-        </div>
+        <LiveStats engine={engine} />
         <button
           class="pa-hud__icon-btn pa-hud__close"
           type="button"
@@ -381,18 +483,40 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
 
         <div
           class="pa-hud__loop"
-          classList={{ 'pa-hud__loop--on': engine.state.loopRegion !== null }}
+          classList={{
+            'pa-hud__loop--on': engine.state.loopRegion !== null,
+            'pa-hud__loop--mark': engine.state.loopMark !== null,
+          }}
         >
           <button
             class="pa-hud__pill pa-hud__pill--loop"
             type="button"
-            data-tip="Cycle loop presets (L)"
-            aria-label="Cycle loop presets"
+            data-tip={
+              engine.state.loopRegion
+                ? 'Clear loop (L)'
+                : engine.state.loopMark !== null
+                  ? 'Mark loop end (L)'
+                  : 'Mark loop start (L)'
+            }
+            aria-label={
+              engine.state.loopRegion
+                ? 'Clear loop'
+                : engine.state.loopMark !== null
+                  ? 'Mark loop end'
+                  : 'Mark loop start'
+            }
             aria-pressed={engine.state.loopRegion !== null}
-            onClick={() => props.onCycleLoop()}
+            onClick={() => props.onMarkLoop()}
           >
             <span innerHTML={LOOP_GLYPH} />
-            <span>Loop</span>
+            <span>
+              <Show
+                when={engine.state.loopRegion}
+                fallback={engine.state.loopMark !== null ? 'Mark B' : 'Loop'}
+              >
+                Loop
+              </Show>
+            </span>
             <Show when={engine.state.loopRegion}>
               {(region) => (
                 <span class="pa-hud__pill-sub">
@@ -401,7 +525,7 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
               )}
             </Show>
           </button>
-          <Show when={engine.state.loopRegion}>
+          <Show when={engine.state.loopRegion !== null || engine.state.loopMark !== null}>
             <button
               class="pa-hud__loop-clear"
               type="button"
