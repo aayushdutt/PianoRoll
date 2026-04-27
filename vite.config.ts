@@ -40,6 +40,13 @@ export default defineConfig({
     },
   },
   build: {
+    // 'hidden' emits .map files next to the .js bundles but omits the
+    // `//# sourceMappingURL=` comment, so prod users never download maps and
+    // their stack traces stay opaque from devtools. The PostHog CLI
+    // (`scripts/upload-sourcemaps.mjs`) reads those .map files at upload
+    // time, injects a chunk-id, and ships them to PostHog where they're paired
+    // with caught errors at view time.
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         // Force every pixi.js module into a single `pixi` chunk.

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "postbuild": "node scripts/build-content.mjs && node scripts/build-og.mjs && node scripts/stamp-sitemap.mjs && node scripts/check-links.mjs",
+    "postbuild": "node scripts/build-content.mjs && node scripts/build-og.mjs && node scripts/stamp-sitemap.mjs && node scripts/check-links.mjs && node scripts/upload-sourcemaps.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
+    "@posthog/cli": "^0.7.10",
     "@resvg/resvg-js": "^2.6.2",
     "@solidjs/testing-library": "^0.8.10",
     "jsdom": "^25.0.1",
