@@ -327,6 +327,8 @@ const ptBR: Messages = {
 
   'coachmark.learn.title': 'Pratique esta peça',
   'coachmark.learn.body': 'Avance nota por nota com o modo de espera.',
+  'coachmark.drag.title': 'Mova para onde quiser',
+  'coachmark.drag.body': 'Arraste esta alça para reposicionar os controles.',
   'coachmark.dismiss': 'Fechar',
 
   // ── MidiPickerModal ─────────────────────────────────────────

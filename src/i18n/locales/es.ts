@@ -327,6 +327,8 @@ const es: Messages = {
 
   'coachmark.learn.title': 'Practica esta pieza',
   'coachmark.learn.body': 'Avanza nota por nota con el modo de espera.',
+  'coachmark.drag.title': 'Muévelo a cualquier sitio',
+  'coachmark.drag.body': 'Arrastra este tirador para reubicar los controles.',
   'coachmark.dismiss': 'Cerrar',
 
   // ── MidiPickerModal ─────────────────────────────────────────

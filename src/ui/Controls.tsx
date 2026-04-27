@@ -8,8 +8,9 @@ import type { LiveLooperState } from '../midi/LiveLooper'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
 import type { AppMode } from '../store/state'
 import { watch } from '../store/watch'
+import { DragCoachmark } from './DragCoachmark'
 import { icons } from './icons'
-import { LearnCoachmark } from './LearnCoachmark'
+import { isLearnCoachmarkSeen, LearnCoachmark } from './LearnCoachmark'
 
 const SKIP_SECONDS = 10
 export const ZOOM_MIN = 80
@@ -746,6 +747,8 @@ export class Controls {
   private readonly setDimTopStrip: (v: boolean) => void
   private readonly setHudIdle: (v: boolean) => void
   private readonly setHudDragging: (v: boolean) => void
+  private readonly setHudHasDragged: (v: boolean) => void
+  private readonly hudHasDraggedSig: () => boolean
   private readonly sigHudPinned: () => boolean
   private readonly setHudPinnedSig: (v: boolean) => void
   private readonly setInstrumentLoadingSig: (v: boolean) => void
@@ -773,6 +776,11 @@ export class Controls {
     const [dimTopStrip, setDimTopStrip] = createSignal(false)
     const [hudIdle, setHudIdle] = createSignal(false)
     const [hudDragging, setHudDragging] = createSignal(false)
+    const [hudHasDragged, setHudHasDragged] = createSignal(loadHudHasDragged())
+    // Reactive mirror of the learn-coachmark "seen" flag so the drag
+    // coachmark's eligibility re-evaluates the moment Learn fires (the
+    // localStorage read alone is not reactive).
+    const [learnCoachmarkSeen, setLearnCoachmarkSeen] = createSignal(isLearnCoachmarkSeen())
     const [hudPinned, setHudPinned] = createSignal(false)
     const [instrumentLoading, setInstrumentLoading] = createSignal(false)
     const [keyHintCollapsed, setKeyHintCollapsed] = createSignal(loadKeyHintHidden())
@@ -799,6 +807,8 @@ export class Controls {
     this.setDimTopStrip = setDimTopStrip
     this.setHudIdle = setHudIdle
     this.setHudDragging = setHudDragging
+    this.setHudHasDragged = setHudHasDragged
+    this.hudHasDraggedSig = hudHasDragged
     this.sigHudPinned = hudPinned
     this.setHudPinnedSig = setHudPinned
     this.setInstrumentLoadingSig = setInstrumentLoading
@@ -847,6 +857,7 @@ export class Controls {
             eligible={() =>
               mode() === 'play' && hasFile() && status() !== 'loading' && status() !== 'exporting'
             }
+            onShow={() => setLearnCoachmarkSeen(true)}
           />
           <HudView
             mode={mode}
@@ -950,6 +961,23 @@ export class Controls {
             speed={speed}
             speedLabel={() => formatSpeed(speed())}
             zoom={zoom}
+          />
+          {/* Mounted *after* HudView so the `#hud-drag` anchor exists when
+              the coachmark's onMount looks it up. */}
+          <DragCoachmark
+            eligible={() =>
+              // Stagger behind the Learn coachmark so two bubbles don't fight
+              // for attention. Only show when the HUD is actually visible
+              // (drag handle lives on it) and the user hasn't already dragged.
+              learnCoachmarkSeen() &&
+              !hudHasDragged() &&
+              hasFile() &&
+              status() !== 'loading' &&
+              status() !== 'exporting' &&
+              (mode() === 'play' || mode() === 'live') &&
+              !hudIdle()
+            }
+            hasDragged={hudHasDragged}
           />
           <KeyHintView
             visible={() => mode() === 'live'}
@@ -1375,6 +1403,10 @@ export class Controls {
     this.hudDragOriginX = off.dx
     this.hudDragOriginY = off.dy
     this.setHudDragging(true)
+    if (!this.hudHasDraggedSig()) {
+      this.setHudHasDragged(true)
+      saveHudHasDragged()
+    }
     document.addEventListener('pointermove', this.onPointerMoveDoc)
     document.addEventListener('pointerup', this.onPointerUpDoc)
   }
@@ -1478,6 +1510,24 @@ function loadKeyHintHidden(): boolean {
 
 function saveKeyHintHidden(hidden: boolean): void {
   localStorage.setItem(KEY_HINT_HIDDEN_KEY, String(hidden))
+}
+
+const HUD_HAS_DRAGGED_KEY = 'midee.hudHasDragged'
+
+function loadHudHasDragged(): boolean {
+  try {
+    return localStorage.getItem(HUD_HAS_DRAGGED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveHudHasDragged(): void {
+  try {
+    localStorage.setItem(HUD_HAS_DRAGGED_KEY, '1')
+  } catch {
+    // Ignore — privacy mode just shows the coachmark again next session.
+  }
 }
 
 function loopLabel(state: LiveLooperState, layerCount: number): string {

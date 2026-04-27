@@ -361,6 +361,8 @@ export const en = {
   // First-encounter coachmark for the topbar's "Learn this MIDI" pill.
   'coachmark.learn.title': 'Practice this piece',
   'coachmark.learn.body': 'Step through note-by-note with wait-mode.',
+  'coachmark.drag.title': 'Move this anywhere',
+  'coachmark.drag.body': 'Drag this handle to reposition the controls.',
   'coachmark.dismiss': 'Dismiss',
 
   // ── MidiPickerModal ─────────────────────────────────────────
