@@ -473,6 +473,7 @@ function HudView(props: HudProps) {
             id="hud-metro-dec"
             type="button"
             aria-label={t('hud.aria.bpmDec')}
+            data-tip={t('hud.bpm')}
             onClick={() => props.onBpmDec()}
           >
             −
@@ -485,6 +486,7 @@ function HudView(props: HudProps) {
             id="hud-metro-inc"
             type="button"
             aria-label={t('hud.aria.bpmInc')}
+            data-tip={t('hud.bpm')}
             onClick={() => props.onBpmInc()}
           >
             +

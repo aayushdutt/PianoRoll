@@ -23,12 +23,13 @@ export interface SessionScore {
   wrongKey: number
   streak: number
   bestStreak: number
-  comboMultiplier: number
   totalPlayed: number
   consecutiveMisses: number // for lives-dots display
   phase: 'idle' | 'playing' | 'knockedOut' | 'complete'
   paused: boolean
   bpm: number // reactive copy updated in tick() when integer value changes
+  rampEnabled: boolean
+  noteGap: number // reactive copy of note spacing multiplier (1.0 = default)
 }
 
 export type TierKey = 'landmark' | 'c-major-1' | 'c-major-2' | 'grand-staff' | 'key-sigs' | 'arcade'

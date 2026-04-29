@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { generateNoteSource, MidiFileSource } from './generator'
+import { poolForClef } from './index'
+import type { TierConfig } from './types'
 
 function seq(values: readonly number[]): () => number {
   let i = 0
@@ -63,10 +65,6 @@ describe('generateNoteSource', () => {
   })
 
   it('stepwise path: second note is within ±2 pool indices of the first', () => {
-    // First call: no lastPitch, so stepwise is empty → Math.random NOT called.
-    // Second call: lastPitch exists → two Math.random calls:
-    //   1. stepwise check (need < 0.7)
-    //   2. weighted pick
     vi.spyOn(Math, 'random').mockImplementation(seq([0.1, 0.5]))
 
     const pool = [60, 62, 64, 65, 67]
@@ -75,13 +73,10 @@ describe('generateNoteSource', () => {
     const first = src.next()!
     expect(pool).toContain(first)
 
-    // Second call: lastPitch=first. First random 0.1 < 0.7 → stepwise path.
-    // Stepwise candidates from first's index ±2 (excl. first itself).
     const firstIdx = pool.indexOf(first)
-    const stepwiseRange = pool.slice(
-      Math.max(0, firstIdx - 2),
-      Math.min(pool.length, firstIdx + 3),
-    ).filter((p) => p !== first)
+    const stepwiseRange = pool
+      .slice(Math.max(0, firstIdx - 2), Math.min(pool.length, firstIdx + 3))
+      .filter((p) => p !== first)
 
     const second = src.next()!
     expect(stepwiseRange).toContain(second)
@@ -94,15 +89,12 @@ describe('generateNoteSource', () => {
     const src = generateNoteSource({ pitchPool: pool, sessionLength: 2 })
 
     const first = src.next()!
-    // Second call: random 0.9 >= 0.7 → full-pool path. Can be any note ≠ first.
     const second = src.next()!
     expect(second).not.toBe(first)
     expect(pool).toContain(second)
   })
 
   it('weakNoteFocus: focused note given 3× weight in weighted pick', () => {
-    // Pool: [60, 64, 67]. Focus 64 = 3×, others = 1×. Total weight = 5.
-    // r=0.5 → 5*0.5=2.5. i=0(60,w=1):2.5-1=1.5>0. i=1(64,w=3):1.5-3=-1.5≤0 → 64.
     vi.spyOn(Math, 'random').mockImplementation(seq([0.5]))
 
     const src = generateNoteSource({
@@ -135,11 +127,57 @@ describe('MidiFileSource', () => {
   it('progress reports correctly mid-sequence', () => {
     const src = new MidiFileSource([60, 64, 67])
     expect(src.progress).toBe(0)
-    src.next() // 60
+    src.next()
     expect(src.progress).toBeCloseTo(1 / 3)
-    src.next() // 64
+    src.next()
     expect(src.progress).toBeCloseTo(2 / 3)
-    src.next() // 67
+    src.next()
     expect(src.progress).toBe(1)
+  })
+})
+
+describe('poolForClef', () => {
+  function makeTier(pitchPool: number[], clef: 'treble' | 'bass' | 'both' = 'treble'): TierConfig {
+    return {
+      name: 'test',
+      pitchPool,
+      defaultBpm: 60,
+      sessionLength: 10,
+      clef,
+      keySignature: 'C',
+    }
+  }
+
+  it('treble: returns tier pitchPool unchanged', () => {
+    const tier = makeTier([60, 64, 67])
+    expect(poolForClef('treble', tier)).toEqual([60, 64, 67])
+  })
+
+  it('bass: transposes notes >= 60 down an octave', () => {
+    const tier = makeTier([60, 64, 67, 72])
+    expect(poolForClef('bass', tier)).toEqual([48, 52, 55, 60])
+  })
+
+  it('bass: preserves notes already in bass range', () => {
+    const tier = makeTier([48, 52, 64, 67])
+    expect(poolForClef('bass', tier)).toEqual([48, 52, 55])
+  })
+
+  it('both: combines tier pool with bass-transposed treble notes', () => {
+    const tier = makeTier([60, 64, 67])
+    expect(poolForClef('both', tier)).toEqual([48, 52, 55, 60, 64, 67])
+  })
+
+  it('both: does not duplicate notes already present', () => {
+    const tier = makeTier([48, 52, 60, 64, 67], 'both')
+    const result = poolForClef('both', tier)
+    expect(result).toEqual([48, 52, 55, 60, 64, 67])
+  })
+
+  it('all modes produce sorted output', () => {
+    const tier = makeTier([72, 60, 67, 64])
+    expect(poolForClef('treble', tier)).toEqual([60, 64, 67, 72])
+    expect(poolForClef('bass', tier)).toEqual([48, 52, 55, 60])
+    expect(poolForClef('both', tier)).toEqual([48, 52, 55, 60, 64, 67, 72])
   })
 })

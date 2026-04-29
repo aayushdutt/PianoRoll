@@ -2,6 +2,7 @@
 // Wires the SightReadingEngine, SightReadLayer, and SightReadHud together
 // and implements the Exercise interface consumed by the learn runner.
 
+import { batch } from 'solid-js'
 import type { BusNoteEvent } from '../../../core/input/InputBus'
 import { t } from '../../../i18n'
 import type { Exercise, ExerciseDescriptor } from '../../core/Exercise'
@@ -11,8 +12,23 @@ import { accuracy, computeXp } from '../../core/scoring'
 import { SightReadingEngine } from './engine'
 import { generateNoteSource, TIER_CONFIGS } from './generator'
 import { SightReadLayer } from './renderer'
-import type { TierKey } from './types'
+import type { ClefMode, TierConfig, TierKey } from './types'
 import { SightReadHud } from './ui'
+
+export function poolForClef(clef: ClefMode, tier: TierConfig): number[] {
+  if (clef === 'treble') return [...tier.pitchPool].sort((a, b) => a - b)
+
+  if (clef === 'bass') {
+    const bassNotes = tier.pitchPool.map((p) => (p >= 60 ? p - 12 : p))
+    return [...new Set(bassNotes)].sort((a, b) => a - b)
+  }
+
+  const pool = new Set(tier.pitchPool)
+  for (const p of tier.pitchPool) {
+    if (p >= 60) pool.add(p - 12)
+  }
+  return [...pool].sort((a, b) => a - b)
+}
 
 export const sightReadingDescriptor: ExerciseDescriptor = {
   id: 'sight-reading',
@@ -83,6 +99,19 @@ class SightReadingExercise implements Exercise {
       onPlayAgain: () => this._restart(),
       onPracticeWeak: (pitches) => this._restartWithFocus(pitches),
       onClose: () => this.ctx.onClose('abandoned'),
+      onRestart: () => this._restart(),
+      onClefChange: (clef) => {
+        this.staffLayer.setClef(clef)
+        this.staffLayer.resetDone()
+        this.staffLayer.activeKeys.clear()
+        const pool = poolForClef(clef, tier)
+        batch(() => {
+          this.engine.attach(
+            generateNoteSource({ pitchPool: pool, sessionLength: tier.sessionLength }),
+          )
+          this.engine.start()
+        })
+      },
     })
   }
 
@@ -95,7 +124,7 @@ class SightReadingExercise implements Exercise {
     // Attach note source and start engine.
     this.engine.attach(
       generateNoteSource({
-        pitchPool: tier.pitchPool,
+        pitchPool: poolForClef(tier.clef, tier),
         sessionLength: tier.sessionLength,
       }),
     )
@@ -181,28 +210,36 @@ class SightReadingExercise implements Exercise {
 
   private _restart(): void {
     const tier = TIER_CONFIGS[this.tierKey]
+    const clef = this.staffLayer.currentClef()
+    const pool = poolForClef(clef, tier)
     this.staffLayer.resetDone()
     this.staffLayer.activeKeys.clear()
-    this.engine.attach(
-      generateNoteSource({
-        pitchPool: tier.pitchPool,
-        sessionLength: tier.sessionLength,
-      }),
-    )
-    this.engine.start()
+    batch(() => {
+      this.engine.attach(
+        generateNoteSource({
+          pitchPool: pool,
+          sessionLength: tier.sessionLength,
+        }),
+      )
+      this.engine.start()
+    })
   }
 
   private _restartWithFocus(pitches: number[]): void {
     const tier = TIER_CONFIGS[this.tierKey]
+    const clef = this.staffLayer.currentClef()
+    const pool = poolForClef(clef, tier)
     this.staffLayer.resetDone()
     this.staffLayer.activeKeys.clear()
-    this.engine.attach(
-      generateNoteSource({
-        pitchPool: tier.pitchPool,
-        sessionLength: tier.sessionLength,
-        weakNoteFocus: pitches,
-      }),
-    )
-    this.engine.start()
+    batch(() => {
+      this.engine.attach(
+        generateNoteSource({
+          pitchPool: pool,
+          sessionLength: tier.sessionLength,
+          weakNoteFocus: pitches,
+        }),
+      )
+      this.engine.start()
+    })
   }
 }

@@ -102,6 +102,22 @@ export class SightReadLayer implements RenderLayer {
     this.doneEmitted = false
   }
 
+  /** Change clef and rebuild staff geometry immediately. */
+  setClef(clef: ClefMode): void {
+    if (this.config.clef === clef) return
+    this.config.clef = clef
+    if (this.w > 0 && this.rollH > 0) {
+      this._recomputeLayout()
+      this._drawStaticStaff()
+      this._rebuildClefTexts()
+    }
+  }
+
+  /** Current clef (used by exercise to build pitch pools on restart). */
+  currentClef(): ClefMode {
+    return this.config.clef
+  }
+
   updateConfig(config: Partial<SightReadLayerConfig>): void {
     Object.assign(this.config, config)
   }
@@ -211,11 +227,13 @@ export class SightReadLayer implements RenderLayer {
   // ── Layout ───────────────────────────────────────────────────────────────
 
   private _computeLayout(ctx: RenderContext): void {
-    const vp = ctx.viewport
-    this.w = vp.config.canvasWidth
-    this.rollH = vp.rollHeight
-    const rollH = this.rollH
+    this.w = ctx.viewport.config.canvasWidth
+    this.rollH = ctx.viewport.rollHeight
+    this._recomputeLayout()
+  }
 
+  private _recomputeLayout(): void {
+    const rollH = this.rollH
     this.lineSpacing = Math.min(22, Math.max(10, rollH * 0.036))
     const staffHeight = this.lineSpacing * 4
 

@@ -5,27 +5,11 @@ import type { EngineConfig, NoteSource, SessionScore, StreamNote } from './types
 
 export const KNOCKOUT_THRESHOLD = 10
 
-// Combo multiplier breakpoints: [minStreak, multiplier]
-const COMBO_TIERS: [number, number][] = [
-  [20, 4],
-  [10, 3],
-  [5, 2],
-  [0, 1],
-]
-
-function comboFor(streak: number): number {
-  for (const [min, mult] of COMBO_TIERS) {
-    if (streak >= min) return mult
-  }
-  return 1
-}
-
 // Duration → beat value mapping
 const BEAT_VALUES: Record<string, number> = {
   whole: 4,
   half: 2,
   quarter: 1,
-  eighth: 0.5,
 }
 
 // Pick a duration for a spawned note based on tempo.
@@ -43,12 +27,13 @@ const INITIAL_SCORE: SessionScore = {
   wrongKey: 0,
   streak: 0,
   bestStreak: 0,
-  comboMultiplier: 1,
   totalPlayed: 0,
   consecutiveMisses: 0,
   phase: 'idle',
   paused: false,
   bpm: 0,
+  rampEnabled: false,
+  noteGap: 1,
 }
 
 export class SightReadingEngine {
@@ -61,6 +46,14 @@ export class SightReadingEngine {
   bpm: number
   started = false
   paused = false
+
+  // Ramp mode — user-toggleable, increases BPM over time.
+  rampEnabled = false
+  private rampRate: number
+
+  // Note spacing multiplier — user-adjustable, persists across restarts.
+  noteGap = 1
+  private userNoteGap: number | null = null
 
   // Per-pitch hit/miss tracking for weak-note analysis. Updated in noteOn()
   // and _recordMiss(). Keyed by MIDI pitch.
@@ -76,6 +69,8 @@ export class SightReadingEngine {
 
   constructor(config: EngineConfig) {
     this.config = config
+    this.rampRate = config.bpmRamp
+    this.rampEnabled = config.bpmRamp > 0
     this.bpm = config.bpm
     const [state, setState] = createStore<SessionScore>({ ...INITIAL_SCORE, bpm: config.bpm })
     this.state = state
@@ -87,13 +82,16 @@ export class SightReadingEngine {
     this.notes = []
     this.time = 0
     this.bpm = this.userBpm ?? this.config.bpm
+    this.noteGap = this.userNoteGap ?? 1
+    this.rampEnabled = this.config.bpmRamp > 0
+    this.rampRate = this.config.bpmRamp
     this.nextNoteTime = this.config.lookAheadBeats * (60 / this.bpm)
     this.noteIdCounter = 0
     this.started = false
     this.paused = false
     this.noteStats.clear()
     batch(() => {
-      this.write({ ...INITIAL_SCORE, bpm: this.bpm })
+      this.write({ ...INITIAL_SCORE, bpm: this.bpm, noteGap: this.noteGap })
     })
   }
 
@@ -103,6 +101,23 @@ export class SightReadingEngine {
     this.userBpm = clamped
     this.bpm = clamped
     this.write({ bpm: clamped })
+  }
+
+  /** Set note spacing multiplier, clamped to [0.3, 2.5]. Persists across restarts. */
+  setNoteGap(gap: number): void {
+    const clamped = Math.max(0.3, Math.min(2.5, Math.round(gap * 20) / 20))
+    this.userNoteGap = clamped
+    this.noteGap = clamped
+    this.write({ noteGap: clamped })
+  }
+
+  /** Toggle tempo ramp. When enabled, BPM increases at `rampRate` BPM/sec. */
+  setRamp(enabled: boolean): void {
+    this.rampEnabled = enabled
+    if (enabled && this.rampRate <= 0) {
+      this.rampRate = 0.2
+    }
+    this.write({ rampEnabled: enabled })
   }
 
   pause(): void {
@@ -131,11 +146,13 @@ export class SightReadingEngine {
     if (!this.started || this.paused) return
     if (this.state.phase === 'knockedOut' || this.state.phase === 'complete') return
 
-    // Ramp BPM for arcade mode.
-    const prevBpmInt = Math.round(this.bpm)
-    this.bpm = Math.min(this.config.maxBpm, this.bpm + this.config.bpmRamp * dt)
-    if (Math.round(this.bpm) !== prevBpmInt) {
-      this.write({ bpm: this.bpm })
+    // Ramp BPM when ramp mode is enabled.
+    if (this.rampEnabled) {
+      const prevBpmInt = Math.round(this.bpm)
+      this.bpm = Math.min(this.config.maxBpm, this.bpm + this.rampRate * dt)
+      if (Math.round(this.bpm) !== prevBpmInt) {
+        this.write({ bpm: this.bpm })
+      }
     }
 
     this.time += dt
@@ -149,9 +166,7 @@ export class SightReadingEngine {
   private _spawnNotes(): void {
     if (!this.source || this.source.done) return
     const lookAheadSec = this.config.lookAheadBeats * (60 / this.bpm)
-    // Each note is spaced at least 0.35 s apart; at higher BPM the spacing
-    // narrows to 1.2 beats to keep visual density consistent.
-    const noteInterval = Math.max(0.35, 1.2 * (60 / this.bpm))
+    const noteInterval = Math.max(0.35, this.noteGap * 1.2 * (60 / this.bpm))
 
     while (this.nextNoteTime < this.time + lookAheadSec) {
       const midi = this.source.next()
@@ -172,8 +187,6 @@ export class SightReadingEngine {
   }
 
   private _updateNoteStates(): void {
-    let missOccurred = false
-
     for (const note of this.notes) {
       if (note.state !== 'approaching' && note.state !== 'in-window') continue
 
@@ -183,13 +196,8 @@ export class SightReadingEngine {
       } else if (delta > LATE_HIT_WINDOW_SEC) {
         note.state = 'missed'
         note.missTime = this.time
-        missOccurred = true
         this._recordMiss(note.midi)
       }
-    }
-
-    if (missOccurred && this.state.phase === 'playing') {
-      // Phase change to knockedOut handled inside _recordMiss via the store.
     }
   }
 
@@ -205,7 +213,6 @@ export class SightReadingEngine {
       this.write({
         missed: this.state.missed + 1,
         streak: 0,
-        comboMultiplier: 1,
         consecutiveMisses: newConsecutive,
         phase: knocked ? 'knockedOut' : this.state.phase,
       })
@@ -270,7 +277,6 @@ export class SightReadingEngine {
             hitVerdict === 'perfect' ? this.state.perfect + 1 : this.state.good + 1,
           streak: newStreak,
           bestStreak: Math.max(this.state.bestStreak, newStreak),
-          comboMultiplier: comboFor(newStreak),
           totalPlayed: this.state.totalPlayed + 1,
           consecutiveMisses: 0,
         })
@@ -284,7 +290,6 @@ export class SightReadingEngine {
       this.write({
         wrongKey: this.state.wrongKey + 1,
         streak: 0,
-        comboMultiplier: 1,
       })
     })
     return 'wrong'

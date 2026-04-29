@@ -267,4 +267,100 @@ describe('SightReadingEngine', () => {
       expect(engine.state.phase).not.toBe('knockedOut')
     })
   })
+
+  describe('ramp state', () => {
+    it('resets to config defaults on attach', () => {
+      const engine = new SightReadingEngine(makeConfig({ bpmRamp: 0.5 }))
+      engine.attach(makeSource([60]))
+      // Arcade-style config (bpmRamp > 0) auto-enables ramp.
+      expect(engine.rampEnabled).toBe(true)
+
+      // Manually toggle off, then restart.
+      engine.setRamp(false)
+      expect(engine.rampEnabled).toBe(false)
+
+      engine.attach(makeSource([60]))
+      // After attach, rampEnabled should reset to config default (true for bpmRamp > 0).
+      expect(engine.rampEnabled).toBe(true)
+    })
+
+    it('stays disabled for practice-mode configs after attach', () => {
+      const engine = new SightReadingEngine(makeConfig({ bpmRamp: 0 }))
+      engine.attach(makeSource([60]))
+      expect(engine.rampEnabled).toBe(false)
+
+      engine.setRamp(true) // user enables ramp
+      expect(engine.rampEnabled).toBe(true)
+      expect(engine.state.rampEnabled).toBe(true)
+
+      engine.attach(makeSource([60]))
+      // After attach with bpmRamp=0, ramp should be off again.
+      expect(engine.rampEnabled).toBe(false)
+      expect(engine.state.rampEnabled).toBe(false)
+    })
+
+    it('rampRate resets to config value on attach', () => {
+      const engine = new SightReadingEngine(makeConfig({ bpmRamp: 0.5 }))
+      expect(engine.rampEnabled).toBe(true)
+
+      // User disables ramp (sets rate to 0.2 via setRamp)
+      engine.setRamp(false)
+      engine.setRamp(true)
+      // After toggling on a config with bpmRamp=0.5, rate stays 0.5
+      // (setRamp only overrides when config rate is 0)
+      engine.attach(makeSource([60]))
+      // Should reset to config.bpmRamp = 0.5
+      expect(engine.rampEnabled).toBe(true)
+    })
+  })
+
+  describe('note gap', () => {
+    it('noteGap default is 1 and persists across attach', () => {
+      const engine = new SightReadingEngine(makeConfig())
+      engine.attach(makeSource([60]))
+      expect(engine.noteGap).toBe(1)
+      expect(engine.state.noteGap).toBe(1)
+
+      engine.setNoteGap(1.5)
+      expect(engine.noteGap).toBe(1.5)
+
+      engine.attach(makeSource([60]))
+      // noteGap persists across restarts (like userBpm).
+      expect(engine.noteGap).toBe(1.5)
+      expect(engine.state.noteGap).toBe(1.5)
+    })
+
+    it('setNoteGap clamps to [0.3, 2.5]', () => {
+      const engine = new SightReadingEngine(makeConfig())
+      engine.attach(makeSource([60]))
+
+      engine.setNoteGap(0.1)
+      expect(engine.noteGap).toBe(0.3)
+
+      engine.setNoteGap(10)
+      expect(engine.noteGap).toBe(2.5)
+    })
+
+    it('noteGap affects spawned note interval', () => {
+      const engine = new SightReadingEngine(makeConfig({ bpm: 60 }))
+      engine.attach(makeSource([60, 62, 64, 65, 67]))
+      engine.start()
+
+      // With noteGap = 1: interval = max(0.35, 1 * 1.2 * (60/60)) = 1.2s.
+      expect(engine.noteGap).toBe(1)
+      engine.tick(0.01)
+      expect(engine.notes.length).toBe(1)
+
+      // Advance time so the first note reaches the now-line. New notes will
+      // be spawned to fill the look-ahead buffer.
+      const firstNoteTime = engine.notes[0]!.time
+      engine.tick(firstNoteTime - engine.time)
+
+      // Multiple notes should now be in the buffer.
+      expect(engine.notes.length).toBeGreaterThanOrEqual(3)
+
+      const firstDelta = engine.notes[1]!.time - engine.notes[0]!.time
+      expect(firstDelta).toBeCloseTo(1.2, 1)
+    })
+  })
 })

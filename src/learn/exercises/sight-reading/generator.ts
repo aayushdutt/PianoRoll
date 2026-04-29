@@ -8,7 +8,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
   landmark: {
     name: 'Landmark Notes',
     pitchPool: [60, 64, 67, 72], // C4, E4, G4, C5
-    defaultBpm: 52,
+    defaultBpm: 48,
     sessionLength: 20,
     clef: 'treble',
     keySignature: 'C',
@@ -16,7 +16,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
   'c-major-1': {
     name: 'C Major — One Octave',
     pitchPool: [60, 62, 64, 65, 67, 69, 71, 72], // C4–C5 white keys
-    defaultBpm: 58,
+    defaultBpm: 54,
     sessionLength: 30,
     clef: 'treble',
     keySignature: 'C',
@@ -24,7 +24,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
   'c-major-2': {
     name: 'C Major — Two Octaves',
     pitchPool: [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84], // C4–C6 white keys
-    defaultBpm: 65,
+    defaultBpm: 60,
     sessionLength: 40,
     clef: 'treble',
     keySignature: 'C',
@@ -39,7 +39,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
       // Treble: C5-C6
       72, 74, 76, 77, 79, 81, 83, 84,
     ],
-    defaultBpm: 60,
+    defaultBpm: 56,
     sessionLength: 40,
     clef: 'both',
     keySignature: 'C',
@@ -48,7 +48,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
     name: 'Key Signatures',
     // G major: G3 A3 B3 C4 D4 E4 F#4 G4 A4 B4 C5 D5 E5 F#5 G5
     pitchPool: [55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74, 76, 78, 79],
-    defaultBpm: 65,
+    defaultBpm: 60,
     sessionLength: 40,
     clef: 'treble',
     keySignature: 'G',
@@ -56,7 +56,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
   arcade: {
     name: 'Arcade',
     pitchPool: [60, 62, 64, 65, 67, 69, 71, 72], // C major, starts simple
-    defaultBpm: 60,
+    defaultBpm: 55,
     sessionLength: Infinity, // until knockout
     clef: 'treble',
     keySignature: 'C',

@@ -6981,49 +6981,202 @@ body.canvas-hidden #kbd-resizer {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* BPM control */
-.sr-hud__bpm {
-  display: flex;
+/* BPM pill — integrated compound control matching live-mode metronome style */
+.sr-hud__bpm-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  height: 30px;
+  padding: 2px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
-.sr-hud__bpm-btn {
-  width: 24px;
+.sr-hud__bpm-pill:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.sr-hud__bpm-step {
+  width: 18px;
   height: 24px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 15px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 5px;
   transition:
-    background 0.15s,
-    color 0.15s;
+    color 0.12s,
+    background 0.12s,
+    transform 0.1s var(--ease-spring);
 }
-.sr-hud__bpm-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+.sr-hud__bpm-step:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
 }
-.sr-hud__bpm-btn:active {
-  background: rgba(255, 255, 255, 0.16);
+.sr-hud__bpm-step:active {
+  transform: scale(0.9);
 }
+
 .sr-hud__bpm-val {
-  font-size: 15px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--accent, #ffc83c);
   min-width: 34px;
   text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  padding: 0 4px;
+  user-select: none;
 }
-.sr-hud__bpm-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.3);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+
+/* Note gap slider — compact group with icon + range to visually distinguish from BPM */
+.sr-hud__gap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sr-hud__gap-icon {
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sr-hud__gap-slider {
+  width: 48px;
+}
+
+.sr-hud__gap-val {
+  min-width: 30px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  user-select: none;
+}
+
+/* Pause / resume toggle — matches btn-play / pa-hud__play circular accent-filled style */
+.sr-hud__pause-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0a14;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    0 4px 14px -4px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.25) inset;
+  transition: transform 0.12s var(--ease-spring);
+  flex-shrink: 0;
+}
+.sr-hud__pause-btn:hover {
+  transform: scale(1.08);
+}
+.sr-hud__pause-btn:active {
+  transform: scale(0.94);
+}
+.sr-hud__pause-btn--paused {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+.sr-hud__pause-btn--paused:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Tempo ramp toggle */
+.sr-hud__ramp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.45);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.sr-hud__ramp-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.sr-hud__ramp-btn--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent, #ffc83c);
+}
+.sr-hud__ramp-btn--on:hover {
+  filter: brightness(1.08);
+}
+.sr-hud__ramp-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.sr-hud__ramp-label {
+  line-height: 1;
+}
+
+/* Clef selector — same pill style as ramp, cycles Treble / Bass / Both */
+.sr-hud__clef-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.sr-hud__clef-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.sr-hud__clef-icon {
+  font-size: 14px;
+  line-height: 1;
+  font-family: serif;
+}
+.sr-hud__clef-label {
+  line-height: 1;
 }
 
 /* Accuracy chip */
@@ -7033,6 +7186,27 @@ body.canvas-hidden #kbd-resizer {
   color: rgba(255, 255, 255, 0.8);
   min-width: 34px;
   text-align: center;
+}
+
+/* Restart button */
+.sr-hud__restart-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.sr-hud__restart-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* Close button */
@@ -7054,64 +7228,6 @@ body.canvas-hidden #kbd-resizer {
 .sr-hud__close:hover {
   background: rgba(255, 255, 255, 0.07);
   color: rgba(255, 255, 255, 0.7);
-}
-
-/* ─── Sight-reading pause overlay ──────────────────────── */
-
-.sr-pause {
-  pointer-events: auto;
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  font-family: var(--font, system-ui, sans-serif);
-}
-.sr-pause__card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  color: #e8e0d0;
-}
-.sr-pause__label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.4);
-  text-transform: uppercase;
-}
-.sr-pause__resume {
-  background: var(--accent, #ffc83c);
-  color: #14120e;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 36px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  letter-spacing: 0.02em;
-  transition: filter 0.15s;
-}
-.sr-pause__resume:hover {
-  filter: brightness(1.08);
-}
-.sr-pause__hint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.22);
-}
-.sr-pause__kbd {
-  font-size: 10px;
-  opacity: 0.75;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-family: inherit;
 }
 
 /* ─── Sight-reading end panel ───────────────────────────── */
