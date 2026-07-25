@@ -78,16 +78,8 @@ async function boot(): Promise<void> {
   // `?bench=...` URLs are inert in prod. Read `import.meta.env` directly (not
   // through env.ts) so the value is statically inlined for the dead-code pass.
   if (import.meta.env.VITE_ENABLE_BENCH) {
-    const { benchFixtureFromUrl, runBench } = await import('./bench/runner')
-    const fixture = benchFixtureFromUrl()
-    if (fixture) {
-      try {
-        window.__BENCH_RESULT = await runBench(fixture, ctx)
-      } catch (err) {
-        window.__BENCH_ERROR = err instanceof Error ? err.message : String(err)
-        console.error('[bench]', err)
-      }
-    }
+    const { maybeRunBench } = await import('./bench/runner')
+    await maybeRunBench(ctx)
   }
 }
 

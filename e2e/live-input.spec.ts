@@ -35,7 +35,7 @@ import { expect, type Page, test } from '@playwright/test'
 // Determinism: we never assert wall-clock timing. We rely on Playwright auto-waiting
 // (toHaveText) for the readout to settle. Tolerances are generous.
 
-const EMPTY_PLACEHOLDER = '—'
+const EMPTY_PLACEHOLDER = '-'
 
 async function focusBodyForKeys(page: Page): Promise<void> {
   // Focus the body so key events land on `window` and aren't ignored by
@@ -86,7 +86,7 @@ test.describe('Live input (computer keyboard)', () => {
     // shared CI runners (the readout can settle on a partial chord). The single
     // held-key test above proves the live-capture wiring; chord *detection* is
     // unit-tested in ChordDetector.test.ts. Run this one locally with E2E_HEAVY=1.
-    test.skip(!process.env.E2E_HEAVY, 'multi-key timing-fragile on CI — run with E2E_HEAVY=1')
+    test.skip(!process.env.E2E_HEAVY, 'multi-key timing-fragile on CI - run with E2E_HEAVY=1')
     await openAppInLiveMode(page)
 
     const tonic = page.locator('#ts-chord-readout .ts-chord-readout-tonic')

@@ -15,7 +15,7 @@ If you've searched for "Synthesia alternative" you probably want one of two thin
 
 Synthesia is great at what it does, but it's a native Windows/Mac/iOS/Android app focused on learning. **[midee](/)** is the browser-native alternative: a free, open-source MIDI player, visualizer, live instrument, practice trainer, loop station, recorder, and MP4 exporter.
 
-This page is a genuine comparison, not a hatchet job — Synthesia is the right choice for plenty of people. Here's how the two differ and when each makes sense.
+This page is a genuine comparison, not a hatchet job - Synthesia is the right choice for plenty of people. Here's how the two differ and when each makes sense.
 
 ## Quick comparison
 
@@ -24,7 +24,7 @@ This page is a genuine comparison, not a hatchet job — Synthesia is the right 
 | Platform | Windows, macOS, iOS, Android | Any browser (Chrome, Safari, Firefox) |
 | Cost | Free built-in songs; paid desktop unlock for custom MIDIs | **Free, forever** |
 | Open source | No | Yes, MIT license |
-| Install required | Yes | No — just visit the URL |
+| Install required | Yes | No - just visit the URL |
 | Primary focus | Learning to play the piano | Browser MIDI playback, live play, learning, looping, and export |
 | Falling-notes display | Yes | Yes |
 | Wait-mode play-along | Yes | Yes |
@@ -41,7 +41,7 @@ This page is a genuine comparison, not a hatchet job — Synthesia is the right 
 
 Synthesia is the established tool in the category and there are real reasons to use it:
 
-- **"Falling notes" for learning.** Synthesia was built around the teach-yourself-piano use case. The scoring, the left/right-hand split view, the wait-for-you mode — all of that is polished and tested.
+- **"Falling notes" for learning.** Synthesia was built around the teach-yourself-piano use case. The scoring, the left/right-hand split view, the wait-for-you mode - all of that is polished and tested.
 - **Offline-first native app.** Once installed, you don't need a browser or an internet connection. If you teach piano lessons in a basement studio with spotty Wi-Fi, that matters.
 - **Library of ready-to-play songs.** 150+ songs ship built-in; more are available for purchase.
 - **Mature iPad and Android apps.** If your practice setup is iPad-only, Synthesia is ahead.
@@ -50,10 +50,10 @@ If learning piano is the main thing, Synthesia is probably the right fit.
 
 ## Where midee fits
 
-midee didn't start as a Synthesia clone — it started because there was no browser-native tool that turned a MIDI into a nice-looking video without uploading anything or installing anything.
+midee didn't start as a Synthesia clone - it started because there was no browser-native tool that turned a MIDI into a nice-looking video without uploading anything or installing anything.
 
 - **Zero install.** Open [midee.app](/) and it's running. No account, no download. If you want to share a link with a friend who's never heard of it, they can try it in five seconds.
-- **Built-in MP4 export.** This is the thing Synthesia doesn't do. Hit record inside midee and you get a frame-accurate 1080p MP4 with audio baked in. 720p, 1080p, vertical for TikTok and Reels, square, or native resolution. Rendered locally in your browser via WebCodecs — no server, no upload.
+- **Built-in MP4 export.** This is the thing Synthesia doesn't do. Hit record inside midee and you get a frame-accurate 1080p MP4 with audio baked in. 720p, 1080p, vertical for TikTok and Reels, square, or native resolution. Rendered locally in your browser via WebCodecs - no server, no upload.
 - **Beautiful out of the box.** Five themes (Dark, Midnight, Neon, Sunset, Ocean), sampled piano plus multiple synth and acoustic voices, and a rotating roster of particle styles. Your picks persist across reloads.
 - **Learn mode.** Drop a MIDI into play-along practice, turn on wait mode, slow it down, focus hands, loop hard sections, and track accuracy. Learn also includes sight reading and interval training.
 - **Free and open source.** MIT-licensed. No paywall, no unlock code for custom MIDIs. The [source code is on GitHub](https://github.com/aayushdutt/midee) and PRs are welcome.
@@ -78,7 +78,7 @@ Use **midee** if:
 - You value open source, no watermark, no account, fully client-side.
 - You want to jam on your MIDI controller without firing up a DAW.
 
-The two tools don't cancel each other out — plenty of piano learners use Synthesia to practice and midee to render a final "here's what I've been working on" clip.
+The two tools don't cancel each other out - plenty of piano learners use Synthesia to practice and midee to render a final "here's what I've been working on" clip.
 
 ## Common questions
 

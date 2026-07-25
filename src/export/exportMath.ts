@@ -8,6 +8,7 @@
 
 import type { MidiFile } from '../core/midi/types'
 import type { ExportResolution, ExportSpeed } from '../ui/ExportModal'
+import type { ExportStage } from './VideoExporter'
 
 // Scans the MIDI's notes for min/max pitch and pads outward by a few keys so
 // the visible range feels natural rather than clipping right at the extremes.
@@ -107,6 +108,66 @@ export function resolveExportDims(
     case 'match':
       return null
   }
+}
+
+// ── Staged progress ─────────────────────────────────────────────────────────
+// Maps each encoder stage onto a fixed window of ONE overall progress bar, plus
+// a "Step k of N" position. The old per-stage bar reset to 0% on every stage
+// change, which read as "stuck in a loop" — PostHog showed a 24.5 s median
+// cancel time. Window sizes are rough wall-clock weights; exactness doesn't
+// matter because the bar is clamped monotonic by the caller. Only the modes
+// that show a progress card appear here ('midi' downloads instantly).
+
+export type ProgressMode = 'av' | 'video-only' | 'audio-only'
+
+export interface StageWindow {
+  step: number
+  totalSteps: number
+  from: number // overall-bar fraction where this stage begins
+  to: number // …and ends
+}
+
+const STAGE_WINDOWS: Record<ProgressMode, Partial<Record<ExportStage, StageWindow>>> = {
+  av: {
+    'Rendering audio': { step: 1, totalSteps: 3, from: 0, to: 0.2 },
+    'Encoding audio': { step: 1, totalSteps: 3, from: 0.2, to: 0.25 },
+    Encoding: { step: 2, totalSteps: 3, from: 0.25, to: 0.93 },
+    Finalizing: { step: 3, totalSteps: 3, from: 0.93, to: 0.98 },
+    Saving: { step: 3, totalSteps: 3, from: 0.98, to: 1 },
+    Done: { step: 3, totalSteps: 3, from: 1, to: 1 },
+  },
+  'video-only': {
+    Encoding: { step: 1, totalSteps: 2, from: 0, to: 0.9 },
+    Finalizing: { step: 2, totalSteps: 2, from: 0.9, to: 0.98 },
+    Saving: { step: 2, totalSteps: 2, from: 0.98, to: 1 },
+    Done: { step: 2, totalSteps: 2, from: 1, to: 1 },
+  },
+  'audio-only': {
+    'Rendering audio': { step: 1, totalSteps: 2, from: 0, to: 0.85 },
+    Saving: { step: 2, totalSteps: 2, from: 0.85, to: 1 },
+    Done: { step: 2, totalSteps: 2, from: 1, to: 1 },
+  },
+}
+
+// Total-range fallback for stage/mode combos that shouldn't occur (e.g. an
+// 'av' export whose audio render failed skips 'Encoding audio') — the bar
+// stays sane instead of throwing mid-export.
+export function stageWindow(mode: ProgressMode, stage: ExportStage): StageWindow {
+  return STAGE_WINDOWS[mode][stage] ?? { step: 1, totalSteps: 1, from: 0, to: 1 }
+}
+
+// Overall-bar position for a per-stage fraction. Callers clamp monotonic.
+export function overallProgress(mode: ProgressMode, stage: ExportStage, pct: number): number {
+  const w = stageWindow(mode, stage)
+  const clamped = Math.min(1, Math.max(0, pct))
+  return w.from + clamped * (w.to - w.from)
+}
+
+// Stage-local ETA in seconds, or null while the estimate would still be junk
+// (too early in the stage for the rate to have stabilised).
+export function stageEtaSeconds(elapsedMs: number, pct: number): number | null {
+  if (pct < 0.04 || elapsedMs < 3000) return null
+  return ((elapsedMs / 1000) * (1 - pct)) / pct
 }
 
 // H.264 bitrate per preset. Lower than YouTube's recommendations but tuned

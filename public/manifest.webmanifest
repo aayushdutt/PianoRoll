@@ -1,7 +1,7 @@
 {
-  "name": "midee — MIDI visualizer",
+  "name": "midee - MIDI visualizer",
   "short_name": "midee",
-  "description": "Free, open-source MIDI visualizer in the browser. Drop a MIDI file, play live with a controller, loop, record, and export as 1080p MP4 — fully client-side.",
+  "description": "Free, open-source MIDI visualizer in the browser. Drop a MIDI file, play live with a controller, loop, record, and export as 1080p MP4 - fully client-side.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

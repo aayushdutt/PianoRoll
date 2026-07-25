@@ -18,7 +18,7 @@ const es: Messages = {
   'home.midi.ready': 'Dispositivo MIDI listo',
   'home.midi.blocked': 'Activa MIDI desde la barra superior',
   'home.midi.unavailable': 'Web MIDI no disponible en este navegador',
-  'home.midi.disconnected': 'Sin dispositivo MIDI — el teclado y el ratón también funcionan',
+  'home.midi.disconnected': 'Sin dispositivo MIDI - el teclado y el ratón también funcionan',
   'home.metaLink.blog': 'Leer el blog',
   'home.metaLink.github': 'Código en GitHub',
   'home.metaLink.discord': 'Únete a la comunidad de Discord',
@@ -84,7 +84,7 @@ const es: Messages = {
   'hud.loopSave': 'Descargar bucle como MIDI',
   'hud.loopClear': 'Borrar bucle',
   'hud.drag': 'Arrastra para mover los controles',
-  'hud.pin': 'Fijar — evita el ocultado automático',
+  'hud.pin': 'Fijar - evita el ocultado automático',
   'hud.close': 'Ocultar controles',
   'hud.reopen': 'Mostrar controles',
   'hud.volume': 'Volumen',
@@ -160,11 +160,11 @@ const es: Messages = {
   'export.focus.all.tip': 'Mostrar las 88 teclas completas',
   'export.speedLabel': 'Velocidad',
   'export.speed.compact': 'Compacto',
-  'export.speed.compact.tip': 'Compacto — más notas en pantalla a la vez',
+  'export.speed.compact.tip': 'Compacto - más notas en pantalla a la vez',
   'export.speed.standard': 'Estándar',
   'export.speed.standard.tip': 'Ritmo predeterminado',
   'export.speed.drama': 'Drama',
-  'export.speed.drama.tip': 'Caída lenta — cinematográfico',
+  'export.speed.drama.tip': 'Caída lenta - cinematográfico',
   'export.start': 'Iniciar exportación',
   'export.action': 'Exportar',
   'export.cancel': 'Cancelar',
@@ -184,25 +184,34 @@ const es: Messages = {
   'export.stage.finalizing': 'Finalizando',
   'export.stage.saving': 'Guardando',
   'export.stage.done': 'Listo',
+  'export.step': 'Paso {step} de {total}',
+  'export.eta.minutes': '~{min} min restantes',
+  'export.eta.soon': 'menos de un minuto restante',
+  'export.error.title': 'Error en la exportación',
+  'export.error.close': 'Cerrar',
+  'export.error.retry720': 'Reintentar en 720p',
+  'export.preset.lowMemory.hint': 'puede quedarse sin memoria en este dispositivo',
 
   // ── Errors ─────────────────────────────────────────────────
-  'error.midi.parseFailed': 'No se pudo leer ese archivo — asegúrate de que sea un MIDI válido.',
+  'error.midi.parseFailed': 'No se pudo leer ese archivo - asegúrate de que sea un MIDI válido.',
   'error.midi.empty': 'Ese MIDI no contiene notas.',
   'error.midi.permissionBlocked':
     'MIDI está bloqueado. Haz clic en el icono 🔒 de la barra de direcciones → Configuración del sitio → permite MIDI, luego recarga.',
   'error.midi.permissionDenied':
     'Permiso MIDI denegado. Vuelve a hacer clic, o actívalo en el icono 🔒 de la barra de direcciones.',
   'error.sample.fetchFailed':
-    'No se pudo cargar ese ejemplo — comprueba tu conexión y vuelve a intentarlo.',
-  'error.audio.renderFailed': 'Falló el renderizado de audio — el MP4 será silencioso.',
-  'error.export.generic': 'Falló la exportación — revisa la consola para más detalles.',
+    'No se pudo cargar ese ejemplo - comprueba tu conexión y vuelve a intentarlo.',
+  'error.audio.renderFailed': 'Falló el renderizado de audio - el MP4 será silencioso.',
+  'error.export.generic': 'Falló la exportación - revisa la consola para más detalles.',
+  'error.export.gpuLost':
+    'Se perdió el contexto gráfico durante la exportación - prueba una resolución más baja.',
 
   // ── Mode error boundary ────────────────────────────────────
   'modeError.title': 'Algo salió mal',
   'modeError.retry': 'Reintentar',
 
   // ── Document title ──────────────────────────────────────────
-  'doc.title.home': 'midee — suelta un MIDI, míralo cantar',
+  'doc.title.home': 'midee - suelta un MIDI, míralo cantar',
   'doc.title.live': 'midee · en vivo',
   'doc.title.learn': 'midee · aprender',
 
@@ -222,13 +231,13 @@ const es: Messages = {
 
   'learn.exercise.intervals.title': 'Intervalos',
   'learn.exercise.intervals.blurb':
-    'Escucha dos notas y nombra la distancia entre ellas. Conjunto inicial — M3, P4, P5, octava.',
+    'Escucha dos notas y nombra la distancia entre ellas. Conjunto inicial - M3, P4, P5, octava.',
   'learn.exercise.playAlong.title': 'Tocar junto',
   'learn.exercise.playAlong.blurb':
     'Suelta un MIDI y toca con él. El modo de espera pausa en cada acorde hasta que pulsas las notas correctas.',
   'learn.exercise.sightReading.title': 'Lectura a vista',
   'learn.exercise.sightReading.blurb':
-    'Las notas pasan por la línea — lee el pentagrama y presiona la tecla correcta a tiempo.',
+    'Las notas pasan por la línea - lee el pentagrama y presiona la tecla correcta a tiempo.',
 
   // Sight-reading HUD.
   'learn.sr.pause': 'Pause',
@@ -239,7 +248,7 @@ const es: Messages = {
   'learn.sr.clefBass': 'Bass',
   'learn.sr.clefBoth': 'Both',
   'learn.sr.clefAria': 'Clef: {clef}',
-  'learn.sr.clefTip': '{clef} — click to change',
+  'learn.sr.clefTip': '{clef} - click to change',
   'learn.sr.bpmDecAria': 'Decrease tempo',
   'learn.sr.bpmDecTip': 'Decrease tempo: scroll down or click',
   'learn.sr.bpmIncAria': 'Increase tempo',
@@ -248,8 +257,8 @@ const es: Messages = {
   'learn.sr.gapAria': 'Note gap',
   'learn.sr.gapTip': 'Note gap: spacing between notes',
   'learn.sr.rampAria': 'Tempo ramp',
-  'learn.sr.rampOnTip': 'Ramp on — BPM increases',
-  'learn.sr.rampOffTip': 'Ramp off — steady tempo',
+  'learn.sr.rampOnTip': 'Ramp on - BPM increases',
+  'learn.sr.rampOffTip': 'Ramp off - steady tempo',
   'learn.sr.rampLabel': 'Ramp',
   'learn.sr.accuracyTip': 'Accuracy',
   'learn.sr.restartAria': 'Restart session',
@@ -278,7 +287,7 @@ const es: Messages = {
   'learn.intervals.streakInRow': '🔥 {n} seguidos',
   'learn.intervals.listen': 'Escucha',
   'learn.intervals.listenHint':
-    'Pulsa reproducir para oír dos notas — elige el intervalo que acabas de escuchar.',
+    'Pulsa reproducir para oír dos notas - elige el intervalo que acabas de escuchar.',
   'learn.intervals.playAria': 'Reproducir intervalo',
   'learn.intervals.playTip': 'Repetir (Espacio)',
   'learn.intervals.playLabel': 'Reproducir intervalo',
@@ -286,7 +295,7 @@ const es: Messages = {
   'learn.intervals.answerTip': '{full} · pulsa {n}',
   'learn.intervals.correct': 'Correcto',
   'learn.intervals.miss': 'Fallo',
-  'learn.intervals.correctMsg': '{name} — buen oído.',
+  'learn.intervals.correctMsg': '{name} - buen oído.',
   'learn.intervals.missMsg': 'Era {name}.',
   'learn.intervals.replayAria': 'Volver a oír el intervalo',
   'learn.intervals.replayTip': 'Volver a oír',
@@ -423,7 +432,7 @@ const es: Messages = {
   'postSession.title': 'Sesión grabada',
   'postSession.openInFile.title': 'Abrir en modo archivo',
   'postSession.openInFile.sub':
-    'Visualízala como un piano roll desplazándose — lista para exportar como MP4.',
+    'Visualízala como un piano roll desplazándose - lista para exportar como MP4.',
   'postSession.download.title': 'Descargar MIDI',
   'postSession.download.sub.html': 'Envía el <code>.mid</code> directo a tu DAW.',
   'postSession.discard.title': 'Descartar',
@@ -435,7 +444,7 @@ const es: Messages = {
   'toast.export.ready': '{filename} listo',
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
-  'toast.recording.empty': 'Nada grabado — toca algunas notas mientras Grabar está activo.',
+  'toast.recording.empty': 'Nada grabado - toca algunas notas mientras Grabar está activo.',
 
   'onboarding.localeDetected': 'Mostrando en {language} · cambia en Apariencia',
 }

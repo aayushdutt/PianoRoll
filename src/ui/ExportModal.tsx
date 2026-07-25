@@ -1,5 +1,11 @@
 import { createSignal, For, Show } from 'solid-js'
 import { Portal, render } from 'solid-js/web'
+import {
+  overallProgress,
+  type ProgressMode,
+  stageEtaSeconds,
+  stageWindow,
+} from '../export/exportMath'
 import type { ExportStage } from '../export/VideoExporter'
 import { t } from '../i18n'
 import { icons } from './icons'
@@ -36,7 +42,15 @@ interface PresetCard {
   hint?: string
 }
 
+// Chrome caps `navigator.deviceMemory` at 8, so ≤4 reliably means a genuinely
+// constrained device. 2K/4K exports build the whole MP4 in memory — on these
+// devices that's the top OOM suspect (PostHog: ~7% of exports die silently).
+const LOW_MEMORY_DEVICE =
+  ((navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8) <= 4
+
 function buildPresets(): readonly PresetCard[] {
+  const heavyHint = (base: string): string =>
+    LOW_MEMORY_DEVICE ? `${base} · ${t('export.preset.lowMemory.hint')}` : base
   return [
     { id: '1080p', label: '1080p', dim: '1920 × 1080', aspect: 'landscape' },
     { id: '720p', label: '720p', dim: '1280 × 720', aspect: 'landscape' },
@@ -45,14 +59,14 @@ function buildPresets(): readonly PresetCard[] {
       label: '2K',
       dim: '2560 × 1440',
       aspect: 'landscape',
-      hint: t('export.preset.2k.hint'),
+      hint: heavyHint(t('export.preset.2k.hint')),
     },
     {
       id: '4k',
       label: '4K',
       dim: '3840 × 2160',
       aspect: 'landscape',
-      hint: t('export.preset.4k.hint'),
+      hint: heavyHint(t('export.preset.4k.hint')),
     },
     {
       id: 'vertical',
@@ -79,7 +93,14 @@ function buildPresets(): readonly PresetCard[] {
 
 const FPS_OPTIONS = [24, 30, 60] as const
 
-type Phase = 'settings' | 'progress'
+// Coarse-pointer devices are exactly where exports fail/crawl in the field
+// (iOS 39% / Android 68% completion vs Mac 90%). Default them to 720p — the
+// user can still pick anything.
+function defaultResolution(): ExportResolution {
+  return window.matchMedia?.('(pointer: coarse)').matches ? '720p' : '1080p'
+}
+
+type Phase = 'settings' | 'progress' | 'error'
 
 interface ViewProps {
   container: HTMLElement
@@ -98,10 +119,15 @@ interface ViewProps {
   speed: () => ExportSpeed
   setSpeed: (v: ExportSpeed) => void
   stage: () => string
+  stepLabel: () => string
   pct: () => number
+  eta: () => string
   indeterminate: () => boolean
+  errorMessage: () => string
+  canRetryLower: () => boolean
   onDismiss: () => void
   onStart: () => void
+  onRetryLower: () => void
   onCancelProgress: () => void
 }
 
@@ -118,7 +144,7 @@ function ExportView(props: ViewProps) {
         id="export-modal"
         classList={{ open: props.isOpen() }}
         onClick={(e) => {
-          if (e.target === e.currentTarget && props.phase() === 'settings') props.onDismiss()
+          if (e.target === e.currentTarget && props.phase() !== 'progress') props.onDismiss()
         }}
       >
         {/* biome-ignore-end lint/a11y/useKeyWithClickEvents: — */}
@@ -317,6 +343,9 @@ function ExportView(props: ViewProps) {
             }}
           >
             <div class="export-spinner"></div>
+            <Show when={props.stepLabel()}>
+              <div class="export-step">{props.stepLabel()}</div>
+            </Show>
             <div class="export-stage">{props.stage()}</div>
             <div class="export-progress-wrap">
               <div
@@ -327,9 +356,34 @@ function ExportView(props: ViewProps) {
             <div class="export-pct">
               {props.indeterminate() ? '' : `${Math.round(props.pct() * 100)}%`}
             </div>
+            <Show when={props.eta()}>
+              <div class="export-eta">{props.eta()}</div>
+            </Show>
             <button type="button" class="modal-btn" onClick={() => props.onCancelProgress()}>
               {t('export.cancel')}
             </button>
+          </div>
+
+          <div class="export-phase" classList={{ hidden: props.phase() !== 'error' }}>
+            <div class="export-error-icon" aria-hidden="true">
+              !
+            </div>
+            <h2 class="export-card-title">{t('export.error.title')}</h2>
+            <p class="export-error-msg">{props.errorMessage()}</p>
+            <div class="export-actions">
+              <button type="button" class="modal-btn" onClick={() => props.onDismiss()}>
+                {t('export.error.close')}
+              </button>
+              <Show when={props.canRetryLower()}>
+                <button
+                  type="button"
+                  class="modal-btn modal-btn--accent"
+                  onClick={() => props.onRetryLower()}
+                >
+                  {t('export.error.retry720')}
+                </button>
+              </Show>
+            </div>
           </div>
         </div>
       </div>
@@ -358,13 +412,18 @@ export class ExportModal {
   private readonly setSpeed: (v: ExportSpeed) => void
   private readonly readSpeed: () => ExportSpeed
   private readonly setStage: (v: string) => void
+  private readonly setStepLabel: (v: string) => void
   private readonly setPct: (v: number) => void
+  private readonly readPct: () => number
+  private readonly setEta: (v: string) => void
   private readonly setIndet: (v: boolean) => void
+  private readonly setErrorMessage: (v: string) => void
+  private readonly setCanRetryLower: (v: boolean) => void
 
   private onKey = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return
     if (!this.readIsOpen()) return
-    if (this.readPhase() !== 'settings') return
+    if (this.readPhase() === 'progress') return
     this.close()
   }
 
@@ -374,18 +433,29 @@ export class ExportModal {
   /** `null` until the offline render reports whether the browser can emit % progress. */
   private renderAudioProgressDeterminate: boolean | null = null
 
+  // Staged-progress state. `progressMode` keys the stage→window mapping;
+  // `currentStage`/`stageStartedAt` drive the ETA; the pct signal is clamped
+  // monotonic so retries and stage flips never move the bar backwards.
+  private progressMode: ProgressMode | null = null
+  private currentStage: ExportStage | null = null
+  private stageStartedAt = 0
+
   constructor(container: HTMLElement) {
     const [isOpen, setIsOpen] = createSignal(false)
     const [phase, setPhase] = createSignal<Phase>('settings')
     const [fps, setFps] = createSignal(30)
-    const [resolution, setResolution] = createSignal<ExportResolution>('1080p')
+    const [resolution, setResolution] = createSignal<ExportResolution>(defaultResolution())
     const [output, setOutput] = createSignal<ExportOutput>('av')
     const [audioFormat, setAudioFormat] = createSignal<ExportAudioFormat>('mp3')
     const [focus, setFocus] = createSignal<ExportFocus>('fit')
     const [speed, setSpeed] = createSignal<ExportSpeed>('drama')
     const [stage, setStage] = createSignal(t('export.preparing'))
+    const [stepLabel, setStepLabel] = createSignal('')
     const [pct, setPct] = createSignal(0)
+    const [eta, setEta] = createSignal('')
     const [indeterminate, setIndet] = createSignal(false)
+    const [errorMessage, setErrorMessage] = createSignal('')
+    const [canRetryLower, setCanRetryLower] = createSignal(false)
 
     this.setIsOpen = setIsOpen
     this.readIsOpen = isOpen
@@ -404,8 +474,13 @@ export class ExportModal {
     this.setSpeed = setSpeed
     this.readSpeed = speed
     this.setStage = setStage
+    this.setStepLabel = setStepLabel
     this.setPct = setPct
+    this.readPct = pct
+    this.setEta = setEta
     this.setIndet = setIndet
+    this.setErrorMessage = setErrorMessage
+    this.setCanRetryLower = setCanRetryLower
 
     const wrapper = document.createElement('div')
     wrapper.style.display = 'contents'
@@ -436,19 +511,18 @@ export class ExportModal {
           speed={speed}
           setSpeed={(v) => this.setSpeed(v)}
           stage={stage}
+          stepLabel={stepLabel}
           pct={pct}
+          eta={eta}
           indeterminate={indeterminate}
+          errorMessage={errorMessage}
+          canRetryLower={canRetryLower}
           onDismiss={() => this.close()}
-          onStart={() => {
-            this.setPhase('progress')
-            this.onStart?.({
-              fps: this.readFps(),
-              resolution: this.readResolution(),
-              output: this.readOutput(),
-              audioFormat: this.readAudioFormat(),
-              focus: this.readFocus(),
-              speed: this.readSpeed(),
-            })
+          onStart={() => this.startExport()}
+          onRetryLower={() => {
+            this.setResolution('720p')
+            if (this.readFps() > 30) this.setFps(30)
+            this.startExport()
           }}
           onCancelProgress={() => this.onCancel?.()}
         />
@@ -462,16 +536,26 @@ export class ExportModal {
   }
 
   open(): void {
-    this.renderAudioProgressDeterminate = null
+    this.resetProgressState()
     this.setPhase('settings')
-    this.setPct(0)
-    this.setIndet(false)
-    this.setStage(t('export.preparing'))
     this.setIsOpen(true)
   }
 
   close(): void {
     this.setIsOpen(false)
+  }
+
+  /**
+   * Failure endpoint: keeps the modal open on an error phase instead of the
+   * old silent close+toast, and offers a one-click 720p retry when the failed
+   * attempt was a video export at a higher resolution.
+   */
+  showFailure(message: string): void {
+    const output = this.readOutput()
+    const isVideo = output === 'av' || output === 'video-only'
+    this.setErrorMessage(message)
+    this.setCanRetryLower(isVideo && this.readResolution() !== '720p')
+    this.setPhase('error')
   }
 
   /**
@@ -481,23 +565,37 @@ export class ExportModal {
   setRenderAudioProgressMode(determinate: boolean): void {
     this.renderAudioProgressDeterminate = determinate
     this.setIndet(!determinate)
-    if (determinate) this.setPct(0)
   }
 
   updateProgress(stage: ExportStage, pct: number): void {
-    this.setStage(`${stageLabel(stage)}…`)
-    if (stage === 'Rendering audio') {
-      if (this.renderAudioProgressDeterminate === true) {
-        this.setIndet(false)
-        this.setPct(pct)
-        return
-      }
-      this.setIndet(true)
-      this.setPct(0)
-      return
+    if (stage !== this.currentStage) {
+      this.currentStage = stage
+      this.stageStartedAt = performance.now()
     }
-    this.setIndet(false)
-    this.setPct(pct)
+    this.setStage(`${stageLabel(stage)}…`)
+
+    const mode = this.progressMode
+
+    // Audio render without the suspend API can't report % — bar animates
+    // indeterminate for that stage, then snaps determinate when video starts.
+    const indet = stage === 'Rendering audio' && this.renderAudioProgressDeterminate !== true
+    this.setIndet(indet)
+    const stagePct = indet ? 0 : pct
+
+    if (mode) {
+      const w = stageWindow(mode, stage)
+      this.setStepLabel(t('export.step', { step: w.step, total: w.totalSteps }))
+      // Monotonic: a software-fallback retry restarts the encode stage at 0 -
+      // the bar holds its high-water mark instead of jumping backwards.
+      this.setPct(Math.max(this.readPct(), overallProgress(mode, stage, stagePct)))
+    } else {
+      this.setPct(Math.max(this.readPct(), stagePct))
+    }
+
+    // ETA only for the long stages, from the stage-local rate.
+    const etaEligible = stage === 'Encoding' || (stage === 'Rendering audio' && !indet)
+    const etaS = etaEligible ? stageEtaSeconds(performance.now() - this.stageStartedAt, pct) : null
+    this.setEta(etaS === null ? '' : formatEta(etaS))
   }
 
   dispose(): void {
@@ -506,6 +604,35 @@ export class ExportModal {
     this.disposeRoot = null
     this.wrapper?.remove()
     this.wrapper = null
+  }
+
+  private startExport(): void {
+    const settings: ExportSettings = {
+      fps: this.readFps(),
+      resolution: this.readResolution(),
+      output: this.readOutput(),
+      audioFormat: this.readAudioFormat(),
+      focus: this.readFocus(),
+      speed: this.readSpeed(),
+    }
+    this.resetProgressState()
+    this.progressMode = settings.output === 'midi' ? null : settings.output
+    this.setPhase('progress')
+    this.onStart?.(settings)
+  }
+
+  private resetProgressState(): void {
+    this.renderAudioProgressDeterminate = null
+    this.progressMode = null
+    this.currentStage = null
+    this.stageStartedAt = 0
+    this.setPct(0)
+    this.setIndet(false)
+    this.setStepLabel('')
+    this.setEta('')
+    this.setStage(t('export.preparing'))
+    this.setErrorMessage('')
+    this.setCanRetryLower(false)
   }
 
   // Only auto-applies a per-resolution default speed when the Focus/Speed
@@ -520,6 +647,11 @@ export class ExportModal {
       this.setSpeed(desiredSpeed)
     }
   }
+}
+
+function formatEta(seconds: number): string {
+  if (seconds < 50) return t('export.eta.soon')
+  return t('export.eta.minutes', { min: Math.ceil(seconds / 60) })
 }
 
 // `ExportStage` values are the canonical English keys used by the encoder

@@ -23,7 +23,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'home.midi.ready': 'Urządzenie MIDI gotowe',
   'home.midi.blocked': 'Włącz MIDI na górnym pasku',
   'home.midi.unavailable': 'Web MIDI niedostępne w tej przeglądarce',
-  'home.midi.disconnected': 'Brak kontrolera MIDI — klawiatura i myszka też działają',
+  'home.midi.disconnected': 'Brak kontrolera MIDI - klawiatura i myszka też działają',
   'home.metaLink.blog': 'Przeczytaj bloga',
   'home.metaLink.github': 'Kod na GitHubie',
   'home.metaLink.discord': 'Dołącz do społeczności na Discordzie',
@@ -86,7 +86,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'hud.loopSave': 'Pobierz pętlę jako MIDI',
   'hud.loopClear': 'Wyczyść pętlę',
   'hud.drag': 'Przeciągnij, aby przesunąć panel',
-  'hud.pin': 'Przypnij — zapobiega ukrywaniu',
+  'hud.pin': 'Przypnij - zapobiega ukrywaniu',
   'hud.close': 'Ukryj panel',
   'hud.reopen': 'Pokaż panel',
   'hud.volume': 'Głośność',
@@ -138,11 +138,11 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'export.focus.all.tip': 'Pokaż pełne 88 klawiszy',
   'export.speedLabel': 'Prędkość',
   'export.speed.compact': 'Zwarty',
-  'export.speed.compact.tip': 'Ciasno — więcej nut naraz na ekranie',
+  'export.speed.compact.tip': 'Ciasno - więcej nut naraz na ekranie',
   'export.speed.standard': 'Standard',
   'export.speed.standard.tip': 'Domyślne tempo',
   'export.speed.drama': 'Dramatyczny',
-  'export.speed.drama.tip': 'Wolniejszy opad — filmowo',
+  'export.speed.drama.tip': 'Wolniejszy opad - filmowo',
   'export.start': 'Rozpocznij eksport',
   'export.action': 'Eksportuj',
   'export.cancel': 'Anuluj',
@@ -162,6 +162,13 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'export.stage.finalizing': 'Finalizowanie',
   'export.stage.saving': 'Zapisywanie',
   'export.stage.done': 'Gotowe',
+  'export.step': 'Krok {step} z {total}',
+  'export.eta.minutes': '~{min} min do końca',
+  'export.eta.soon': 'mniej niż minuta do końca',
+  'export.error.title': 'Eksport nie powiódł się',
+  'export.error.close': 'Zamknij',
+  'export.error.retry720': 'Ponów w 720p',
+  'export.preset.lowMemory.hint': 'na tym urządzeniu może zabraknąć pamięci',
 
   'hud.session.label.record': 'Nagrywaj',
   'hud.loop.label.idle': 'Pętla',
@@ -183,21 +190,23 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'chord.aria': 'Aktualnie brzmiący akord',
 
   'error.midi.parseFailed':
-    'Nie udało się odczytać tego pliku — upewnij się, że to prawidłowy plik MIDI.',
+    'Nie udało się odczytać tego pliku - upewnij się, że to prawidłowy plik MIDI.',
   'error.midi.empty': 'Ten plik MIDI nie zawiera żadnych nut.',
   'error.midi.permissionBlocked':
     'MIDI jest zablokowane. Kliknij ikonę 🔒 na pasku adresu → Ustawienia witryny → zezwól na MIDI, a następnie odśwież stronę.',
   'error.midi.permissionDenied':
     'Odmówiono dostępu do MIDI. Kliknij ponownie lub włącz je przez ikonę 🔒 na pasku adresu.',
   'error.sample.fetchFailed':
-    'Nie udało się załadować tego przykładu — sprawdź połączenie i spróbuj ponownie.',
-  'error.audio.renderFailed': 'Renderowanie audio nie powiodło się — MP4 będzie bez dźwięku.',
-  'error.export.generic': 'Eksport nie powiódł się — sprawdź szczegóły w konsoli.',
+    'Nie udało się załadować tego przykładu - sprawdź połączenie i spróbuj ponownie.',
+  'error.audio.renderFailed': 'Renderowanie audio nie powiodło się - MP4 będzie bez dźwięku.',
+  'error.export.generic': 'Eksport nie powiódł się - sprawdź szczegóły w konsoli.',
+  'error.export.gpuLost':
+    'Kontekst graficzny został utracony podczas eksportu - spróbuj niższej rozdzielczości.',
 
   'modeError.title': 'Coś poszło nie tak',
   'modeError.retry': 'Spróbuj ponownie',
 
-  'doc.title.home': 'midee — wrzuć MIDI i patrz, jak śpiewa',
+  'doc.title.home': 'midee - wrzuć MIDI i patrz, jak śpiewa',
   'doc.title.live': 'midee · na żywo',
   'doc.title.learn': 'midee · nauka',
 
@@ -216,13 +225,13 @@ const pl: Messages & Record<PolishPluralKey, string> = {
 
   'learn.exercise.intervals.title': 'Interwały',
   'learn.exercise.intervals.blurb':
-    'Posłuchaj dwóch dźwięków i nazwij odległość między nimi. Zestaw dla początkujących — M3, P4, P5, oktawa.',
+    'Posłuchaj dwóch dźwięków i nazwij odległość między nimi. Zestaw dla początkujących - M3, P4, P5, oktawa.',
   'learn.exercise.playAlong.title': 'Graj razem',
   'learn.exercise.playAlong.blurb':
     'Wrzuć MIDI i graj razem. Tryb czekania zatrzymuje się przy każdym akordzie, aż zagrasz właściwe nuty.',
   'learn.exercise.sightReading.title': 'Czytanie nut',
   'learn.exercise.sightReading.blurb':
-    'Nuty przesuwają się obok linii trafienia — czytaj pięciolinię i naciskaj właściwy klawisz w odpowiednim momencie.',
+    'Nuty przesuwają się obok linii trafienia - czytaj pięciolinię i naciskaj właściwy klawisz w odpowiednim momencie.',
 
   'learn.sr.pause': 'Pauza',
   'learn.sr.resumeAria': 'Wznów',
@@ -232,7 +241,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'learn.sr.clefBass': 'Basowy',
   'learn.sr.clefBoth': 'Oba',
   'learn.sr.clefAria': 'Klucz: {clef}',
-  'learn.sr.clefTip': '{clef} — kliknij, aby zmienić',
+  'learn.sr.clefTip': '{clef} - kliknij, aby zmienić',
   'learn.sr.bpmDecAria': 'Zmniejsz tempo',
   'learn.sr.bpmDecTip': 'Zmniejsz tempo: przewiń w dół lub kliknij',
   'learn.sr.bpmIncAria': 'Zwiększ tempo',
@@ -241,8 +250,8 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'learn.sr.gapAria': 'Odstęp między nutami',
   'learn.sr.gapTip': 'Odstęp: odległość między nutami',
   'learn.sr.rampAria': 'Narastanie tempa',
-  'learn.sr.rampOnTip': 'Narastanie wł. — BPM rośnie',
-  'learn.sr.rampOffTip': 'Narastanie wył. — stałe tempo',
+  'learn.sr.rampOnTip': 'Narastanie wł. - BPM rośnie',
+  'learn.sr.rampOffTip': 'Narastanie wył. - stałe tempo',
   'learn.sr.rampLabel': 'Narastanie',
   'learn.sr.accuracyTip': 'Celność',
   'learn.sr.restartAria': 'Zacznij od nowa',
@@ -270,7 +279,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'learn.intervals.streakInRow': '🔥 {n} z rzędu',
   'learn.intervals.listen': 'Słuchaj',
   'learn.intervals.listenHint':
-    'Naciśnij odtwarzanie, aby usłyszeć dwa dźwięki — wybierz interwał, który usłyszałeś.',
+    'Naciśnij odtwarzanie, aby usłyszeć dwa dźwięki - wybierz interwał, który usłyszałeś.',
   'learn.intervals.playAria': 'Odtwórz interwał',
   'learn.intervals.playTip': 'Zagraj ponownie (Spacja)',
   'learn.intervals.playLabel': 'Odtwórz interwał',
@@ -278,7 +287,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'learn.intervals.answerTip': '{full} · naciśnij {n}',
   'learn.intervals.correct': 'Poprawnie',
   'learn.intervals.miss': 'Błąd',
-  'learn.intervals.correctMsg': '{name} — dobry słuch.',
+  'learn.intervals.correctMsg': '{name} - dobry słuch.',
   'learn.intervals.missMsg': 'Poprawna odpowiedź: {name}.',
   'learn.intervals.replayAria': 'Posłuchaj interwału ponownie',
   'learn.intervals.replayTip': 'Posłuchaj ponownie',
@@ -412,7 +421,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
 
   'postSession.title': 'Sesja nagrana',
   'postSession.openInFile.title': 'Otwórz w trybie pliku',
-  'postSession.openInFile.sub': 'Pokaż jako przewijający się pianoroll — gotowy do eksportu MP4.',
+  'postSession.openInFile.sub': 'Pokaż jako przewijający się pianoroll - gotowy do eksportu MP4.',
   'postSession.download.title': 'Pobierz MIDI',
   'postSession.download.sub.html': 'Wyślij <code>.mid</code> prosto do swojego DAW.',
   'postSession.discard.title': 'Odrzuć',
@@ -425,7 +434,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'toast.export.ready': '{filename} gotowe',
   'toast.session.saved': 'midee-session.mid · {seconds} s',
   'toast.loop.saved': 'midee-loop.mid',
-  'toast.recording.empty': 'Nic nie nagrano — zagraj kilka nut przy włączonym nagrywaniu.',
+  'toast.recording.empty': 'Nic nie nagrano - zagraj kilka nut przy włączonym nagrywaniu.',
 
   'onboarding.localeDetected': 'Język interfejsu: {language} · zmień w sekcji Wygląd',
 }

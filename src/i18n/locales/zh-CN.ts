@@ -155,6 +155,13 @@ const zhCN: Messages = {
   'export.stage.finalizing': '正在收尾',
   'export.stage.saving': '正在保存',
   'export.stage.done': '完成',
+  'export.step': '第 {step} 步，共 {total} 步',
+  'export.eta.minutes': '预计还需 {min} 分钟',
+  'export.eta.soon': '不到一分钟',
+  'export.error.title': '导出失败',
+  'export.error.close': '关闭',
+  'export.error.retry720': '以 720p 重试',
+  'export.preset.lowMemory.hint': '此设备可能内存不足',
 
   'hud.session.label.record': '录制',
   'hud.loop.label.idle': '循环',
@@ -183,6 +190,7 @@ const zhCN: Messages = {
   'error.sample.fetchFailed': '无法加载该示例 · 请检查网络后重试。',
   'error.audio.renderFailed': '音频渲染失败 · 导出的 MP4 将没有声音。',
   'error.export.generic': '导出失败 · 请查看控制台了解详情。',
+  'error.export.gpuLost': '导出过程中图形上下文丢失 · 请尝试更低的分辨率。',
 
   'modeError.title': '出了点问题',
   'modeError.retry': '重试',

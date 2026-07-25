@@ -57,7 +57,7 @@ export class ChordOverlay {
 
   constructor(slot: HTMLElement) {
     const [visible, setVisible] = createSignal(false)
-    const [tonic, setTonic] = createSignal('—')
+    const [tonic, setTonic] = createSignal('-')
     const [qualityHtml, setQualityHtml] = createSignal('')
     const [empty, setEmpty] = createSignal(true)
 
@@ -135,7 +135,7 @@ export class ChordOverlay {
     this.rootEl.classList.add('ts-chord-readout--pulse')
 
     if (isEmpty) {
-      this.setTonic('—')
+      this.setTonic('-')
       this.setQualityHtml('')
       return
     }

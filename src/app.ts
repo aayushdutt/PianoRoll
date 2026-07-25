@@ -24,7 +24,7 @@ import {
 // Both are dynamic-imported from startExport(). Import order matters: load the
 // offline-audio module first when audio is needed — do not block Tone on the
 // heavy VideoExporter chunk (see Promise.all removal below).
-import type { VideoExporter } from './export/VideoExporter'
+import type { ExportStage, VideoExporter } from './export/VideoExporter'
 import { audioBufferToWav } from './export/wav'
 import { setLocale, t } from './i18n'
 import { CaptureFanout } from './midi/CaptureFanout'
@@ -46,6 +46,9 @@ import type { AppMode, AppStore } from './store/state'
 import { watch } from './store/watch'
 import {
   categorizeMidiDevice,
+  clearExportInflight,
+  consumeInterruptedExport,
+  markExportInflight,
   midiLoadErrorType,
   track,
   trackActivation,
@@ -188,6 +191,21 @@ export class App {
   private unsubs: Array<() => void> = []
 
   async init(): Promise<void> {
+    // If the previous session died mid-export (OOM, tab kill), its in-flight
+    // marker is still in localStorage — surface it as export_interrupted so
+    // silent export deaths show up in the funnel.
+    const interrupted = consumeInterruptedExport()
+    if (interrupted) {
+      trackEvent('export_interrupted', {
+        stage: interrupted.stage,
+        pct: Math.round(interrupted.pct * 100) / 100,
+        output: interrupted.output,
+        resolution: interrupted.resolution,
+        fps: interrupted.fps,
+        age_s: Math.max(0, Math.round((Date.now() - interrupted.ts) / 1000)),
+      })
+    }
+
     const canvas = document.querySelector<HTMLCanvasElement>('#pianoroll')!
     const overlay = document.querySelector<HTMLElement>('#ui-overlay')!
     this.overlay = overlay
@@ -443,7 +461,7 @@ export class App {
       ),
     )
 
-    // Customization popover bundles theme / particles / chord toggle —
+    // Customization popover bundles theme / particles / chord toggle -
     // collapses three topbar pills into a single trigger.
     this.customizeMenu = new CustomizeMenu(
       this.controls.customizeSlot,
@@ -944,6 +962,12 @@ export class App {
     // One settings shape shared across started / completed / failed so the
     // funnel can be sliced by social-format settings without a join. `stage`
     // is advanced as the pipeline progresses and reported on failure.
+    // Hardware fields are the join key for "which devices fail/crawl" — the
+    // 90d data showed completion rates of 90% (Mac) down to 0% (Linux) with
+    // no way to correlate against device capability.
+    const nav = navigator as Navigator & { deviceMemory?: number }
+    const isVideoOutput = settings.output === 'av' || settings.output === 'video-only'
+    const targetDims = isVideoOutput ? resolveExportDims(settings.resolution) : null
     const exportBase = {
       output: settings.output,
       resolution: settings.resolution,
@@ -951,6 +975,10 @@ export class App {
       focus: settings.focus,
       speed: settings.speed,
       midi_duration_s: Math.round(midi.duration),
+      hardware_concurrency: nav.hardwareConcurrency ?? null,
+      device_memory: nav.deviceMemory ?? null,
+      export_w: isVideoOutput ? (targetDims?.width ?? this.renderer.canvasSize.width) : null,
+      export_h: isVideoOutput ? (targetDims?.height ?? this.renderer.canvasSize.height) : null,
     }
     let exportStage: 'serialize' | 'audio_render' | 'video_encode' = 'serialize'
     track('export_started', exportBase)
@@ -971,6 +999,45 @@ export class App {
       return
     }
 
+    // Progress fan-out: drive the modal AND keep crash forensics fresh. The
+    // localStorage marker is rewritten on stage changes and every ≥10% of
+    // stage progress; if the tab dies mid-export, the next boot reports the
+    // last persisted position via export_interrupted (see init()).
+    let lastStage: ExportStage | 'start' = 'start'
+    let lastPct = 0
+    let lastPersistedPct = -1
+    const onExportProgress = (stage: ExportStage, pct: number): void => {
+      if (stage !== lastStage || pct - lastPersistedPct >= 0.1) {
+        lastPersistedPct = pct
+        markExportInflight({
+          stage,
+          pct: Math.round(pct * 100) / 100,
+          output: settings.output,
+          resolution: settings.resolution,
+          fps: settings.fps,
+          ts: Date.now(),
+        })
+      }
+      lastStage = stage
+      lastPct = pct
+      exportModal.updateProgress(stage, pct)
+    }
+    markExportInflight({
+      stage: 'start',
+      pct: 0,
+      output: settings.output,
+      resolution: settings.resolution,
+      fps: settings.fps,
+      ts: Date.now(),
+    })
+
+    // Which encoder plan is live (for failure telemetry — on success the
+    // exporter returns the same info in its stats). Boxed because it's only
+    // ever assigned inside the onPlan callback, which TS's narrowing can't see.
+    const codecInfo: { current: { codec: string; hw: string; attempts: number } | null } = {
+      current: null,
+    }
+
     const wasPlaying = this.store.state.status === 'playing'
     // Snapshot the playhead so we can restore position after export instead of
     // snapping back to t=0.
@@ -987,6 +1054,18 @@ export class App {
     const metronomeWasRunning = this.metronome.running.value
     this.metronome.stop()
     this.renderer.pauseAutoRender()
+
+    // A lost WebGL context mid-export (typical on weak GPUs at 4K) previously
+    // produced either black frames or an opaque encoder error. Fail fast with
+    // a distinct error instead; the flag overrides the AbortError that
+    // cancel() raises so this is reported as a failure, not a user cancel.
+    let glContextLost = false
+    const onGlContextLost = (e: Event): void => {
+      e.preventDefault()
+      glContextLost = true
+      this.currentExporter?.cancel()
+    }
+    this.renderer.canvas.addEventListener('webglcontextlost', onGlContextLost)
 
     const needsVideo = settings.output !== 'audio-only'
     const needsAudio = settings.output !== 'video-only'
@@ -1026,6 +1105,7 @@ export class App {
     const filename =
       settings.output === 'audio-only' ? `midee.${settings.audioFormat}` : 'midee.mp4'
 
+    let audioRenderMs = 0
     try {
       let audioBuffer: AudioBuffer | undefined
       if (needsAudio) {
@@ -1033,18 +1113,18 @@ export class App {
         // parsed) and must not run before / in parallel with offline audio setup.
         const { renderAudioOffline } = await import('./audio/OfflineAudioRenderer')
         exportStage = 'audio_render'
-        exportModal.updateProgress('Rendering audio', 0)
+        onExportProgress('Rendering audio', 0)
+        const audioRenderStart = performance.now()
         try {
-          // Per-stage progress: pct flows straight through. The bar resets
-          // between stages; the stage label makes that explicit.
           audioBuffer = await renderAudioOffline({
             midi,
             instrumentId: INSTRUMENTS[this.instrumentIndex]!.id,
             volume: this.store.state.volume,
             disabledTrackIds: this.synth.getDisabledTrackIds(),
             onRenderAudioProgressMode: (d) => exportModal.setRenderAudioProgressMode(d),
-            onProgress: (pct) => exportModal.updateProgress('Rendering audio', pct),
+            onProgress: (pct) => onExportProgress('Rendering audio', pct),
           })
+          audioRenderMs = Math.round(performance.now() - audioRenderStart)
         } catch (err) {
           console.error('Offline audio render failed:', err)
           // Audio-only has nothing to export without it — surface the error.
@@ -1063,6 +1143,7 @@ export class App {
       // dynamic-imported so it stays out of the initial bundle.
       if (settings.output === 'audio-only') {
         if (!audioBuffer) throw new Error('Audio-only export requires a rendered audio buffer')
+        onExportProgress('Saving', 0)
         const trimmed = trimAudioBuffer(audioBuffer, midi.duration)
         let bytes: Uint8Array
         let mime: string
@@ -1085,6 +1166,7 @@ export class App {
         track('export_completed', {
           ...exportBase,
           elapsed_ms: Math.round(performance.now() - exportStartedAt),
+          audio_render_ms: audioRenderMs,
         })
         return
       }
@@ -1099,7 +1181,7 @@ export class App {
           ? trimAudioBuffer(audioBuffer, midi.duration)
           : audioBuffer
 
-      await exporter.export({
+      const stats = await exporter.export({
         fps: settings.fps,
         duration: midi.duration,
         mode: settings.output,
@@ -1108,27 +1190,81 @@ export class App {
         ...(exportAudio ? { audio: exportAudio } : {}),
         onSeek: (t) => this.clock.seek(t),
         onRenderFrame: (t, dt) => this.renderer.renderManualFrame(t, dt),
-        onProgress: (stage, pct) => exportModal.updateProgress(stage, pct),
+        onProgress: onExportProgress,
+        onPlan: (info) => {
+          codecInfo.current = { codec: info.codec, hw: info.hw, attempts: info.attempt }
+        },
+        onFallback: (info) =>
+          trackEvent('export_fallback', {
+            from_codec: info.fromCodec,
+            to_codec: info.toCodec,
+            error_name: info.errorName,
+            output: settings.output,
+            resolution: settings.resolution,
+            fps: settings.fps,
+          }),
       })
       exportModal.close()
       this.showSuccess(`↓ ${t('toast.export.ready', { filename })}`)
+      const elapsedMs = Math.round(performance.now() - exportStartedAt)
       track('export_completed', {
         ...exportBase,
-        elapsed_ms: Math.round(performance.now() - exportStartedAt),
+        elapsed_ms: elapsedMs,
+        codec: stats.codec,
+        hw: stats.hw,
+        attempts: stats.attempts,
+        audio_render_ms: audioRenderMs,
+        audio_encode_ms: stats.audioEncodeMs,
+        video_encode_ms: stats.videoEncodeMs,
+        finalize_ms: stats.finalizeMs,
+        output_mb: Math.round((stats.outputBytes / 1_048_576) * 10) / 10,
+        encode_fps:
+          stats.videoEncodeMs > 0
+            ? Math.round(stats.framesEncoded / (stats.videoEncodeMs / 1000))
+            : null,
+        // >1 means the export took longer than the piece itself plays for -
+        // the field's p90 was 4-6× on Windows/Android, hence the ETA UI.
+        realtime_factor: Math.round((elapsedMs / 1000 / Math.max(1, midi.duration)) * 100) / 100,
       })
     } catch (err) {
-      const isCancel = err instanceof DOMException && err.name === 'AbortError'
-      if (!isCancel) {
-        console.error('Export failed:', err)
-        this.showError((err as Error).message || t('error.export.generic'))
-      }
+      const isCancel = err instanceof DOMException && err.name === 'AbortError' && !glContextLost
+      if (!isCancel) console.error('Export failed:', err)
+      const errorMessage = glContextLost
+        ? t('error.export.gpuLost')
+        : (err as Error).message || t('error.export.generic')
       track(isCancel ? 'export_cancelled' : 'export_failed', {
         ...exportBase,
         stage: exportStage,
+        last_stage: lastStage,
+        pct: Math.round(lastPct * 100) / 100,
         elapsed_ms: Math.round(performance.now() - exportStartedAt),
+        ...(isCancel
+          ? {}
+          : {
+              error_name: glContextLost
+                ? 'webgl_context_lost'
+                : err instanceof Error
+                  ? err.name
+                  : 'UnknownError',
+              error_message: String(err instanceof Error ? err.message || err.name : err).slice(
+                0,
+                200,
+              ),
+              codec: codecInfo.current?.codec ?? null,
+              hw: codecInfo.current?.hw ?? null,
+              attempts: codecInfo.current?.attempts ?? 0,
+            }),
       })
-      exportModal.close()
+      if (isCancel) {
+        exportModal.close()
+      } else {
+        // Keep the modal open on an error phase with a one-click lower-res
+        // retry — the old silent close+toast lost 27 of 37 failing users.
+        exportModal.showFailure(errorMessage)
+      }
     } finally {
+      this.renderer.canvas.removeEventListener('webglcontextlost', onGlContextLost)
+      clearExportInflight()
       this.currentExporter = null
       if (resized) {
         // Match window dimensions instead of the stale originalCanvas values
@@ -1430,7 +1566,7 @@ export class App {
   // 60 fps, so the worst-case readout latency is imperceptible while the
   // per-tick scan is not free on long files.
   //
-  // Invariant: `chordLastSig` always matches what the overlay displays —
+  // Invariant: `chordLastSig` always matches what the overlay displays -
   // they are only ever written together below. Callers must not reset the
   // signature independently or a skipped update leaves a stale reading.
   private maybeUpdateChordOverlay(time: number): void {

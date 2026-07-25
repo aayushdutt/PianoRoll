@@ -130,7 +130,7 @@ function SrControlBar(props: SightReadHudOptions) {
               {(alive) => <span class={alive ? 'sr-hud__dot' : 'sr-hud__dot sr-hud__dot--spent'} />}
             </For>
           </span>
-          <span class="sr-hud__acc">{accuracyPct() !== null ? `${accuracyPct()}%` : '—'}</span>
+          <span class="sr-hud__acc">{accuracyPct() !== null ? `${accuracyPct()}%` : '-'}</span>
         </span>
       }
     >
@@ -261,7 +261,7 @@ function SrControlBar(props: SightReadHudOptions) {
 
       {/* Accuracy */}
       <span class="sr-hud__acc" data-tip={t('learn.sr.accuracyTip')}>
-        {accuracyPct() !== null ? `${accuracyPct()}%` : '—'}
+        {accuracyPct() !== null ? `${accuracyPct()}%` : '-'}
       </span>
 
       <div class="sr-hud__sep" />
@@ -312,7 +312,7 @@ function EndPanel(props: SightReadHudOptions) {
               'text-shadow': `0 0 40px ${gradeColor()}55`,
             }}
           >
-            {grade() ?? '—'}
+            {grade() ?? '-'}
           </div>
           <div class="sr-end__subtitle">{subtitle()}</div>
         </div>

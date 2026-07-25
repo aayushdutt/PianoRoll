@@ -21,7 +21,7 @@ const fr: Messages = {
   'home.midi.ready': 'Périphérique MIDI prêt',
   'home.midi.blocked': 'Activez MIDI depuis la barre du haut',
   'home.midi.unavailable': 'Web MIDI indisponible dans ce navigateur',
-  'home.midi.disconnected': 'Aucun périphérique MIDI — clavier et souris fonctionnent aussi',
+  'home.midi.disconnected': 'Aucun périphérique MIDI - clavier et souris fonctionnent aussi',
   'home.metaLink.blog': 'Lire le blog',
   'home.metaLink.github': 'Code source sur GitHub',
   'home.metaLink.discord': 'Rejoindre la communauté Discord',
@@ -87,7 +87,7 @@ const fr: Messages = {
   'hud.loopSave': 'Télécharger la boucle en MIDI',
   'hud.loopClear': 'Effacer la boucle',
   'hud.drag': 'Glissez pour déplacer les commandes',
-  'hud.pin': 'Épingler — empêche le masquage automatique',
+  'hud.pin': 'Épingler - empêche le masquage automatique',
   'hud.close': 'Masquer les commandes',
   'hud.reopen': 'Afficher les commandes',
   'hud.volume': 'Volume',
@@ -163,11 +163,11 @@ const fr: Messages = {
   'export.focus.all.tip': 'Afficher les 88 touches complètes',
   'export.speedLabel': 'Vitesse',
   'export.speed.compact': 'Compact',
-  'export.speed.compact.tip': "Serré — plus de notes à l'écran à la fois",
+  'export.speed.compact.tip': "Serré - plus de notes à l'écran à la fois",
   'export.speed.standard': 'Standard',
   'export.speed.standard.tip': 'Cadence par défaut',
   'export.speed.drama': 'Cinématique',
-  'export.speed.drama.tip': 'Chute lente — cinématographique',
+  'export.speed.drama.tip': 'Chute lente - cinématographique',
   'export.start': "Lancer l'export",
   'export.action': 'Exporter',
   'export.cancel': 'Annuler',
@@ -187,26 +187,35 @@ const fr: Messages = {
   'export.stage.finalizing': 'Finalisation',
   'export.stage.saving': 'Enregistrement',
   'export.stage.done': 'Terminé',
+  'export.step': 'Étape {step} sur {total}',
+  'export.eta.minutes': '~{min} min restantes',
+  'export.eta.soon': "moins d'une minute restante",
+  'export.error.title': "Échec de l'export",
+  'export.error.close': 'Fermer',
+  'export.error.retry720': 'Réessayer en 720p',
+  'export.preset.lowMemory.hint': 'risque de manquer de mémoire sur cet appareil',
 
   // ── Errors ─────────────────────────────────────────────────
   'error.midi.parseFailed':
-    "Impossible de lire ce fichier — assurez-vous qu'il s'agit d'un MIDI valide.",
+    "Impossible de lire ce fichier - assurez-vous qu'il s'agit d'un MIDI valide.",
   'error.midi.empty': 'Ce MIDI ne contient aucune note.',
   'error.midi.permissionBlocked':
     "MIDI est bloqué. Cliquez sur l'icône 🔒 dans la barre d'adresse → Paramètres du site → autorisez MIDI, puis rechargez.",
   'error.midi.permissionDenied':
     "Autorisation MIDI refusée. Cliquez à nouveau, ou activez-la via l'icône 🔒 dans la barre d'adresse.",
   'error.sample.fetchFailed':
-    'Impossible de charger cet exemple — vérifiez votre connexion et réessayez.',
-  'error.audio.renderFailed': 'Échec du rendu audio — le MP4 sera silencieux.',
-  'error.export.generic': "Échec de l'export — consultez la console pour plus de détails.",
+    'Impossible de charger cet exemple - vérifiez votre connexion et réessayez.',
+  'error.audio.renderFailed': 'Échec du rendu audio - le MP4 sera silencieux.',
+  'error.export.generic': "Échec de l'export - consultez la console pour plus de détails.",
+  'error.export.gpuLost':
+    "Le contexte graphique a été perdu pendant l'export - essayez une résolution plus basse.",
 
   // ── Mode error boundary ────────────────────────────────────
   'modeError.title': "Quelque chose n'a pas fonctionné",
   'modeError.retry': 'Réessayer',
 
   // ── Document title ──────────────────────────────────────────
-  'doc.title.home': 'midee — déposez un MIDI, regardez-le chanter',
+  'doc.title.home': 'midee - déposez un MIDI, regardez-le chanter',
   'doc.title.live': 'midee · direct',
   'doc.title.learn': 'midee · apprendre',
 
@@ -226,13 +235,13 @@ const fr: Messages = {
 
   'learn.exercise.intervals.title': 'Intervalles',
   'learn.exercise.intervals.blurb':
-    "Écoutez deux notes et identifiez l'intervalle entre elles. Niveau débutant — M3, P4, P5, octave.",
+    "Écoutez deux notes et identifiez l'intervalle entre elles. Niveau débutant - M3, P4, P5, octave.",
   'learn.exercise.playAlong.title': 'Jouer ensemble',
   'learn.exercise.playAlong.blurb':
     "Déposez un MIDI et jouez avec. Le mode attente s'arrête à chaque accord jusqu'à ce que vous trouviez les bonnes notes.",
   'learn.exercise.sightReading.title': 'Lecture à vue',
   'learn.exercise.sightReading.blurb':
-    'Les notes défilent vers la ligne — lisez la portée et appuyez sur la bonne touche en rythme.',
+    'Les notes défilent vers la ligne - lisez la portée et appuyez sur la bonne touche en rythme.',
 
   // Sight-reading HUD.
   'learn.sr.pause': 'Pause',
@@ -243,7 +252,7 @@ const fr: Messages = {
   'learn.sr.clefBass': 'Bass',
   'learn.sr.clefBoth': 'Both',
   'learn.sr.clefAria': 'Clef: {clef}',
-  'learn.sr.clefTip': '{clef} — click to change',
+  'learn.sr.clefTip': '{clef} - click to change',
   'learn.sr.bpmDecAria': 'Decrease tempo',
   'learn.sr.bpmDecTip': 'Decrease tempo: scroll down or click',
   'learn.sr.bpmIncAria': 'Increase tempo',
@@ -252,8 +261,8 @@ const fr: Messages = {
   'learn.sr.gapAria': 'Note gap',
   'learn.sr.gapTip': 'Note gap: spacing between notes',
   'learn.sr.rampAria': 'Tempo ramp',
-  'learn.sr.rampOnTip': 'Ramp on — BPM increases',
-  'learn.sr.rampOffTip': 'Ramp off — steady tempo',
+  'learn.sr.rampOnTip': 'Ramp on - BPM increases',
+  'learn.sr.rampOffTip': 'Ramp off - steady tempo',
   'learn.sr.rampLabel': 'Ramp',
   'learn.sr.accuracyTip': 'Accuracy',
   'learn.sr.restartAria': 'Restart session',
@@ -282,7 +291,7 @@ const fr: Messages = {
   'learn.intervals.streakInRow': "🔥 {n} d'affilée",
   'learn.intervals.listen': 'Écoutez',
   'learn.intervals.listenHint':
-    "Appuyez sur lecture pour entendre deux notes — choisissez l'intervalle que vous venez d'entendre.",
+    "Appuyez sur lecture pour entendre deux notes - choisissez l'intervalle que vous venez d'entendre.",
   'learn.intervals.playAria': "Lire l'intervalle",
   'learn.intervals.playTip': 'Rejouer (Espace)',
   'learn.intervals.playLabel': "Lire l'intervalle",
@@ -290,7 +299,7 @@ const fr: Messages = {
   'learn.intervals.answerTip': '{full} · touche {n}',
   'learn.intervals.correct': 'Correct',
   'learn.intervals.miss': 'Raté',
-  'learn.intervals.correctMsg': '{name} — belle oreille.',
+  'learn.intervals.correctMsg': '{name} - belle oreille.',
   'learn.intervals.missMsg': "C'était {name}.",
   'learn.intervals.replayAria': "Réécouter l'intervalle",
   'learn.intervals.replayTip': 'Réécouter',
@@ -427,7 +436,7 @@ const fr: Messages = {
   'postSession.title': 'Session enregistrée',
   'postSession.openInFile.title': 'Ouvrir en mode fichier',
   'postSession.openInFile.sub':
-    'Visualisez-la comme un piano roll défilant — prête à être exportée en MP4.',
+    'Visualisez-la comme un piano roll défilant - prête à être exportée en MP4.',
   'postSession.download.title': 'Télécharger MIDI',
   'postSession.download.sub.html': 'Envoyez le <code>.mid</code> directement dans votre DAW.',
   'postSession.discard.title': 'Jeter',
@@ -440,7 +449,7 @@ const fr: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds} s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty':
-    "Rien d'enregistré — jouez quelques notes pendant que Record est activé.",
+    "Rien d'enregistré - jouez quelques notes pendant que Record est activé.",
 
   'onboarding.localeDetected': 'Affichage en {language} · changez dans Apparence',
 }

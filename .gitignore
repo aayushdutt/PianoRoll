@@ -41,3 +41,5 @@ public/local/
 # NOT ignored — without the slash this would match any directory named bench.
 /bench/
 docs
+
+CLAUDE.md

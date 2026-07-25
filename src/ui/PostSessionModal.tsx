@@ -114,7 +114,7 @@ export class PostSessionModal {
 
   constructor(container: HTMLElement) {
     const [isOpen, setIsOpen] = createSignal(false)
-    const [stats, setStats] = createSignal('—')
+    const [stats, setStats] = createSignal('-')
 
     this.setIsOpen = setIsOpen
     this.readIsOpen = isOpen

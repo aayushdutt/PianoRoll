@@ -631,9 +631,9 @@ body {
    ≤519     Separator hides; pills/strip pack tighter for ≥360px phones
 
    Selector convention:
-   - Hide LABEL spans only via `> span + span` (second/text span)
-   - The icon span (`> span:first-child`, holds inline SVG) always stays
-   - This avoids the prior bug where `.ts-pill > span:not(.icon-slot)`
+   — Hide LABEL spans only via `> span + span` (second/text span)
+   — The icon span (`> span:first-child`, holds inline SVG) always stays
+   — This avoids the prior bug where `.ts-pill > span:not(.icon-slot)`
      hid the icon-bearing span too, leaving empty pill boxes
 ────────────────────────────────────────────────────────────────────────── */
 
@@ -761,7 +761,7 @@ body {
   }
 }
 
-/* Phones (≥360px target). Pack tighter, drop the action-group separator —
+/* Phones (≥360px target). Pack tighter, drop the action-group separator -
    at this width the visual grouping it provided is irrelevant; horizontal
    space is the priority. */
 @media (max-width: 519px) {
@@ -2662,7 +2662,7 @@ body {
   display: none;
 }
 
-/* Collapse MIDI pill when the browser doesn't support Web MIDI at all —
+/* Collapse MIDI pill when the browser doesn't support Web MIDI at all -
    nothing the user can do, so we just disable it visually. */
 #top-strip[data-midi-status="unavailable"] .ts-pill--midi {
   opacity: 0.35;
@@ -3993,7 +3993,7 @@ body {
 }
 
 /* Shortcuts: wrapped row of small chord chips, each chip = one or more
-   keycaps + a label. Stacked layout means no special divider needed —
+   keycaps + a label. Stacked layout means no special divider needed -
    the section spacing alone separates regions. */
 .kh-shortcuts {
   /* Two-column grid keeps the chips on a stable rhythm — labels and caps
@@ -5163,6 +5163,47 @@ body.canvas-hidden #kbd-resizer {
   min-height: 1em;
 }
 
+/* "Step k of N" above the stage name — orients the user across the
+   multi-stage pipeline so per-stage transitions don't read as restarts. */
+.export-step {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: -8px;
+}
+
+.export-eta {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: -8px;
+}
+
+/* Error phase */
+.export-error-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--red-border);
+  color: var(--red-text);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.export-error-msg {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 40ch;
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
 /* ─────────────────────────────────────────
    POST-SESSION MODAL (live-mode → next step)
 ───────────────────────────────────────── */
@@ -5984,9 +6025,9 @@ body.canvas-hidden #kbd-resizer {
 }
 
 /* ─── Export modal: narrow viewport fixes.
-   - fps-group tabs wrap instead of overflowing
-   - res-card grid auto-fits
-   - taller vertical padding on the overlay (see --modal-vpad) so .modal-scroll
+   — fps-group tabs wrap instead of overflowing
+   — res-card grid auto-fits
+   — taller vertical padding on the overlay (see --modal-vpad) so .modal-scroll
      max-height matches; card still scrolls inside itself on short phones. */
 @media (max-width: 640px) {
   #export-modal,
@@ -6442,7 +6483,7 @@ body.canvas-hidden #kbd-resizer {
   animation: ts-chord-readout-pulse 0.32s var(--ease-spring);
 }
 
-/* Compact icon-only toggle. The chord readout is a niche, opt-in feature —
+/* Compact icon-only toggle. The chord readout is a niche, opt-in feature -
    the button reflects that with a small footprint and dim default state, so
    it doesn't compete with primary topbar actions for attention. */
 .ts-chord-btn {
@@ -6740,7 +6781,7 @@ body.canvas-hidden #kbd-resizer {
 }
 
 /* Scroll region between the pinned header and the popover edge. Lets the
-   menu stay usable on short viewports (landscape phones, small laptops) —
+   menu stay usable on short viewports (landscape phones, small laptops) -
    the header holds, the sections scroll, nothing gets clipped. */
 .ts-customize-body {
   flex: 1 1 auto;

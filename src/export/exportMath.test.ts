@@ -2,10 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { MidiFile, MidiNote, MidiTrack } from '../core/midi/types'
 import {
   fitPitchRange,
+  overallProgress,
+  type ProgressMode,
   pitchSignature,
   resolveExportBitrate,
   resolveExportDims,
   speedToPps,
+  stageEtaSeconds,
+  stageWindow,
   trimAudioBuffer,
   trimmedFrameCount,
 } from './exportMath'
@@ -48,13 +52,13 @@ describe('fitPitchRange', () => {
   })
 
   it('pads a wide range by 12% of its span (rounded), clamped to 21..108', () => {
-    // span = 84 - 36 = 48; pad = round(48 * 0.12) = round(5.76) = 6
+    // span = 84 — 36 = 48; pad = round(48 * 0.12) = round(5.76) = 6
     const r = fitPitchRange(midiWith([36, 84]))
     expect(r).toEqual({ min: 30, max: 90 })
   })
 
   it('uses the 3-semitone floor when 12% of the span is smaller', () => {
-    // span = 64 - 60 = 4; round(0.48) = 0 -> floor at 3
+    // span = 64 — 60 = 4; round(0.48) = 0 -> floor at 3
     const r = fitPitchRange(midiWith([60, 64]))
     expect(r).toEqual({ min: 57, max: 67 })
   })
@@ -307,5 +311,83 @@ describe('pitchSignature', () => {
     const a = pitchSignature(new Set([67, 60, 64]))
     const b = pitchSignature(new Set([64, 67, 60]))
     expect(a).toBe(b)
+  })
+})
+
+// --- staged progress ---------------------------------------------------------
+
+describe('stageWindow / overallProgress', () => {
+  it('covers 0→1 contiguously for every progress mode', () => {
+    const sequences: Record<ProgressMode, string[]> = {
+      av: ['Rendering audio', 'Encoding audio', 'Encoding', 'Finalizing', 'Saving'],
+      'video-only': ['Encoding', 'Finalizing', 'Saving'],
+      'audio-only': ['Rendering audio', 'Saving'],
+    }
+    for (const [mode, stages] of Object.entries(sequences) as Array<
+      [ProgressMode, Array<Parameters<typeof stageWindow>[1]>]
+    >) {
+      let cursor = 0
+      for (const stage of stages) {
+        const w = stageWindow(mode, stage)
+        expect(w.from).toBeCloseTo(cursor, 10)
+        expect(w.to).toBeGreaterThan(w.from)
+        cursor = w.to
+      }
+      expect(cursor).toBe(1)
+    }
+  })
+
+  it('numbers steps monotonically and agrees on totalSteps within a mode', () => {
+    const w1 = stageWindow('av', 'Rendering audio')
+    const w2 = stageWindow('av', 'Encoding')
+    const w3 = stageWindow('av', 'Saving')
+    expect(w1.totalSteps).toBe(3)
+    expect([w1.step, w2.step, w3.step]).toEqual([1, 2, 3])
+  })
+
+  it('maps per-stage pct into the stage window on the overall bar', () => {
+    // av encode runs 0.25→0.93: halfway through it = 0.59 overall.
+    expect(overallProgress('av', 'Encoding', 0.5)).toBeCloseTo(0.59, 10)
+    expect(overallProgress('av', 'Encoding', 0)).toBeCloseTo(0.25, 10)
+    expect(overallProgress('av', 'Encoding', 1)).toBeCloseTo(0.93, 10)
+  })
+
+  it('clamps out-of-range pct instead of escaping the stage window', () => {
+    expect(overallProgress('av', 'Encoding', -0.5)).toBeCloseTo(0.25, 10)
+    expect(overallProgress('av', 'Encoding', 1.7)).toBeCloseTo(0.93, 10)
+  })
+
+  it('falls back to a full-range single step for stages a mode never emits', () => {
+    // video-only never renders audio; the fallback keeps the bar sane.
+    expect(stageWindow('video-only', 'Rendering audio')).toEqual({
+      step: 1,
+      totalSteps: 1,
+      from: 0,
+      to: 1,
+    })
+  })
+
+  it("'Done' pins the bar at 100% in every mode", () => {
+    for (const mode of ['av', 'video-only', 'audio-only'] as const) {
+      expect(overallProgress(mode, 'Done', 1)).toBe(1)
+    }
+  })
+})
+
+describe('stageEtaSeconds', () => {
+  it('returns null while the rate is still junk (too early)', () => {
+    expect(stageEtaSeconds(10_000, 0.02)).toBeNull() // < 4% done
+    expect(stageEtaSeconds(1000, 0.5)).toBeNull() // < 3 s elapsed
+  })
+
+  it('extrapolates the remaining time from the stage-local rate', () => {
+    // 10 s for 25% → 30 s left.
+    expect(stageEtaSeconds(10_000, 0.25)).toBeCloseTo(30, 6)
+    // 60 s for 50% → 60 s left.
+    expect(stageEtaSeconds(60_000, 0.5)).toBeCloseTo(60, 6)
+  })
+
+  it('approaches zero as the stage completes', () => {
+    expect(stageEtaSeconds(120_000, 0.999)).toBeLessThan(1)
   })
 })

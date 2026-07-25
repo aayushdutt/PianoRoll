@@ -148,9 +148,19 @@ export class PianoRollRenderer {
       height: window.innerHeight,
       backgroundColor: darkTheme.background,
       antialias: true,
-      resolution: window.devicePixelRatio || 1,
+      // Cap the raster resolution at 2×: a dpr-3 phone would rasterize 2.25×
+      // the pixels of 2× for no visible gain on falling rectangles, and the
+      // fill-rate cost lands exactly on the devices least able to pay it.
+      resolution: Math.min(window.devicePixelRatio || 1, 2),
       autoDensity: true,
     })
+
+    // Cap the render loop at 60fps on touch devices: most phone panels are
+    // 60Hz anyway, and on 90/120Hz panels the battery cost of high-refresh
+    // falling notes outweighs the smoothness gain. Desktop stays uncapped.
+    if (window.matchMedia?.('(pointer: coarse)').matches) {
+      this.app.ticker.maxFPS = 60
+    }
 
     // Pick a viewport-appropriate initial keyboard height before building the
     // scene — otherwise the first paint uses the desktop 120px default even
@@ -422,11 +432,13 @@ export class PianoRollRenderer {
   // Drives rendering during video export. `emitParticles: true` so note-on
   // bursts appear in the captured output — the exporter steps time forward
   // monotonically from t=0, so prev/curr note tracking works just like live
-  // playback.
-  renderManualFrame(time: number, dt: number): void {
+  // playback. `present: false` runs only the CPU scene update without the
+  // GPU submit — used by the bench harness to time update cost separately
+  // from (environment-dependent) present cost.
+  renderManualFrame(time: number, dt: number, present = true): void {
     if (!this.midi) return
     this.renderFrame(time, dt, true)
-    this.app.renderer.render(this.app.stage)
+    if (present) this.app.renderer.render(this.app.stage)
   }
 
   renderStaticFrame(currentTime: number): void {

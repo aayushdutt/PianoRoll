@@ -30,7 +30,7 @@ SeeMusic is one of the best-known MIDI visualizers among music educators and ser
 | Session recording / `.mid` bounce | Limited | Yes |
 | Visual themes | Yes, extensive | Yes, five themes + particle styles |
 | Runs on Linux / Chromebook | No | Yes |
-| Your files leave your device? | Depends on tier | No — fully client-side |
+| Your files leave your device? | Depends on tier | No - fully client-side |
 
 ## Where SeeMusic wins
 
@@ -47,10 +47,10 @@ If you're a teacher making polished demonstration videos daily or a full-time mu
 
 midee is the browser-first, design-forward, open-source option for everyone who doesn't need the full SeeMusic kit.
 
-- **No install, no license key.** Open [midee.app](/), drag in a `.mid`, and you're rendering. Works on Chromebooks, locked-down work laptops, Linux — anywhere SeeMusic doesn't run.
+- **No install, no license key.** Open [midee.app](/), drag in a `.mid`, and you're rendering. Works on Chromebooks, locked-down work laptops, Linux - anywhere SeeMusic doesn't run.
 - **No watermark, ever.** midee's MP4 export is clean on the free tier because there *is* no paid tier. MIT-licensed.
 - **Fully client-side.** Your MIDI file and the rendered video never leave your browser.
-- **Vertical export out of the box.** TikTok/Reels 9:16, square 1:1, 1080p, 720p, or native aspect ratio — all free, all built-in.
+- **Vertical export out of the box.** TikTok/Reels 9:16, square 1:1, 1080p, 720p, or native aspect ratio - all free, all built-in.
 - **Loop station + live play.** Jam with a MIDI controller, loop a phrase bar-snapped to the metronome, layer takes, record sessions. This is the one category where midee does something SeeMusic doesn't.
 - **Open source.** The [source is on GitHub](https://github.com/aayushdutt/midee). Fork it, submit themes and particle styles, audit the code.
 
@@ -68,12 +68,12 @@ Use **midee** if:
 - You're on Linux, a Chromebook, or any platform SeeMusic doesn't support.
 - You prefer open-source tools.
 - You want to jam on your MIDI keyboard and record loops *alongside* the visualizer, not in a separate DAW.
-- You want "drop and go" — try it, render it, share it, without commitment.
+- You want "drop and go" - try it, render it, share it, without commitment.
 
 ## Common questions
 
 **Is midee's video quality comparable to SeeMusic's?**
-For most use cases, yes. midee renders at 60fps with baked-in audio, frame-accurate via WebCodecs. The output is plain H.264 MP4 that uploads to YouTube, TikTok, and Reels without any re-encoding on their side. The aesthetic is different — midee leans clean and design-forward; SeeMusic leans cinematic with more camera motion options — so pick the look you prefer.
+For most use cases, yes. midee renders at 60fps with baked-in audio, frame-accurate via WebCodecs. The output is plain H.264 MP4 that uploads to YouTube, TikTok, and Reels without any re-encoding on their side. The aesthetic is different - midee leans clean and design-forward; SeeMusic leans cinematic with more camera motion options - so pick the look you prefer.
 
 **Does midee require internet?**
 Only on first load. Once the app is cached, MIDI playback and video export work offline.
@@ -82,7 +82,7 @@ Only on first load. Once the app is cached, MIDI playback and video export work 
 No plans to. The project is MIT-licensed, indie, and built because existing options demanded money, uploads, or installs. If features land that need server costs (hosted galleries, collaborative features), those will be opt-in and priced separately, and the core visualizer + export will stay free.
 
 **Can I install midee as a desktop app?**
-Yes — modern browsers let you "Install" a web app from the URL bar. It runs in its own window, pinnable in the dock. midee ships a web manifest so this works cleanly.
+Yes - modern browsers let you "Install" a web app from the URL bar. It runs in its own window, pinnable in the dock. midee ships a web manifest so this works cleanly.
 
 ## Try it
 

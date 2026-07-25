@@ -22,7 +22,7 @@ export const SAMPLES: readonly Sample[] = [
     composer: 'Chopin',
     accent: '#06b6d4',
     url: `${import.meta.env.BASE_URL}samples/chopin-nocturne-op9-2.mid`,
-    displayName: 'Chopin — Nocturne Op. 9 No. 2',
+    displayName: 'Chopin - Nocturne Op. 9 No. 2',
   },
   {
     id: 'bach-prelude-c',
@@ -30,7 +30,7 @@ export const SAMPLES: readonly Sample[] = [
     composer: 'J.S. Bach',
     accent: '#f97316',
     url: `${import.meta.env.BASE_URL}samples/bach-prelude-in-c.mid`,
-    displayName: 'Bach — Prelude in C (BWV 846)',
+    displayName: 'Bach - Prelude in C (BWV 846)',
   },
   {
     id: 'satie-gnossienne-1',
@@ -38,7 +38,7 @@ export const SAMPLES: readonly Sample[] = [
     composer: 'Satie',
     accent: '#a78bfa',
     url: `${import.meta.env.BASE_URL}samples/satie-gnossienne-1.mid`,
-    displayName: 'Satie — Gnossienne No. 1',
+    displayName: 'Satie - Gnossienne No. 1',
   },
 ]
 

@@ -15,7 +15,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
     keySignature: 'C',
   },
   'c-major-1': {
-    name: 'C Major — One Octave',
+    name: 'C Major - One Octave',
     pitchPool: [60, 62, 64, 65, 67, 69, 71, 72], // C4–C5 white keys
     defaultBpm: 54,
     sessionLength: 30,
@@ -23,7 +23,7 @@ export const TIER_CONFIGS: Record<TierKey, TierConfig> = {
     keySignature: 'C',
   },
   'c-major-2': {
-    name: 'C Major — Two Octaves',
+    name: 'C Major - Two Octaves',
     pitchPool: [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84], // C4–C6 white keys
     defaultBpm: 60,
     sessionLength: 40,

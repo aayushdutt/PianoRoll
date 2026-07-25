@@ -65,7 +65,7 @@ function SamplesGridView(props: GridProps) {
   const states = SAMPLES.map((sample) => {
     const [state, setState] = createSignal<SampleState>({
       bars: placeholderBars(),
-      sub: `${sample.composer} · —`,
+      sub: `${sample.composer} · -`,
     })
     return { sample, state, setState }
   })
