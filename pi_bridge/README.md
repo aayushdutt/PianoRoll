@@ -12,7 +12,7 @@ cd ~/midee-pi-bridge
 ```
 
 Open Midee with `?pi=1`. The page connects to
-`ws://raspberrypi.local:8765/leds` automatically and retries if the Pi or bridge
+`ws://192.168.10.220:8765/leds` automatically and retries if the Pi or bridge
 restarts. Expand **Pi connection** to change the URL or use the transport
 buttons.
 
@@ -28,3 +28,18 @@ Midee maps the output index back to piano pitch (`index + 21`) and normalizes
 velocity to its internal 0-1 range before sending the note through the normal
 input, visualization, and synthesizer path. A missing velocity uses `0.8` as a
 backward-compatible fallback.
+
+The live bridge also supports buffered evaluation traces:
+
+```json
+{"type":"evaluation","action":"start","timingMode":"adaptive"}
+{"type":"evaluation","action":"start","timingMode":"fixed"}
+{"type":"evaluation","action":"stop"}
+{"type":"evaluation","action":"get"}
+```
+
+Trace retrieval is chunked and records the detected → scheduled → emitted or
+suppressed lifecycle without streaming diagnostic traffic during inference.
+The fixed mode holds additional delay at startup and keeps one immutable
+presentation epoch for the phrase; adaptive mode retains the live slew/resync
+behavior.

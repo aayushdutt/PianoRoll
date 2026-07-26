@@ -50,4 +50,17 @@ describe('LED harness protocol', () => {
     expect(midiVelocityToUnit(200)).toBe(1)
     expect(midiVelocityToUnit(undefined)).toBe(0.8)
   })
+
+  it('accepts chunked evaluation traces', () => {
+    expect(
+      parseLedMessageJson(
+        '{"type":"evaluation_trace","sessionId":"abc","chunkIndex":0,"chunkCount":1,"records":[{"stage":"detected","serverTime":1.2,"pitch":60}]}',
+      ),
+    ).toMatchObject({
+      type: 'evaluation_trace',
+      sessionId: 'abc',
+      chunkIndex: 0,
+      chunkCount: 1,
+    })
+  })
 })

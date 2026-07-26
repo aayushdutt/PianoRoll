@@ -157,8 +157,8 @@ npm run dev -- --host 0.0.0.0
 ```
 
 Open <http://localhost:5173/?pi=1>. The default bridge address is
-`ws://raspberrypi.local:8765/leds`. If the Pi uses another hostname, expand
-**Pi connection**, enter its `.local` hostname or LAN address, and reconnect.
+`ws://192.168.10.220:8765/leds`. If the Pi's DHCP address changes, expand
+**Pi connection**, enter its current LAN address, and reconnect.
 
 Use the harness buttons to verify:
 
@@ -168,6 +168,24 @@ Use the harness buttons to verify:
 4. Multiple keys remain active at the same time.
 5. Velocity reaches Midee rather than being replaced by a fixed value.
 6. Stop and disconnect clear all active outputs.
+
+### Reconstruction evaluation dashboard
+
+The same `?pi=1` page contains a local-only evaluation dashboard for the live
+audio-to-MIDI bridge. In Chrome or Edge:
+
+1. Upload a reference MIDI.
+2. Select the Pi Bluetooth endpoint as the Windows default audio output.
+3. Choose the adaptive scheduler or the fixed-epoch scheduler with startup
+   buffering.
+4. Run the performance and wait for the post-roll analysis.
+
+The dashboard separates detected, scheduled, emitted, suppressed, late, and
+dropped events. It reports note precision/recall, cumulative timing drift,
+local tempo, IOI errors, and hiccups, then renders reference and reconstructed
+MIDI through the same deterministic instrument for an onset-weighted audio
+severity timeline. Evaluation bundles can be exported and compared as local
+versioned JSON; no session data is uploaded.
 
 ### Live Bluetooth audio prototype
 
@@ -248,8 +266,8 @@ export/     WebCodecs video export
 
 MIDI files and normal rendering stay in the browser. The Pi harness opens a
 WebSocket only to the address shown in its connection field. Repository
-examples use generic hostnames and contain no passwords, private keys, device
-identifiers, or private network addresses.
+examples contain no passwords, private keys, or paired-device identifiers. The
+LED harness default contains the Pi's LAN address for local development.
 
 Do not commit Pi credentials, paired-device identifiers, local home paths, or
 private model-download tokens. Use environment variables or local ignored

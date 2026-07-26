@@ -57,7 +57,26 @@ const TAIL_SECONDS = 1.5
 // smooth bar without measurable overhead on typical MIDIs.
 const PROGRESS_STEPS = 20
 
+// Tone owns one process-wide context. Offline renders must never overlap or the
+// second caller can capture the first caller's offline context as its "online"
+// context and restore a closed context when it finishes.
+let previousRender = Promise.resolve()
+
 export async function renderAudioOffline(opts: OfflineRenderOptions): Promise<AudioBuffer> {
+  const waitForPrevious = previousRender
+  let releaseRender: () => void = () => undefined
+  previousRender = new Promise<void>((resolve) => {
+    releaseRender = resolve
+  })
+  await waitForPrevious
+  try {
+    return await renderAudioOfflineExclusive(opts)
+  } finally {
+    releaseRender()
+  }
+}
+
+async function renderAudioOfflineExclusive(opts: OfflineRenderOptions): Promise<AudioBuffer> {
   const { midi, instrumentId, volume, disabledTrackIds, onProgress } = opts
   const sampleRate = opts.sampleRate ?? DEFAULT_SAMPLE_RATE
 

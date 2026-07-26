@@ -1,16 +1,33 @@
+.pi-evaluation-page .home-card {
+  display: none;
+}
+
+.pi-lab {
+  --lab-panel: rgba(10, 14, 26, 0.96);
+  --lab-panel-soft: rgba(18, 24, 41, 0.88);
+  --lab-line: rgba(148, 163, 184, 0.16);
+  --lab-line-strong: rgba(148, 163, 184, 0.3);
+  --lab-cyan: #46d9e8;
+  --lab-violet: #9b8afb;
+  --lab-green: #6ee7b7;
+  --lab-red: #fb7185;
+  --lab-amber: #fbbf24;
+  color: var(--text);
+  pointer-events: auto;
+}
+
 .led-strip-harness {
   position: fixed;
-  z-index: 65;
+  z-index: 66;
   top: 76px;
-  right: 12px;
-  left: 12px;
-  padding: 8px 10px 7px;
-  border: 1px solid var(--border-hi);
-  border-radius: 12px;
-  background: rgba(6, 7, 16, 0.92);
-  box-shadow: 0 12px 42px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(14px);
-  pointer-events: auto;
+  right: 18px;
+  left: 18px;
+  padding: 11px 14px;
+  border: 1px solid var(--lab-line-strong);
+  border-radius: 14px;
+  background: var(--lab-panel);
+  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
 }
 
 .led-strip-harness__bar,
@@ -24,49 +41,82 @@
 
 .led-strip-harness__bar {
   justify-content: space-between;
-  margin-bottom: 5px;
+  min-height: 30px;
 }
+
+.led-strip-harness__title {
+  min-width: 0;
+}
+
 .led-strip-harness__title strong {
-  font: 600 11px var(--font-mono);
+  font: 650 12px var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
 .led-strip-harness__status,
 .led-strip-harness__mismatch,
 .led-strip-harness__song {
+  overflow: hidden;
   color: var(--text-dim);
-  font: 500 9px var(--font-mono);
+  font: 500 10px var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.led-strip-harness__status::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #64748b;
+  content: "";
+}
+
 .led-strip-harness__status.is-connected {
-  color: #6ee7b7;
+  color: var(--lab-green);
 }
+
+.led-strip-harness__status.is-connected::before {
+  background: var(--lab-green);
+  box-shadow: 0 0 8px rgba(110, 231, 183, 0.7);
+}
+
 .led-strip-harness__status.is-error,
 .led-strip-harness__mismatch {
-  color: #fca5a5;
+  color: var(--lab-red);
 }
+
 .led-strip-harness__legend {
+  flex-shrink: 0;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: 10px;
 }
+
 .led-strip-harness__legend span {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
+
 .led-strip-harness__legend i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: #293047;
 }
+
 .led-strip-harness__legend .is-expected {
-  background: #67e8f9;
-  box-shadow: 0 0 7px #22d3ee;
+  background: var(--lab-cyan);
+  box-shadow: 0 0 7px var(--lab-cyan);
 }
+
 .led-strip-harness__legend .is-actual {
-  background: #a78bfa;
-  box-shadow: 0 0 7px #8b5cf6;
+  background: var(--lab-violet);
+  box-shadow: 0 0 7px var(--lab-violet);
 }
+
 .led-strip-harness__legend .is-aux {
   border: 1px solid #f97316;
   background: transparent;
@@ -75,22 +125,46 @@
 
 .led-strip-harness button,
 .led-strip-harness input {
-  border: 1px solid var(--border-hi);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--lab-line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text);
-  font: 500 9px var(--font);
+  font: 550 10px var(--font);
 }
+
 .led-strip-harness button {
-  padding: 4px 8px;
+  padding: 6px 9px;
   cursor: pointer;
 }
+
+.led-strip-harness__toggle {
+  margin-left: 4px;
+  border-color: rgba(70, 217, 232, 0.28) !important;
+}
+
 .led-strip-harness input {
   min-width: 260px;
-  padding: 5px 8px;
+  padding: 6px 8px;
 }
+
 .led-strip-harness__connection {
-  margin: 2px 0 7px;
+  flex-wrap: wrap;
+  margin: 10px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--lab-line);
+}
+
+.led-strip-harness__threshold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font: 600 10px var(--font-mono);
+}
+
+.led-strip-harness__threshold input[type="range"] {
+  width: 105px;
+  min-width: 105px;
 }
 
 .led-strip-harness__row,
@@ -100,69 +174,817 @@
   align-items: center;
   gap: 2px;
 }
+
 .led-strip-harness__row + .led-strip-harness__row {
   margin-top: 3px;
 }
+
 .led-strip-harness__row-label {
   color: var(--text-dim);
   font: 600 8px var(--font-mono);
 }
+
 .led-strip-dot {
   display: block;
   width: 100%;
-  aspect-ratio: 1;
   min-width: 3px;
   max-width: 10px;
   padding: 0 !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 50% !important;
+  aspect-ratio: 1;
   background: #1b2031 !important;
 }
+
 .led-strip-dot.is-aux {
   border-color: rgba(249, 115, 22, 0.5) !important;
 }
+
 .led-strip-dot--expected.is-on {
   border-color: #a5f3fc !important;
-  background: #67e8f9 !important;
-  box-shadow:
-    0 0 5px #22d3ee,
-    0 0 11px rgba(34, 211, 238, 0.75);
+  background: var(--lab-cyan) !important;
+  box-shadow: 0 0 8px rgba(70, 217, 232, 0.8);
 }
+
 .led-strip-dot--actual.is-on {
   border-color: #ddd6fe !important;
-  background: #a78bfa !important;
-  box-shadow:
-    0 0 5px #8b5cf6,
-    0 0 11px rgba(139, 92, 246, 0.75);
+  background: var(--lab-violet) !important;
+  box-shadow: 0 0 8px rgba(155, 138, 251, 0.8);
 }
+
 .led-strip-dot.is-mismatch {
-  outline: 1px solid #ef4444;
+  outline: 1px solid var(--lab-red);
   outline-offset: 1px;
 }
+
 .led-strip-harness__ticks {
-  margin-top: 1px;
+  margin-top: 2px;
 }
+
 .led-strip-harness__ticks span {
-  color: #4f5678;
+  color: #566079;
   font: 400 6px var(--font-mono);
   text-align: center;
 }
 
-@media (max-width: 800px) {
-  .led-strip-harness__legend {
+.pi-eval {
+  position: fixed;
+  z-index: 65;
+  top: 140px;
+  right: 18px;
+  bottom: 18px;
+  left: 18px;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--lab-line-strong);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 80% -20%, rgba(70, 217, 232, 0.08), transparent 36%),
+    linear-gradient(145deg, rgba(13, 18, 32, 0.985), rgba(6, 9, 18, 0.99));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.56);
+  flex-direction: column;
+}
+
+.pi-lab.is-hardware-open .pi-eval {
+  top: 282px;
+}
+
+.pi-eval.is-fullscreen {
+  z-index: 80;
+  inset: 12px;
+}
+
+.pi-eval-launcher {
+  position: fixed;
+  z-index: 65;
+  right: 22px;
+  bottom: 22px;
+  display: flex;
+  min-width: 260px;
+  padding: 13px 16px;
+  border: 1px solid rgba(70, 217, 232, 0.35);
+  border-radius: 12px;
+  background: var(--lab-panel);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  cursor: pointer;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pi-eval-launcher span {
+  font: 600 12px var(--font);
+}
+
+.pi-eval-launcher strong {
+  color: var(--lab-cyan);
+  font: 600 10px var(--font-mono);
+}
+
+.pi-eval__topbar {
+  display: grid;
+  min-height: 72px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--lab-line);
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.pi-eval__identity h2,
+.pi-eval h3,
+.pi-eval p {
+  margin: 0;
+}
+
+.pi-eval__identity h2 {
+  margin-top: 3px;
+  font: 650 20px var(--font);
+}
+
+.pi-eval__eyebrow,
+.pi-eval__step,
+.pi-eval__result-heading span {
+  color: var(--lab-cyan);
+  font: 650 9px var(--font-mono);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.pi-eval__health,
+.pi-eval__window-actions,
+.pi-eval__tabs,
+.pi-eval__transport,
+.pi-eval__session-tools > div,
+.pi-eval__legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pi-eval__chip {
+  display: flex;
+  min-width: 88px;
+  padding: 7px 9px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  flex-direction: column;
+}
+
+.pi-eval__chip span {
+  color: var(--text-dim);
+  font: 550 8px var(--font-mono);
+  text-transform: uppercase;
+}
+
+.pi-eval__chip strong {
+  margin-top: 2px;
+  color: #cbd5e1;
+  font: 650 10px var(--font-mono);
+}
+
+.pi-eval__chip.is-ok strong {
+  color: var(--lab-green);
+}
+
+.pi-eval button,
+.pi-eval select,
+.pi-eval__file {
+  min-height: 34px;
+  padding: 8px 11px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font: 600 11px var(--font);
+}
+
+.pi-eval button,
+.pi-eval__file {
+  cursor: pointer;
+}
+
+.pi-eval button:hover:not(:disabled),
+.pi-eval__file:hover {
+  border-color: rgba(70, 217, 232, 0.4);
+  background: rgba(70, 217, 232, 0.08);
+}
+
+.pi-eval button:focus-visible,
+.pi-eval__file:focus-within {
+  outline: 2px solid var(--lab-cyan);
+  outline-offset: 2px;
+}
+
+.pi-eval button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.pi-eval__workspace {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 310px minmax(0, 1fr);
+}
+
+.pi-eval__setup {
+  overflow-y: auto;
+  padding: 15px;
+  border-right: 1px solid var(--lab-line);
+  background: rgba(4, 7, 15, 0.35);
+}
+
+.pi-eval__setup > section {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--lab-line);
+}
+
+.pi-eval__setup > section:first-child {
+  padding-top: 0;
+}
+
+.pi-eval__setup p {
+  margin-top: 8px;
+  color: var(--text-dim);
+  font: 500 10px / 1.55 var(--font);
+}
+
+.pi-eval__dropzone {
+  display: flex;
+  margin-top: 9px;
+  padding: 14px;
+  border: 1px dashed rgba(70, 217, 232, 0.36);
+  border-radius: 10px;
+  background: rgba(70, 217, 232, 0.035);
+  cursor: pointer;
+  flex-direction: column;
+}
+
+.pi-eval__dropzone:hover {
+  background: rgba(70, 217, 232, 0.07);
+}
+
+.pi-eval__dropzone strong {
+  overflow: hidden;
+  font: 600 11px var(--font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-eval__dropzone span {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font: 500 9px var(--font-mono);
+}
+
+.pi-eval__dropzone input,
+.pi-eval__file input {
+  display: none;
+}
+
+.pi-eval__route {
+  display: flex;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-dim);
+  font: 550 9px var(--font-mono);
+}
+
+.pi-eval__route i {
+  color: #64748b;
+  font-style: normal;
+}
+
+.pi-eval__route strong {
+  color: var(--lab-green);
+}
+
+.pi-eval__meter,
+.pi-eval__progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.pi-eval__meter {
+  margin-top: 9px;
+}
+
+.pi-eval__meter span,
+.pi-eval__progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--lab-cyan), var(--lab-green));
+  transition: width 160ms ease;
+}
+
+.pi-eval__mode-picker {
+  display: grid;
+  margin-top: 9px;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.pi-eval__mode-picker button {
+  display: flex;
+  min-height: 60px;
+  padding: 9px;
+  text-align: left;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.pi-eval__mode-picker button span {
+  margin-top: 3px;
+  color: var(--text-dim);
+  font: 500 8px / 1.35 var(--font-mono);
+}
+
+.pi-eval__mode-picker button.is-selected {
+  border-color: rgba(70, 217, 232, 0.58);
+  background: rgba(70, 217, 232, 0.1);
+}
+
+.pi-eval__run-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.pi-eval__run {
+  border-color: rgba(70, 217, 232, 0.5) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(70, 217, 232, 0.18),
+    rgba(155, 138, 251, 0.14)
+  ) !important;
+}
+
+.pi-eval__run-card .pi-eval__progress,
+.pi-eval__run-card .pi-eval__status {
+  grid-column: 1 / -1;
+}
+
+.pi-eval__status {
+  min-height: 31px;
+  padding: 8px 9px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pi-eval__session-tools {
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+}
+
+.pi-eval__session-tools .pi-eval__file,
+.pi-eval__session-tools button {
+  flex: 1;
+  text-align: center;
+}
+
+.pi-eval__main {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.pi-eval__tabs {
+  position: sticky;
+  z-index: 2;
+  top: -16px;
+  margin: -16px -16px 16px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--lab-line);
+  background: rgba(9, 13, 24, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.pi-eval__tabs button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.pi-eval__tabs button.is-active {
+  border-color: rgba(70, 217, 232, 0.35);
+  background: rgba(70, 217, 232, 0.08);
+  color: var(--text);
+}
+
+.pi-eval__empty {
+  display: flex;
+  min-height: calc(100% - 58px);
+  max-width: 650px;
+  margin: auto;
+  padding: 40px;
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.pi-eval__empty > span {
+  color: var(--lab-cyan);
+  font: 650 10px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pi-eval__empty h3 {
+  max-width: 520px;
+  margin-top: 10px;
+  color: var(--text);
+  font: 650 26px / 1.2 var(--font);
+  text-transform: none;
+}
+
+.pi-eval__empty p,
+.pi-eval__empty ol {
+  max-width: 570px;
+  color: var(--text-dim);
+  font: 500 12px / 1.65 var(--font);
+}
+
+.pi-eval__empty ol {
+  margin: 18px 0 0;
+  padding-left: 18px;
+}
+
+.pi-eval__result-heading {
+  display: flex;
+  margin-bottom: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pi-eval__result-heading h3 {
+  max-width: 700px;
+  margin-top: 4px;
+  color: var(--text);
+  font: 650 18px var(--font);
+  text-transform: none;
+}
+
+.pi-eval__result-heading time,
+.pi-eval__result-heading > strong {
+  color: var(--text-dim);
+  font: 550 10px var(--font-mono);
+}
+
+.pi-eval__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.pi-eval__metrics > div,
+.pi-eval__trace-summary > div {
+  padding: 12px;
+  border: 1px solid var(--lab-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pi-eval__metrics span,
+.pi-eval__metrics strong,
+.pi-eval__trace-summary span,
+.pi-eval__trace-summary strong {
+  display: block;
+}
+
+.pi-eval__metrics span,
+.pi-eval__trace-summary span {
+  color: var(--text-dim);
+  font: 550 9px var(--font-mono);
+  text-transform: uppercase;
+}
+
+.pi-eval__metrics strong,
+.pi-eval__trace-summary strong {
+  margin-top: 5px;
+  font: 650 18px var(--font-mono);
+}
+
+.pi-eval__chart-grid {
+  display: grid;
+  margin-top: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pi-eval__chart,
+.pi-eval__table,
+.pi-eval__comparison,
+.pi-eval__replay,
+.pi-eval__trace-summary {
+  padding: 13px;
+  border: 1px solid var(--lab-line);
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.pi-eval__chart h3,
+.pi-eval__table h3,
+.pi-eval__trace-summary h3 {
+  margin-bottom: 9px;
+  color: var(--text-dim);
+  font: 650 9px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pi-eval__chart svg {
+  display: block;
+  width: 100%;
+  height: 135px;
+}
+
+.pi-eval__chart line {
+  stroke: rgba(255, 255, 255, 0.09);
+}
+
+.pi-eval__chart path {
+  fill: none;
+  stroke: var(--lab-cyan);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.pi-eval__replay {
+  min-height: 360px;
+}
+
+.pi-eval__transport {
+  margin: 20px 0 24px;
+}
+
+.pi-eval__transport button {
+  display: flex;
+  min-width: 170px;
+  padding: 11px 13px;
+  align-items: center;
+  gap: 9px;
+}
+
+.pi-eval__transport button > span {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  place-items: center;
+  font: 700 10px var(--font-mono);
+}
+
+.pi-eval__transport button.is-selected {
+  border-color: rgba(70, 217, 232, 0.55);
+  background: rgba(70, 217, 232, 0.1);
+}
+
+.pi-eval__transport .is-stop {
+  min-width: auto;
+  margin-left: auto;
+  color: #fecdd3;
+}
+
+.pi-eval__error-timeline > button {
+  display: block;
+  width: 100%;
+  min-height: 140px;
+  padding: 14px 0;
+  border: 0;
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px) 0 0 / 100% 25%,
+    transparent;
+  cursor: crosshair;
+}
+
+.pi-eval__error-timeline svg {
+  display: block;
+  width: 100%;
+}
+
+.pi-eval__error-track {
+  fill: rgba(148, 163, 184, 0.22);
+}
+
+.pi-eval__error-marker.is-timing,
+.pi-eval__error-marker.is-drop {
+  fill: var(--lab-red);
+}
+
+.pi-eval__error-marker.is-missing {
+  fill: var(--lab-amber);
+}
+
+.pi-eval__error-marker.is-extra {
+  fill: var(--lab-violet);
+}
+
+.pi-eval__playback-cursor {
+  stroke: #f8fafc;
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 4px #020617);
+}
+
+.pi-eval__error-timeline > div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-dim);
+  font: 550 11px var(--font-mono);
+}
+
+.pi-eval__error-timeline > div strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+}
+
+.pi-eval__legend-row {
+  margin-top: 16px;
+  color: var(--text-dim);
+  font: 500 10px var(--font-mono);
+}
+
+.pi-eval__legend-row i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+}
+
+.pi-eval__legend-row .is-cursor {
+  background: #f8fafc;
+}
+
+.pi-eval__legend-row .is-timing {
+  background: var(--lab-red);
+}
+
+.pi-eval__legend-row .is-missing {
+  background: var(--lab-amber);
+}
+
+.pi-eval__legend-row .is-extra {
+  background: var(--lab-violet);
+}
+
+.pi-eval__diagnostic-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) 220px;
+  gap: 10px;
+}
+
+.pi-eval__table > div,
+.pi-eval__table > button {
+  display: grid;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 0;
+  border-top: 1px solid var(--lab-line);
+  border-radius: 0;
+  background: transparent;
+  grid-template-columns: 90px 1fr 110px;
+  color: var(--text);
+  text-align: left;
+  font: 550 10px var(--font-mono);
+}
+
+.pi-eval__table > button:hover {
+  background: rgba(70, 217, 232, 0.06);
+}
+
+.pi-eval__table .is-head {
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.pi-eval__trace-summary {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.pi-eval__comparison {
+  min-width: 420px;
+  margin-top: 10px;
+}
+
+.pi-eval__comparison h3 {
+  margin-bottom: 10px;
+}
+
+.pi-eval__comparison-head,
+.pi-eval__comparison > div {
+  display: grid;
+  padding: 7px 0;
+  border-top: 1px solid var(--lab-line);
+  grid-template-columns: 1fr 130px 130px;
+  font: 550 10px var(--font-mono);
+}
+
+@media (max-width: 1000px) {
+  .pi-eval__health {
     display: none;
   }
+
+  .pi-eval__topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .pi-eval__workspace {
+    grid-template-columns: 270px minmax(0, 1fr);
+  }
+
+  .pi-eval__metrics {
+    grid-template-columns: repeat(2, minmax(100px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
   .led-strip-harness {
+    top: 68px;
     right: 6px;
     left: 6px;
   }
+
+  .led-strip-harness__legend > span {
+    display: none;
+  }
+
+  .led-strip-harness__song {
+    display: none;
+  }
+
+  .led-strip-harness input {
+    min-width: 0;
+    flex: 1;
+  }
+
   .led-strip-harness__row,
   .led-strip-harness__ticks {
     gap: 1px;
     grid-template-columns: 20px repeat(100, minmax(1px, 1fr));
   }
-  .led-strip-harness input {
+
+  .pi-eval,
+  .pi-lab.is-hardware-open .pi-eval {
+    inset: 124px 6px 6px;
+  }
+
+  .pi-eval.is-fullscreen {
+    inset: 4px;
+  }
+
+  .pi-eval__topbar {
+    min-height: 62px;
+    padding: 10px;
+  }
+
+  .pi-eval__identity h2 {
+    font-size: 16px;
+  }
+
+  .pi-eval__workspace {
+    display: block;
+    overflow-y: auto;
+  }
+
+  .pi-eval__setup {
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--lab-line);
+  }
+
+  .pi-eval__main {
+    overflow: visible;
+  }
+
+  .pi-eval__chart-grid,
+  .pi-eval__diagnostic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pi-eval__transport {
+    flex-wrap: wrap;
+  }
+
+  .pi-eval__transport button {
     min-width: 0;
     flex: 1;
+  }
+
+  .pi-eval__transport .is-stop {
+    margin-left: 0;
+    flex: 0;
   }
 }

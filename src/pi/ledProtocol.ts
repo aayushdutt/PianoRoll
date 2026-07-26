@@ -6,6 +6,9 @@ export interface LedSetMessage {
   on: boolean
   color?: string
   velocity?: number
+  t?: number
+  eventId?: number
+  sessionId?: string | null
 }
 
 export interface LedClearMessage {
@@ -26,9 +29,76 @@ export interface PiStatusMessage {
   position: number
   duration: number
   eventCount: number
+  threshold?: number
+  holdMs?: number
+  energyOff?: boolean
+  energyGate?: number
+  timingMode?: TimingMode
+  traceSessionId?: string | null
+  traceActive?: boolean
+  lookaheadS?: number
+  computeMs?: number
+  audioLevelDbfs?: number
+  queuedEvents?: number
+  slackMs?: number
+  latencyBudgetMs?: number
+  fixedExtraBufferMs?: number
+  droppedAudioMs?: number
+  resyncs?: number
+  lateEvents?: number
+  suppressedOnsets?: number
+  epochAdjustmentMs?: number
 }
 
-export type LedMessage = LedSetMessage | LedClearMessage | LedSnapshotMessage | PiStatusMessage
+export type TimingMode = 'adaptive' | 'fixed'
+
+export interface EvaluationStartedMessage {
+  type: 'evaluation_started'
+  sessionId: string
+  timingMode: TimingMode
+}
+
+export interface EvaluationStoppedMessage {
+  type: 'evaluation_stopped'
+  sessionId: string
+  recordCount: number
+}
+
+export interface EvaluationTraceRecord {
+  stage: string
+  serverTime: number
+  eventId?: number | null
+  batchId?: number
+  pitch?: number
+  velocity?: number
+  audioTime?: number
+  dueTime?: number
+  latenessMs?: number
+  reason?: string
+  kind?: string
+  adjustmentMs?: number
+  startAudioTime?: number
+  endAudioTime?: number
+  durationMs?: number
+  timingMode?: TimingMode
+}
+
+export interface EvaluationTraceMessage {
+  type: 'evaluation_trace'
+  sessionId: string
+  chunkIndex: number
+  chunkCount: number
+  records: EvaluationTraceRecord[]
+}
+
+export type LedMessage =
+  | LedSetMessage
+  | LedClearMessage
+  | LedSnapshotMessage
+  | PiStatusMessage
+  | EvaluationStartedMessage
+  | EvaluationStoppedMessage
+  | EvaluationTraceMessage
 
 function isOutputIndex(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0 && Number(value) < LED_OUTPUT_COUNT
@@ -46,7 +116,7 @@ export function parseLedMessage(value: unknown): LedMessage | null {
     typeof message.duration === 'number' &&
     typeof message.eventCount === 'number'
   ) {
-    return {
+    const status: PiStatusMessage = {
       type: 'status',
       state: message.state as PiPlaybackState,
       song: message.song,
@@ -54,12 +124,89 @@ export function parseLedMessage(value: unknown): LedMessage | null {
       duration: message.duration,
       eventCount: message.eventCount,
     }
+    if (typeof message.threshold === 'number') status.threshold = message.threshold
+    if (typeof message.holdMs === 'number') status.holdMs = message.holdMs
+    if (typeof message.energyOff === 'boolean') status.energyOff = message.energyOff
+    if (typeof message.energyGate === 'number') status.energyGate = message.energyGate
+    if (message.timingMode === 'adaptive' || message.timingMode === 'fixed') {
+      status.timingMode = message.timingMode
+    }
+    if (typeof message.traceSessionId === 'string' || message.traceSessionId === null) {
+      status.traceSessionId = message.traceSessionId
+    }
+    if (typeof message.traceActive === 'boolean') status.traceActive = message.traceActive
+    for (const key of [
+      'lookaheadS',
+      'computeMs',
+      'audioLevelDbfs',
+      'queuedEvents',
+      'slackMs',
+      'latencyBudgetMs',
+      'fixedExtraBufferMs',
+      'droppedAudioMs',
+      'resyncs',
+      'lateEvents',
+      'suppressedOnsets',
+      'epochAdjustmentMs',
+    ] as const) {
+      if (typeof message[key] === 'number') status[key] = message[key]
+    }
+    return status
   }
   if (message.type === 'set' && isOutputIndex(message.index) && typeof message.on === 'boolean') {
     const parsed: LedSetMessage = { type: 'set', index: message.index, on: message.on }
     if (typeof message.color === 'string') parsed.color = message.color
     if (typeof message.velocity === 'number') parsed.velocity = message.velocity
+    if (typeof message.t === 'number') parsed.t = message.t
+    if (typeof message.eventId === 'number') parsed.eventId = message.eventId
+    if (typeof message.sessionId === 'string' || message.sessionId === null) {
+      parsed.sessionId = message.sessionId
+    }
     return parsed
+  }
+  if (
+    message.type === 'evaluation_started' &&
+    typeof message.sessionId === 'string' &&
+    (message.timingMode === 'adaptive' || message.timingMode === 'fixed')
+  ) {
+    return {
+      type: 'evaluation_started',
+      sessionId: message.sessionId,
+      timingMode: message.timingMode,
+    }
+  }
+  if (
+    message.type === 'evaluation_stopped' &&
+    typeof message.sessionId === 'string' &&
+    Number.isInteger(message.recordCount)
+  ) {
+    return {
+      type: 'evaluation_stopped',
+      sessionId: message.sessionId,
+      recordCount: Number(message.recordCount),
+    }
+  }
+  if (
+    message.type === 'evaluation_trace' &&
+    typeof message.sessionId === 'string' &&
+    Number.isInteger(message.chunkIndex) &&
+    Number.isInteger(message.chunkCount) &&
+    Array.isArray(message.records) &&
+    message.records.every(
+      (record) =>
+        record &&
+        typeof record === 'object' &&
+        typeof (record as Record<string, unknown>).stage === 'string' &&
+        typeof (record as Record<string, unknown>).serverTime === 'number',
+    )
+  ) {
+    return {
+      type: 'evaluation_trace',
+      sessionId: message.sessionId,
+      chunkIndex: Number(message.chunkIndex),
+      chunkCount: Number(message.chunkCount),
+      records: message.records as EvaluationTraceRecord[],
+    }
   }
   if (
     message.type === 'snapshot' &&
@@ -87,7 +234,14 @@ export function midiVelocityToUnit(velocity: number | undefined, fallback = 0.8)
 }
 
 export function applyLedMessage(outputs: readonly boolean[], message: LedMessage): boolean[] {
-  if (message.type === 'status') return [...outputs]
+  if (
+    message.type === 'status' ||
+    message.type === 'evaluation_started' ||
+    message.type === 'evaluation_stopped' ||
+    message.type === 'evaluation_trace'
+  ) {
+    return [...outputs]
+  }
   if (message.type === 'clear_all') return Array.from({ length: LED_OUTPUT_COUNT }, () => false)
   if (message.type === 'snapshot') return [...message.outputs]
   const next = [...outputs]
