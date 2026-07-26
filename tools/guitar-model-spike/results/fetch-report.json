@@ -1,0 +1,107 @@
+{
+  "fetchedAt": "2026-07-21T04:49:31.040Z",
+  "trackIds": [
+    "00_SS1-68-E_comp",
+    "00_BN1-129-Eb_solo",
+    "01_BN2-166-Ab_comp",
+    "01_Jazz1-130-D_solo",
+    "02_Rock3-148-C_comp",
+    "02_SS1-100-C#_solo",
+    "03_Jazz1-200-B_comp",
+    "03_Jazz2-110-Bb_solo",
+    "04_SS3-98-C_comp",
+    "04_Jazz1-200-B_solo",
+    "05_SS1-68-E_comp",
+    "05_Rock2-85-F_solo"
+  ],
+  "audio": {
+    "results": [
+      {
+        "name": "00_SS1-68-E_comp_mic.wav",
+        "bytes": 3734996,
+        "sha256": "f301b36c16e3a4e7646905f1f8da82f539afbacccdbf33928dc77a0a4f55b7b7",
+        "cached": false,
+        "ms": 29320
+      },
+      {
+        "name": "00_BN1-129-Eb_solo_mic.wav",
+        "bytes": 1969056,
+        "sha256": "2a6057d0485d8ee2f4a04175ee085d610c0f7a13194e083b13ce803bec091d43",
+        "cached": false,
+        "ms": 5537
+      },
+      {
+        "name": "01_BN2-166-Ab_comp_mic.wav",
+        "bytes": 2040110,
+        "sha256": "6aa9debf130ca3e27ed5fe30d4986ad4dcd2620a21760a1984e548cc0231b62c",
+        "cached": false,
+        "ms": 12751
+      },
+      {
+        "name": "01_Jazz1-130-D_solo_mic.wav",
+        "bytes": 1953428,
+        "sha256": "726991869569d7b76fe69b36fbefb3571f030556f020a7e3d599f0728d60f3ef",
+        "cached": false,
+        "ms": 10744
+      },
+      {
+        "name": "02_Rock3-148-C_comp_mic.wav",
+        "bytes": 2288022,
+        "sha256": "0ce12b6c42e79f6d02e82577b7128de77c2c02d79f4b6600833df2afdbdfa5ff",
+        "cached": false,
+        "ms": 19826
+      },
+      {
+        "name": "02_SS1-100-C#_solo_mic.wav",
+        "bytes": 2540204,
+        "sha256": "1866e928ccc36ab697754b30bbfc293e603deb445362372472e5b01f320f9623",
+        "cached": false,
+        "ms": 20925
+      },
+      {
+        "name": "03_Jazz1-200-B_comp_mic.wav",
+        "bytes": 1270124,
+        "sha256": "2bcc479599713e00c934cdfd382e7f217438369cbf36ff6125ef0049a6761373",
+        "cached": false,
+        "ms": 5096
+      },
+      {
+        "name": "03_Jazz2-110-Bb_solo_mic.wav",
+        "bytes": 3078506,
+        "sha256": "44b1d87dfda1833356b380b87520bd3b3548e2ab67d3498a63bb3fdc01de856c",
+        "cached": false,
+        "ms": 27791
+      },
+      {
+        "name": "04_SS3-98-C_comp_mic.wav",
+        "bytes": 3455614,
+        "sha256": "ffd315c2999a31d800ac707d330e661aa58cc2d4b6d3dd99230326860d11ca68",
+        "cached": false,
+        "ms": 22346
+      },
+      {
+        "name": "04_Jazz1-200-B_solo_mic.wav",
+        "bytes": 1270124,
+        "sha256": "4f567c6c6501ae25086ed7423eb3f9d3c653c002d3fb75373d17bf3136730bda",
+        "cached": false,
+        "ms": 4660
+      },
+      {
+        "name": "05_SS1-68-E_comp_mic.wav",
+        "bytes": 3734996,
+        "sha256": "665b982fb9221b5c91b0ed0c3d2c271f3fab569e8a1f397f0e5f46fde8a298d5",
+        "cached": false,
+        "ms": 26585
+      },
+      {
+        "name": "05_Rock2-85-F_solo_mic.wav",
+        "bytes": 3984320,
+        "sha256": "44203ba40a1bc5675c1991666e7a780b8cd4f3af566b2c8addca7b699616aa03",
+        "cached": false,
+        "ms": 5479
+      }
+    ],
+    "requestsMade": 25,
+    "bytesOverWire": 21478011
+  }
+}

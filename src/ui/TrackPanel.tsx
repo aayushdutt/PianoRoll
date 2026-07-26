@@ -2,7 +2,6 @@ import { createSignal, For } from 'solid-js'
 import { render } from 'solid-js/web'
 import type { MidiFile, MidiTrack } from '../core/midi/types'
 import { t, tn } from '../i18n'
-import type { PianoRollRenderer } from '../renderer/PianoRollRenderer'
 import { getTrackColor, type Theme } from '../renderer/theme'
 import { icons } from './icons'
 import { hexToCSS, isNarrowViewport } from './utils'
@@ -16,7 +15,7 @@ interface PanelProps {
   isSheet: () => boolean
   tracks: () => readonly MidiTrack[]
   theme: () => Theme
-  renderer: PianoRollRenderer
+  onTrackVisibleChange: (trackId: string, visible: boolean) => void
   onTrackEnabledChange: (trackId: string, enabled: boolean) => void
   onLoadNew: () => void
   registerPanelEl: (el: HTMLElement) => void
@@ -61,7 +60,7 @@ function TrackPanelView(props: PanelProps) {
                     onChange={(e) => {
                       e.stopPropagation()
                       const enabled = e.currentTarget.checked
-                      props.renderer.setTrackVisible(tr.id, enabled)
+                      props.onTrackVisibleChange(tr.id, enabled)
                       props.onTrackEnabledChange(tr.id, enabled)
                     }}
                   />
@@ -114,16 +113,21 @@ export class TrackPanel {
     this.positionUnder()
   }
 
+  // Decoupled from any concrete renderer — the caller supplies a callback for
+  // per-track visibility (piano-only today, but this keeps TrackPanel from
+  // needing to know that) and the theme to seed with; `setTheme()` still
+  // drives subsequent updates explicitly.
   constructor(
     container: HTMLElement,
-    renderer: PianoRollRenderer,
+    initialTheme: Theme,
+    onTrackVisibleChange: (trackId: string, visible: boolean) => void,
     onTrackEnabledChange: (trackId: string, enabled: boolean) => void,
     onLoadNew: () => void,
   ) {
     const [isOpen, setIsOpen] = createSignal(false)
     const [isSheet, setIsSheet] = createSignal(false)
     const [tracks, setTracks] = createSignal<readonly MidiTrack[]>([])
-    const [theme, setThemeSig] = createSignal<Theme>(renderer.currentTheme)
+    const [theme, setThemeSig] = createSignal<Theme>(initialTheme)
     this.isOpenFn = isOpen
     this.setIsOpen = setIsOpen
     this.setIsSheet = setIsSheet
@@ -140,7 +144,7 @@ export class TrackPanel {
           isSheet={isSheet}
           tracks={tracks}
           theme={theme}
-          renderer={renderer}
+          onTrackVisibleChange={onTrackVisibleChange}
           onTrackEnabledChange={onTrackEnabledChange}
           onLoadNew={() => {
             this.close()

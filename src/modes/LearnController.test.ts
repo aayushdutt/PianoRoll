@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MidiFile } from '../core/midi/types'
 import { LearnController } from './LearnController'
 
+const runnerLaunch = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const runnerClose = vi.hoisted(() => vi.fn(() => null))
+const createSessionSummaryMock = vi.hoisted(() =>
+  vi.fn(() => ({ show: vi.fn(), dismiss: vi.fn() })),
+)
+
 // LearnOverlay pulls in PixiJS (Container / Graphics) which needs a real
 // WebGL context — not available in jsdom. Mock the whole module so
 // `new LearnOverlay()` returns a plain object with enough of the surface to
@@ -26,12 +32,8 @@ vi.mock('../learn/core/ExerciseRunner', () => ({
     get activeId() {
       return null
     }
-    launch() {
-      return Promise.resolve()
-    }
-    close() {
-      return null
-    }
+    launch = runnerLaunch
+    close = runnerClose
   },
 }))
 
@@ -45,7 +47,7 @@ vi.mock('../learn/hub/LearnHub', () => ({
 // SessionSummary renders HTML into the hub host after an exercise closes.
 // Not exercised by these tests; mocking prevents stray DOM side-effects.
 vi.mock('../learn/ui/SessionSummary', () => ({
-  createSessionSummary: () => ({ show: () => {}, dismiss: () => {} }),
+  createSessionSummary: createSessionSummaryMock,
 }))
 
 vi.mock('../telemetry', () => ({
@@ -100,6 +102,7 @@ function makeFakeCtx() {
         setState: vi.fn((key: string, val: unknown) => {
           ;(storeState as Record<string, unknown>)[key] = val
         }),
+        setVisualizationForced: vi.fn(),
       },
       clock: {
         currentTime: 0,
@@ -193,5 +196,160 @@ describe('LearnController.queueMidi', () => {
     ctrl.enter()
     await Promise.resolve()
     expect(ctx.setLearnFileName).toHaveBeenCalledWith('bach-prelude.mid')
+  })
+})
+
+// `launchExercise` is private — the hub UI is mocked out (see the
+// `createLearnHub` mock above), so it's the only way to drive a non-default
+// exercise without standing up the real catalog/hub DOM. Casting to reach it
+// tests the forcing/restoration policy directly, independent of hub wiring.
+interface LaunchExerciseAccess {
+  launchExercise(descriptor: { id: string; category: string }): Promise<void>
+  consumeMidi(midi: MidiFile): Promise<void>
+}
+
+describe('LearnController visualization forcing', () => {
+  const sightReading = { id: 'sight-reading', category: 'sight-reading' }
+  const playAlongLike = { id: 'play-along', category: 'play-along' }
+
+  it('forces piano and disables the selector for a non-play-along exercise', async () => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    await Promise.resolve()
+    await (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith('piano')
+  })
+
+  it('clears the force when the launched exercise is play-along', async () => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    await Promise.resolve()
+    await (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+    await (ctrl as unknown as LaunchExerciseAccess).launchExercise(playAlongLike)
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith(null)
+  })
+
+  it('restores on exit() — never overwrites the saved preference, only clears the force', async () => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    await Promise.resolve()
+    await (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith('piano')
+    ctrl.exit()
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith(null)
+  })
+
+  it('exit invalidates runner work even when no exercise is active', async () => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    await (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+    runnerClose.mockClear()
+    ctrl.exit()
+    expect(runnerClose).toHaveBeenCalledWith('abandoned')
+  })
+
+  it('clears a piano force when exercise launch rejects', async () => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    runnerLaunch.mockRejectedValueOnce(new Error('exercise failed'))
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenNthCalledWith(1, 'piano')
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith(null)
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+  })
+
+  it('does not let a stale failed launch roll back a newer successful launch', async () => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    let rejectFirst!: (reason: unknown) => void
+    runnerLaunch
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectFirst = reject
+          }),
+      )
+      .mockResolvedValueOnce(undefined)
+    const first = (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+    const second = (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+    await second
+    rejectFirst(new Error('stale preload failed'))
+    await first
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith('piano')
+  })
+
+  it.each([
+    'resolve',
+    'reject',
+  ] as const)('closes an inactive pending launch and ignores its later %s', async (settlement) => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    ctrl.learnState.completeLoad(makeMidi('pending.mid'))
+    let resolveLaunch!: () => void
+    let rejectLaunch!: (reason: unknown) => void
+    runnerLaunch.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          resolveLaunch = resolve
+          rejectLaunch = reject
+        }),
+    )
+    const launch = (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+
+    runnerClose.mockClear()
+    createSessionSummaryMock.mockClear()
+    ctrl.closeActiveExercise('abandoned')
+
+    expect(runnerClose).toHaveBeenCalledWith('abandoned')
+    expect(createSessionSummaryMock).not.toHaveBeenCalled()
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith(null)
+    expect(ctrl.view.value).toBe('hub')
+    expect(ctrl.learnState.state.loadedMidi).toBeNull()
+    expect(ctx.setLearnFileName).toHaveBeenLastCalledWith(null)
+
+    if (settlement === 'resolve') resolveLaunch()
+    else rejectLaunch(new Error('cancelled preload failed'))
+    await launch
+
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith(null)
+    expect(ctrl.view.value).toBe('hub')
+    expect(ctrl.learnState.state.loadedMidi).toBeNull()
+  })
+
+  it('cancels a pending launch before consuming a fresh MIDI', async () => {
+    const ctx = makeFakeCtx()
+    const ctrl = new LearnController(ctx as never)
+    ctrl.enter()
+    let rejectOld!: (reason: unknown) => void
+    runnerLaunch
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectOld = reject
+          }),
+      )
+      .mockResolvedValueOnce(undefined)
+    const oldLaunch = (ctrl as unknown as LaunchExerciseAccess).launchExercise(sightReading)
+
+    runnerClose.mockClear()
+    await (ctrl as unknown as LaunchExerciseAccess).consumeMidi(makeMidi('fresh.mid'))
+    expect(runnerClose).toHaveBeenCalledWith('abandoned')
+    expect(ctrl.learnState.state.loadedMidi?.name).toBe('fresh.mid')
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith(null)
+
+    rejectOld(new Error('stale pending launch failed'))
+    await oldLaunch
+    expect(ctrl.learnState.state.loadedMidi?.name).toBe('fresh.mid')
+    expect(ctx.services.store.setVisualizationForced).toHaveBeenLastCalledWith(null)
+    expect(ctrl.view.value).toBe('exercise')
   })
 })

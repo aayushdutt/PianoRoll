@@ -75,6 +75,16 @@ export function booleanPersisted(key: string, fallback: boolean): Persisted<bool
   return persisted(key, fallback, (raw) => raw === 'true')
 }
 
+/** One of a fixed set of string literals. Any other stored value (including
+ * values from a since-removed variant) falls back to `fallback`. */
+export function stringEnumPersisted<T extends string>(
+  key: string,
+  fallback: T,
+  allowed: readonly T[],
+): Persisted<T> {
+  return persisted(key, fallback, (raw) => (allowed.includes(raw as T) ? (raw as T) : null))
+}
+
 // Structured value serialised as JSON. Callers supply a fallback used when the
 // key is missing, invalid, or a migration throws; and an optional `migrate`
 // hook that runs on every successful parse so older schemas can be upgraded

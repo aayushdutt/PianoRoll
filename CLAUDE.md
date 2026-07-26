@@ -1,4 +1,4 @@
-**Reality:** The product is **midee** (`package.json` → `"name": "midee"`). The repo directory on disk is often **`pianoroll`** — same codebase. Everything user-facing is a **static Vite SPA**: MIDI, audio, Pixi canvas, and MP4 export run in the **browser only**; there is no app server for core features (deploy is static assets + optional analytics keys).
+**Reality:** The product is **midee** (`package.json` → `"name": "midee"`). The repo directory on disk is often **`pianoroll`** — same codebase. Everything user-facing is a **static Vite SPA**: MIDI, audio, the Pixi piano/guitar canvases, and MP4 export run in the **browser only**; there is no app server for core features (deploy is static assets + optional analytics keys).
 
 ## Commands (from `package.json`, repo root)
 
@@ -35,7 +35,7 @@ Dependency versions (Solid, Vite, Pixi, Tone, mediabunny, etc.) live in **`packa
 - **UI:** SolidJS (`*.tsx`), progressive port: some surfaces still mount from the imperative **`App`** class while Solid owns a subtree under `#solid-root` (see `src/main.tsx` comments).
 - **Orchestration:** `createApp()` builds the store, constructs **`App`** (`src/app.ts`), `await app.init()`, returns `{ ctx, app }` for `AppCtx` + subsystem handles (`src/createApp.ts`).
 - **State:** `src/store/` (`state.ts` store factory, `AppCtx.ts`, `watch.ts`, `eventSignal.ts`).
-- **Graphics / theory / MIDI helpers:** Pixi.js + `pixi-filters`, **tonal**, `@tonejs/midi`, `@tonejs/piano`, **tone** (synth / scheduling).
+- **Graphics / theory / MIDI helpers:** Pixi.js + `pixi-filters`, **tonal**, `@tonejs/midi`, `@tonejs/piano`, **tone** (synth / scheduling). Shared surface routing starts in `src/renderer/`; Guitar tuning, fingering, interaction, and rendering live in `src/guitar/`.
 - **MP4 export:** **`VideoEncoder` / `AudioEncoder` (WebCodecs) + Mediabunny** (`mediabunny`); offline audio via **`OfflineAudioRenderer`** (`src/export/VideoExporter.ts` header comment). Heavy export modules are **dynamic-imported** from `App` so they stay out of the initial bundle (`src/app.ts` comment near `VideoExporter`).
 
 ## Where things live (verified paths)
@@ -48,7 +48,8 @@ Dependency versions (Solid, Vite, Pixi, Tone, mediabunny, etc.) live in **`packa
 | Clock / MIDI parse / persistence / service types | `src/core/` (`core/clock/MasterClock.ts`, `core/midi/parser.ts`, `core/persistence.ts`, `core/services.ts`) |
 | Audio                                            | `src/audio/` (`AudioEngine.ts`, `SynthEngine.ts`, `Metronome.ts`, `OfflineAudioRenderer.ts`, …)             |
 | MIDI I/O & recording                             | `src/midi/`                                                                                                 |
-| Canvas / piano roll / particles                  | `src/renderer/`                                                                                             |
+| Piano canvas / shared surface routing / particles | `src/renderer/`                                                                                            |
+| Guitar profile / fingering / interaction / canvas | `src/guitar/`                                                                                              |
 | Export                                           | `src/export/VideoExporter.ts`                                                                               |
 | Modes (home / live / learn wiring)               | `src/modes/`                                                                                                |
 | Learn / practice                                 | `src/learn/`                                                                                                |

@@ -1,9 +1,9 @@
 # midee
 
-**A browser-native MIDI studio and piano visualization harness.** Load a MIDI
-file to play it on an 88-key piano with cascading notes, glowing keys, and
-particle effects. Connect a MIDI controller to play live, practice, record,
-loop, and export performances.
+**A browser-native MIDI studio with piano-roll and guitar-fretboard
+visualization.** Load a MIDI file to play it on an 88-key piano or a 6-string
+guitar surface with falling notes and live highlights. Connect a MIDI
+controller to play live, practice, record, loop, and export performances.
 
 The project now also includes an experimental Raspberry Pi verification mode
 for developing an 88-key piano-learning LED strip.
@@ -13,10 +13,12 @@ for developing an 88-key piano-learning LED strip.
 ## Features
 
 - 88-key piano visualization with multi-track playback and live note glow.
+- 6-string, 24-fret guitar visualization (standard EADGBE) with ergonomic
+  fingering inference, touch input, and a keyboard-accessible 6 × 25 fret grid.
 - Web MIDI, sustain pedal, and computer-keyboard input.
 - Sampled instruments, looping, session recording, and MIDI export.
-- Synthesia-style practice modes.
-- Local MP4 rendering through WebCodecs.
+- Synthesia-style practice modes and interactive Play-Along exercises.
+- Local active-surface MP4 video rendering through WebCodecs.
 - Raspberry Pi LED harness with WebSocket streaming and transport controls.
 - MIDI velocity propagation from the Pi into Midee's normal input,
   visualization, and synthesizer path.
@@ -42,6 +44,7 @@ Useful commands:
 
 ```bash
 npm run dev
+npm run check
 npm run typecheck
 npm run test
 npm run build
@@ -222,12 +225,54 @@ on the host operating system's ability to expose received Bluetooth audio as a
 capturable stream; Linux, Windows, and macOS provide different A2DP sink
 capabilities.
 
+## MIDI Guitar visualization
+
+Midee supports a 6-string guitar fretboard alongside the 88-key piano surface.
+To use it:
+
+1. Open a MIDI file in **Play**, or enter **Live** for controller and direct
+   fretboard input.
+2. Choose **Guitar** in the Piano/Guitar view selector in the top strip. The
+   choice is saved locally and does not change the selected audio instrument.
+3. Click or touch a fret to play its exact string/fret position. Drag
+   horizontally, use a horizontal wheel gesture, or hold Shift while scrolling
+   to reach later frets.
+4. For keyboard access in Play or Guitar Play-Along, Tab to the interactive
+   fretboard and use the controls in [Keyboard controls](#keyboard-controls).
+   Live currently reserves Tab for its session shortcut.
+
+The current guitar contract is:
+
+- **Timbre Independence:** The active visualization surface (Piano vs Guitar) is independent of output audio timbre settings.
+- **Fretboard Geometry:** Standard EADGBE 24-fret profile (MIDI 40 [E2] to MIDI 88 [E6] inclusive).
+- **Supported Workflows:** MIDI file Play mode, Live input, Guitar Play-Along,
+  multi-track visibility toggles, touch/mobile layouts with at least 44 px
+  targets and horizontal panning, and active-surface WebCodecs MP4 export for
+  loaded MIDI files in Play.
+- **Accessibility:** A localized 6-row × 25-column DOM grid mirrors every
+  string/fret position. It supports roving keyboard focus without intercepting
+  mouse or touch input intended for the canvas.
+- **Fingering Inference & Live Semantics:** Scheduled MIDI playback uses `precomputeGuitarFingerings` with 40 ms cluster windowing, movement distance penalties against immediately preceding cluster positions at the same cluster-array index, and soft MIDI channel affinity across time. Live performance uses `assignLiveGuitarVoices`, which preserves explicit direct fret positions, reserves those strings, and calls `assignGuitarCluster` with an empty state for remaining held notes (without prior-cluster history across live renders). Inferred fingering provides playable guidance and is not exact performed tablature.
+- **Unsupported Voices:** Out-of-range notes (<40 or >88) or polyphony > 6 play through Midee's normal audio and synthesizer path and remain visible, but are marked unassigned and are not required for Guitar Play-Along verification.
+- **Learn Exercises:** Piano-only Learn exercises temporarily force the piano
+  visualization and disable the view selector with an explanation. Leaving the
+  exercise restores the saved Guitar preference.
+- **Explicit v1 Exclusions:** Microphone/Pi guitar audio transcription is absent (the separate Pi verification harness is piano-oriented), alternate tunings, pitch bends/MPE, and exact performed tablature.
+
+For complete behavior and controls, see
+[`docs/MIDI_GUITAR.md`](docs/MIDI_GUITAR.md). The separate
+[`docs/GUITAR_TRANSCRIPTION_MODEL_EVALUATION.md`](docs/GUITAR_TRANSCRIPTION_MODEL_EVALUATION.md)
+records the open-source audio-transcription research. No transcription model
+was adopted in v1; shipped Guitar mode consumes note events from MIDI,
+computer-keyboard, and direct fretboard input rather than raw audio.
+
 ## Main architecture
 
 ```text
 core/       MIDI types, clock, music logic, and practice engines
 audio/      Tone.js instruments and offline rendering
-renderer/   PixiJS piano roll, keyboard, and particles
+renderer/   Shared visualization routing plus the PixiJS piano roll
+guitar/     Tuning, fingering, fretboard interaction, and guitar surface
 midi/       Web MIDI input, looping, recording, and encoding
 pi/         Pi harness UI, protocol parsing, and LED state mapping
 pi_bridge/  Python MIDI-file verification bridge
@@ -237,12 +282,18 @@ export/     WebCodecs video export
 
 ## Keyboard controls
 
-| Key | Action |
-| --- | --- |
-| `Space` | Play or pause |
-| `Z-M`, `Q-P` | Play two octaves |
-| `S D G H J`, `2 3 5 6 7` | Play black keys |
-| Left/Right arrow | Shift octave |
+| Key | Context | Action |
+| --- | --- | --- |
+| `Space` | Play, outside the guitar fretboard | Play or pause |
+| Hold `Space` | Live, outside the guitar fretboard | Engage software sustain until released |
+| `Z-M`, `Q-P` | Computer-keyboard input | Play two octaves |
+| `S D G H J`, `2 3 5 6 7` | Computer-keyboard input | Play black keys |
+| Up/Down arrow | Outside the guitar fretboard | Shift computer-keyboard octave |
+| Left/Right arrow | Play, outside the guitar fretboard | Skip backward or forward 10 seconds |
+| `Tab` / `Shift+Tab` | Guitar in Play or Play-Along | Enter or leave the fretboard's single tab stop |
+| Arrow keys | Guitar fretboard focused | Move one fret or string; later frets pan into view |
+| `Home` / `End` | Guitar fretboard focused | Move to fret 0 or fret 24 on the current string |
+| `Enter` / `Space` | Guitar fretboard focused | Play the focused string/fret position |
 
 ## Privacy and security
 

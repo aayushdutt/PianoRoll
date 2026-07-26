@@ -1,10 +1,12 @@
 import { createEffect, onCleanup, onMount } from 'solid-js'
+import type { VisualizationMode } from '../guitar/types'
 import { t } from '../i18n'
 import type { LiveLooperState } from '../midi/LiveLooper'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
 import type { AppMode } from '../store/state'
 import { FloatingHud } from './FloatingHud'
 import { icons } from './icons'
+import { VisualizationSelector } from './VisualizationSelector'
 
 export const ZOOM_MIN = 80
 export const ZOOM_MAX = 600
@@ -32,6 +34,9 @@ export interface TopStripProps {
   onLearnThis: () => void
   registerEl: (el: HTMLElement) => void
   registerTracksBtn: (el: HTMLButtonElement) => void
+  visualizationMode: () => VisualizationMode
+  visualizationDisabled: () => boolean
+  onVisualizationChange: (mode: VisualizationMode) => void
 }
 
 export interface HudProps {
@@ -296,6 +301,11 @@ export function TopStripView(props: TopStripProps) {
           <span innerHTML={icons.practice()} />
           <span>{t('topStrip.learnThis.label')}</span>
         </button>
+        <VisualizationSelector
+          mode={props.visualizationMode()}
+          disabled={props.visualizationDisabled()}
+          onChange={(m) => props.onVisualizationChange(m)}
+        />
         <span id="ts-instrument-slot" />
         <div class="ts-sep" aria-hidden="true" />
         <button

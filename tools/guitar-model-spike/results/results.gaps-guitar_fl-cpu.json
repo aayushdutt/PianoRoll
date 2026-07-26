@@ -1,0 +1,427 @@
+{
+  "generatedAt": "2026-07-21T06:01:42Z",
+  "instrument": "guitar_fl",
+  "checkpointRepoId": "xavriley/midi-transcription-models",
+  "checkpointRequestedRevision": "689e773723bcafd8c81015b10c03f12675ce16ec",
+  "checkpointResolvedRevision": "689e773723bcafd8c81015b10c03f12675ce16ec",
+  "checkpointFile": "guitar-fl.pth",
+  "checkpointSnapshot": "snapshots/689e773723bcafd8c81015b10c03f12675ce16ec/guitar-fl.pth",
+  "checkpointSha256": "50d93dba89bdd3401849bc735614478e83d9f46d21fa3f71d8aca5acc0a52028",
+  "dependencyVersions": {
+    "hf-midi-transcription": "0.1.1",
+    "piano-transcription-inference": "0.1.0",
+    "torch": "2.13.0",
+    "huggingface-hub": "0.25.2"
+  },
+  "dependencyVcsRevisions": {
+    "hf-midi-transcription": "96f6797881e9497cbfc8f8e5deccea9c1f2f7adc",
+    "piano-transcription-inference": "7568dc7f78b625e40cf9776e2806d164006610e3"
+  },
+  "requirementsLock": {
+    "path": "python/requirements-lock.txt",
+    "sha256": "e7e6cfcc9ba678b2f5012730189e6160cb0fb1d846eda51cfd38ff24d854af42"
+  },
+  "device": "cpu",
+  "requestedDevice": "cpu",
+  "modelLoadSec": 0.3224220275878906,
+  "platform": "darwin",
+  "peakRssRaw": 7973322752,
+  "peakRssRawUnit": "bytes",
+  "peakRssKb": 7786448.0,
+  "summary": {
+    "tracksMeasured": 12,
+    "tracksTotal": 12,
+    "meanOnsetF1": 0.9028959265709879,
+    "meanOnsetOffsetF1": 0.6735658277079208,
+    "meanRealTimeFactor": 0.1183225963681311,
+    "meanRealTimeFactorExcludingFirstInference": 0.11583828767660943,
+    "totalFalsePositives": 205,
+    "totalFalseNegatives": 278
+  },
+  "perTrack": [
+    {
+      "trackId": "00_SS1-68-E_comp",
+      "player": "00",
+      "part": "comp",
+      "status": "MEASURED",
+      "audioDurationSec": 42.34639455782313,
+      "inferenceSec": 6.167752027511597,
+      "realTimeFactor": 0.1456499919748695,
+      "isFirstInference": true,
+      "predictedNoteCount": 186,
+      "groundTruthNoteCount": 189,
+      "metrics": {
+        "groundTruthNoteCount": 189,
+        "predictedNoteCount": 186,
+        "onsetOnly": {
+          "precision": 0.8709677419354839,
+          "recall": 0.8571428571428571,
+          "f1": 0.864,
+          "truePositives": 162,
+          "falsePositives": 24,
+          "falseNegatives": 27
+        },
+        "onsetAndOffset": {
+          "precision": 0.45698924731182794,
+          "recall": 0.4497354497354497,
+          "f1": 0.45333333333333325,
+          "truePositives": 85,
+          "falsePositives": 101,
+          "falseNegatives": 104
+        }
+      }
+    },
+    {
+      "trackId": "00_BN1-129-Eb_solo",
+      "player": "00",
+      "part": "solo",
+      "status": "MEASURED",
+      "audioDurationSec": 22.32439909297052,
+      "inferenceSec": 2.278142213821411,
+      "realTimeFactor": 0.10204719080383892,
+      "isFirstInference": false,
+      "predictedNoteCount": 68,
+      "groundTruthNoteCount": 71,
+      "metrics": {
+        "groundTruthNoteCount": 71,
+        "predictedNoteCount": 68,
+        "onsetOnly": {
+          "precision": 0.9411764705882353,
+          "recall": 0.9014084507042254,
+          "f1": 0.920863309352518,
+          "truePositives": 64,
+          "falsePositives": 4,
+          "falseNegatives": 7
+        },
+        "onsetAndOffset": {
+          "precision": 0.6470588235294118,
+          "recall": 0.6197183098591549,
+          "f1": 0.6330935251798561,
+          "truePositives": 44,
+          "falsePositives": 24,
+          "falseNegatives": 27
+        }
+      }
+    },
+    {
+      "trackId": "01_BN2-166-Ab_comp",
+      "player": "01",
+      "part": "comp",
+      "status": "MEASURED",
+      "audioDurationSec": 23.13,
+      "inferenceSec": 2.344412088394165,
+      "realTimeFactor": 0.10135806694311134,
+      "isFirstInference": false,
+      "predictedNoteCount": 279,
+      "groundTruthNoteCount": 260,
+      "metrics": {
+        "groundTruthNoteCount": 260,
+        "predictedNoteCount": 279,
+        "onsetOnly": {
+          "precision": 0.8136200716845878,
+          "recall": 0.8730769230769231,
+          "f1": 0.8423005565862709,
+          "truePositives": 227,
+          "falsePositives": 52,
+          "falseNegatives": 33
+        },
+        "onsetAndOffset": {
+          "precision": 0.6021505376344086,
+          "recall": 0.6461538461538462,
+          "f1": 0.6233766233766234,
+          "truePositives": 168,
+          "falsePositives": 111,
+          "falseNegatives": 92
+        }
+      }
+    },
+    {
+      "trackId": "01_Jazz1-130-D_solo",
+      "player": "01",
+      "part": "solo",
+      "status": "MEASURED",
+      "audioDurationSec": 22.14721088435374,
+      "inferenceSec": 3.2693331241607666,
+      "realTimeFactor": 0.147618277589547,
+      "isFirstInference": false,
+      "predictedNoteCount": 69,
+      "groundTruthNoteCount": 68,
+      "metrics": {
+        "groundTruthNoteCount": 68,
+        "predictedNoteCount": 69,
+        "onsetOnly": {
+          "precision": 0.9710144927536232,
+          "recall": 0.9852941176470589,
+          "f1": 0.9781021897810219,
+          "truePositives": 67,
+          "falsePositives": 2,
+          "falseNegatives": 1
+        },
+        "onsetAndOffset": {
+          "precision": 0.8405797101449275,
+          "recall": 0.8529411764705882,
+          "f1": 0.8467153284671534,
+          "truePositives": 58,
+          "falsePositives": 11,
+          "falseNegatives": 10
+        }
+      }
+    },
+    {
+      "trackId": "02_Rock3-148-C_comp",
+      "player": "02",
+      "part": "comp",
+      "status": "MEASURED",
+      "audioDurationSec": 25.94079365079365,
+      "inferenceSec": 2.8558127880096436,
+      "realTimeFactor": 0.1100896459242399,
+      "isFirstInference": false,
+      "predictedNoteCount": 388,
+      "groundTruthNoteCount": 435,
+      "metrics": {
+        "groundTruthNoteCount": 435,
+        "predictedNoteCount": 388,
+        "onsetOnly": {
+          "precision": 0.845360824742268,
+          "recall": 0.7540229885057471,
+          "f1": 0.7970838396111787,
+          "truePositives": 328,
+          "falsePositives": 60,
+          "falseNegatives": 107
+        },
+        "onsetAndOffset": {
+          "precision": 0.5721649484536082,
+          "recall": 0.5103448275862069,
+          "f1": 0.5394896719319563,
+          "truePositives": 222,
+          "falsePositives": 166,
+          "falseNegatives": 213
+        }
+      }
+    },
+    {
+      "trackId": "02_SS1-100-C#_solo",
+      "player": "02",
+      "part": "solo",
+      "status": "MEASURED",
+      "audioDurationSec": 28.8,
+      "inferenceSec": 2.2754409313201904,
+      "realTimeFactor": 0.07900836567083995,
+      "isFirstInference": false,
+      "predictedNoteCount": 61,
+      "groundTruthNoteCount": 59,
+      "metrics": {
+        "groundTruthNoteCount": 59,
+        "predictedNoteCount": 61,
+        "onsetOnly": {
+          "precision": 0.9016393442622951,
+          "recall": 0.9322033898305084,
+          "f1": 0.9166666666666666,
+          "truePositives": 55,
+          "falsePositives": 6,
+          "falseNegatives": 4
+        },
+        "onsetAndOffset": {
+          "precision": 0.819672131147541,
+          "recall": 0.847457627118644,
+          "f1": 0.8333333333333333,
+          "truePositives": 50,
+          "falsePositives": 11,
+          "falseNegatives": 9
+        }
+      }
+    },
+    {
+      "trackId": "03_Jazz1-200-B_comp",
+      "player": "03",
+      "part": "comp",
+      "status": "MEASURED",
+      "audioDurationSec": 14.4,
+      "inferenceSec": 1.8449158668518066,
+      "realTimeFactor": 0.12811915742026433,
+      "isFirstInference": false,
+      "predictedNoteCount": 81,
+      "groundTruthNoteCount": 82,
+      "metrics": {
+        "groundTruthNoteCount": 82,
+        "predictedNoteCount": 81,
+        "onsetOnly": {
+          "precision": 0.9506172839506173,
+          "recall": 0.9390243902439024,
+          "f1": 0.9447852760736196,
+          "truePositives": 77,
+          "falsePositives": 4,
+          "falseNegatives": 5
+        },
+        "onsetAndOffset": {
+          "precision": 0.48148148148148145,
+          "recall": 0.47560975609756095,
+          "f1": 0.4785276073619632,
+          "truePositives": 39,
+          "falsePositives": 42,
+          "falseNegatives": 43
+        }
+      }
+    },
+    {
+      "trackId": "03_Jazz2-110-Bb_solo",
+      "player": "03",
+      "part": "solo",
+      "status": "MEASURED",
+      "audioDurationSec": 34.90319727891156,
+      "inferenceSec": 3.2790000438690186,
+      "realTimeFactor": 0.09394554939097753,
+      "isFirstInference": false,
+      "predictedNoteCount": 96,
+      "groundTruthNoteCount": 99,
+      "metrics": {
+        "groundTruthNoteCount": 99,
+        "predictedNoteCount": 96,
+        "onsetOnly": {
+          "precision": 0.96875,
+          "recall": 0.9393939393939394,
+          "f1": 0.9538461538461539,
+          "truePositives": 93,
+          "falsePositives": 3,
+          "falseNegatives": 6
+        },
+        "onsetAndOffset": {
+          "precision": 0.9270833333333334,
+          "recall": 0.898989898989899,
+          "f1": 0.9128205128205129,
+          "truePositives": 89,
+          "falsePositives": 7,
+          "falseNegatives": 10
+        }
+      }
+    },
+    {
+      "trackId": "04_SS3-98-C_comp",
+      "player": "04",
+      "part": "comp",
+      "status": "MEASURED",
+      "audioDurationSec": 39.17879818594104,
+      "inferenceSec": 2.6951019763946533,
+      "realTimeFactor": 0.06878980727289809,
+      "isFirstInference": false,
+      "predictedNoteCount": 226,
+      "groundTruthNoteCount": 268,
+      "metrics": {
+        "groundTruthNoteCount": 268,
+        "predictedNoteCount": 226,
+        "onsetOnly": {
+          "precision": 0.8584070796460177,
+          "recall": 0.7238805970149254,
+          "f1": 0.785425101214575,
+          "truePositives": 194,
+          "falsePositives": 32,
+          "falseNegatives": 74
+        },
+        "onsetAndOffset": {
+          "precision": 0.5707964601769911,
+          "recall": 0.48134328358208955,
+          "f1": 0.5222672064777328,
+          "truePositives": 129,
+          "falsePositives": 97,
+          "falseNegatives": 139
+        }
+      }
+    },
+    {
+      "trackId": "04_Jazz1-200-B_solo",
+      "player": "04",
+      "part": "solo",
+      "status": "MEASURED",
+      "audioDurationSec": 14.4,
+      "inferenceSec": 1.7433032989501953,
+      "realTimeFactor": 0.12106272909376356,
+      "isFirstInference": false,
+      "predictedNoteCount": 65,
+      "groundTruthNoteCount": 65,
+      "metrics": {
+        "groundTruthNoteCount": 65,
+        "predictedNoteCount": 65,
+        "onsetOnly": {
+          "precision": 0.9076923076923077,
+          "recall": 0.9076923076923077,
+          "f1": 0.9076923076923076,
+          "truePositives": 59,
+          "falsePositives": 6,
+          "falseNegatives": 6
+        },
+        "onsetAndOffset": {
+          "precision": 0.7692307692307693,
+          "recall": 0.7692307692307693,
+          "f1": 0.7692307692307693,
+          "truePositives": 50,
+          "falsePositives": 15,
+          "falseNegatives": 15
+        }
+      }
+    },
+    {
+      "trackId": "05_SS1-68-E_comp",
+      "player": "05",
+      "part": "comp",
+      "status": "MEASURED",
+      "audioDurationSec": 42.34639455782313,
+      "inferenceSec": 5.267734050750732,
+      "realTimeFactor": 0.12439628227517102,
+      "isFirstInference": false,
+      "predictedNoteCount": 146,
+      "groundTruthNoteCount": 143,
+      "metrics": {
+        "groundTruthNoteCount": 143,
+        "predictedNoteCount": 146,
+        "onsetOnly": {
+          "precision": 0.9657534246575342,
+          "recall": 0.986013986013986,
+          "f1": 0.9757785467128028,
+          "truePositives": 141,
+          "falsePositives": 5,
+          "falseNegatives": 2
+        },
+        "onsetAndOffset": {
+          "precision": 0.5958904109589042,
+          "recall": 0.6083916083916084,
+          "f1": 0.6020761245674742,
+          "truePositives": 87,
+          "falsePositives": 59,
+          "falseNegatives": 56
+        }
+      }
+    },
+    {
+      "trackId": "05_Rock2-85-F_solo",
+      "player": "05",
+      "part": "solo",
+      "status": "MEASURED",
+      "audioDurationSec": 45.173197278911566,
+      "inferenceSec": 8.934630155563354,
+      "realTimeFactor": 0.19778609205805217,
+      "isFirstInference": false,
+      "predictedNoteCount": 126,
+      "groundTruthNoteCount": 125,
+      "metrics": {
+        "groundTruthNoteCount": 125,
+        "predictedNoteCount": 126,
+        "onsetOnly": {
+          "precision": 0.9444444444444444,
+          "recall": 0.952,
+          "f1": 0.9482071713147411,
+          "truePositives": 119,
+          "falsePositives": 7,
+          "falseNegatives": 6
+        },
+        "onsetAndOffset": {
+          "precision": 0.8650793650793651,
+          "recall": 0.872,
+          "f1": 0.8685258964143426,
+          "truePositives": 109,
+          "falsePositives": 17,
+          "falseNegatives": 16
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "saxophone": {
+    "checkpoint_file": "filosax_25k.pth",
+    "description": "Saxophone transcription model trained on 25k iterations"
+  },
+  "bass": {
+    "checkpoint_file": "filobass_20000_iterations.pth",
+    "description": "Bass transcription model trained on 20k iterations"
+  },
+  "guitar": {
+    "checkpoint_file": "guitar-gaps.pth",
+    "description": "Guitar transcription model (default: GAPS)"
+  },
+  "guitar_fl": {
+    "checkpoint_file": "guitar-fl.pth",
+    "description": "Guitar transcription model trained on Francois Leduc dataset"
+  },
+  "guitar_gaps": {
+    "checkpoint_file": "guitar-gaps.pth",
+    "description": "Guitar transcription model trained on GAPS"
+  },
+  "piano": {
+    "checkpoint_file": "piano.pth",
+    "description": "Piano transcription model"
+  }
+}

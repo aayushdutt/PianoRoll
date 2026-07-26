@@ -60,6 +60,16 @@ const es: Messages = {
   'topStrip.midi.disconnectedMenu': 'Conectar un dispositivo MIDI',
   'topStrip.midi.blockedPill': 'Activar MIDI',
   'topStrip.midi.pillFallback': 'MIDI',
+  'visualization.aria': 'Vista de visualización',
+  'visualization.piano.label': 'Piano',
+  'visualization.piano.aria': 'Mostrar visualización de piano',
+  'visualization.guitar.label': 'Guitarra',
+  'visualization.guitar.aria': 'Mostrar visualización de guitarra',
+  'visualization.learnPianoRequired': 'Esta actividad de aprendizaje requiere la vista de piano.',
+  'guitar.fretboard.aria': 'Diapasón de guitarra interactivo',
+  'guitar.fretboard.position': 'Cuerda {string}, traste {fret}, nota {note}',
+  'guitar.unsupportedNote': '{note} está fuera de este diapasón',
+  'guitar.unsupportedNotes': '{count} notas no se pueden colocar en este diapasón',
 
   // ── Appearance / customize popover ──────────────────────────
   'customize.aria': 'Apariencia',

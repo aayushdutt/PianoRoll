@@ -100,11 +100,13 @@ class IntervalsExercise implements Exercise {
       // Reuse the shared celebration swell so ear training feels coherent
       // with play-along — same visual reward vocabulary across exercises.
       const viewport = this.ctx.services.renderer.currentViewport
-      this.ctx.overlay.celebrationSwell(
-        viewport.config.canvasWidth / 2,
-        viewport.nowLineY,
-        0x7ee7b8,
-      )
+      if (viewport) {
+        this.ctx.overlay.celebrationSwell(
+          viewport.config.canvasWidth / 2,
+          viewport.nowLineY,
+          0x7ee7b8,
+        )
+      }
       this.ctx.log.hit(0)
     } else {
       this.ctx.log.miss(0)

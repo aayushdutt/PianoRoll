@@ -1,0 +1,10 @@
+# Isolated research-spike project. Never commit downloaded audio, model
+# weights, node_modules, or build output -- only code, manifests, and
+# small (<10KB) JSON/markdown results summaries belong in git.
+node_modules/
+dist/
+.cache/
+*.wav
+*.mid
+python/venv/
+python/.venv/

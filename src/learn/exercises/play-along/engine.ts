@@ -3,11 +3,30 @@ import { createStore, type SetStoreFunction } from 'solid-js/store'
 import type { BusNoteEvent } from '../../../core/input/InputBus'
 import type { MidiFile } from '../../../core/midi/types'
 import type { AppServices } from '../../../core/services'
+import { assignGuitarCluster } from '../../../guitar/fingering'
+import type { VisualizationMode } from '../../../guitar/types'
 import { watch } from '../../../store/watch'
 import type { LearnState } from '../../core/LearnState'
 import { classifyArticulation } from '../../core/scoring'
 import { type LoopRegion, makeRegionFromBars, ramp, wrapIfAtEnd } from '../../engines/LoopRegion'
 import { PracticeEngine } from '../../engines/PracticeEngine'
+
+// Guitar Play-Along requirement: a pitch outside standard tuning's fretboard
+// range stays audible/visible (the schedule and synth are untouched) but
+// isn't something wait-mode requires the player to press — and a chord that
+// is *entirely* unsupported advances automatically instead of blocking.
+export function guitarPitchFilter(pitches: ReadonlySet<number>): Set<number> {
+  const voices = Array.from(pitches, (pitch, index) => ({
+    pitch,
+    time: 0,
+    voiceId: `practice:${index}`,
+  }))
+  return new Set(
+    assignGuitarCluster(voices)
+      .voices.filter((voice) => voice.supported)
+      .map((voice) => voice.pitch),
+  )
+}
 
 // Composes wait-mode (PracticeEngine) with loop-region + tempo-ramp + a
 // graded score model. UI reads off `engine.state.*`; nothing here touches
@@ -77,7 +96,7 @@ export class PlayAlongEngine {
   // Pitches currently held across all input sources, maintained by
   // `onNoteOn`/`onNoteOff`. Intersection with `heldEligible` drives the
   // legato bonus.
-  private pressedPitches = new Set<number>()
+  private pressedVoices = new Map<string, number>()
   // pitch → song-time expiry. Populated on chord clear, pruned per tick.
   private heldEligible = new Map<number, number>()
 
@@ -141,6 +160,7 @@ export class PlayAlongEngine {
     services.clock.seek(initial)
 
     // Now build practice steps + apply filters against the correct time.
+    this.practice.setPitchFilter(this.pitchFilterForMode(services.store.effectiveVisualizationMode))
     this.practice.loadMidi(midi)
     this.applyHand(midi)
     this.applySpeed()
@@ -158,13 +178,26 @@ export class PlayAlongEngine {
         () => learnState.state.status,
         (s) => this.setState('isPlaying', s === 'playing'),
       ),
+      // Play-Along is the one exercise the visualization selector stays
+      // enabled for — a live switch mid-session must re-filter what's
+      // required without disturbing the transport.
+      watch(
+        () => services.store.effectiveVisualizationMode,
+        (mode) => this.practice.setPitchFilter(this.pitchFilterForMode(mode)),
+      ),
     )
+  }
+
+  private pitchFilterForMode(
+    mode: VisualizationMode,
+  ): ((pitches: ReadonlySet<number>) => Set<number>) | null {
+    return mode === 'guitar' ? guitarPitchFilter : null
   }
 
   detach(): void {
     this.active = false
     this.currentMidi = null
-    this.pressedPitches.clear()
+    this.pressedVoices.clear()
     this.heldEligible.clear()
     this.setState('userWantsToPlay', false)
     for (const off of this.unsubs) off()
@@ -233,7 +266,7 @@ export class PlayAlongEngine {
 
   onNoteOn(evt: BusNoteEvent): 'advanced' | 'rejected' | 'none' {
     if (!this.active) return 'none'
-    this.pressedPitches.add(evt.pitch)
+    this.pressedVoices.set(this.voiceKey(evt), evt.pitch)
     const outcome = this.practice.notePressed(evt.pitch)
     if (outcome.kind === 'advanced') {
       const verdict = classifyArticulation(outcome.articulationMs)
@@ -266,7 +299,7 @@ export class PlayAlongEngine {
 
   onNoteOff(evt: BusNoteEvent): void {
     if (!this.active) return
-    this.pressedPitches.delete(evt.pitch)
+    this.pressedVoices.delete(this.voiceKey(evt))
   }
 
   setWaitEnabled(enabled: boolean): void {
@@ -442,11 +475,17 @@ export class PlayAlongEngine {
         this.heldEligible.delete(pitch)
         continue
       }
-      if (this.pressedPitches.has(pitch)) held++
+      if (Array.from(this.pressedVoices.values()).includes(pitch)) held++
     }
     if (held > 0) {
       this.setState('heldTicks', this.state.heldTicks + held)
     }
+  }
+
+  private voiceKey(evt: BusNoteEvent): string {
+    return (
+      evt.voiceId ?? `legacy:${evt.source}:${evt.sourceId ?? ''}:${evt.channel ?? ''}:${evt.pitch}`
+    )
   }
 }
 

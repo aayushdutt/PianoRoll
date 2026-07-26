@@ -63,6 +63,14 @@ export class SynthEngine implements AudioEngine {
   // notes already in flight finish their natural decay (we don't track per-track
   // voice handles, and stealing them mid-note would click).
   private disabledTrackIds = new Set<string>()
+  // Reference-counts live (non-scheduled) voices by pitch, keyed by voiceId.
+  // Multiple input sources (MIDI, keyboard, guitar fretboard) can legitimately
+  // hold the same MIDI pitch at once (e.g. two guitar strings fretted to the
+  // same pitch, or a MIDI note doubled on the keyboard) — without this,
+  // `liveNoteOff` from whichever source releases *first* would cut the
+  // sample/envelope out from under every other source still holding that
+  // pitch. Only actually releases the voice once no source holds it anymore.
+  private heldLiveVoicesByPitch = new Map<number, Set<string>>()
 
   async load(source: MidiFile | AudioBuffer): Promise<void> {
     if (!(source instanceof AudioBuffer)) {
@@ -95,6 +103,10 @@ export class SynthEngine implements AudioEngine {
     if (id === this.currentId) return
     // Release anything currently sounding on the old instrument
     this.instruments.get(this.currentId)?.releaseAll()
+    // Ref-counted live voices belonged to the old instrument's runtime — a
+    // stale entry here would block a real release on the new instrument
+    // from ever reaching zero.
+    this.heldLiveVoicesByPitch.clear()
     this.currentId = id
     await this.ensureInstrument(id)
   }
@@ -250,14 +262,19 @@ export class SynthEngine implements AudioEngine {
     void this.ensureInstrument(this.currentId).catch(() => undefined)
   }
 
-  liveNoteOn(pitch: number, velocity: number): void {
+  // `voiceId` identifies the specific press for ref-counting — omit it only
+  // for callers with no voice identity (legacy mouse/touch), which falls
+  // back to a per-pitch key and so can still only collide with itself.
+  liveNoteOn(pitch: number, velocity: number, voiceId?: string): void {
     this.primeLiveInput()
     const inst = this.instruments.get(this.currentId)
     if (!inst) return // still loading — first notes may drop, acceptable tradeoff
+    this.trackLiveVoiceHeld(pitch, voiceId)
     inst.triggerAttack(midiToNoteName(pitch), immediate(), velocity)
   }
 
-  liveNoteOff(pitch: number): void {
+  liveNoteOff(pitch: number, voiceId?: string): void {
+    if (!this.releaseLiveVoiceHeld(pitch, voiceId)) return
     const inst = this.instruments.get(this.currentId)
     if (!inst) return
     inst.triggerRelease(midiToNoteName(pitch), immediate())
@@ -265,6 +282,28 @@ export class SynthEngine implements AudioEngine {
 
   liveReleaseAll(): void {
     this.releaseAllInstruments()
+  }
+
+  private trackLiveVoiceHeld(pitch: number, voiceId?: string): void {
+    const key = voiceId ?? `legacy:${pitch}`
+    let voices = this.heldLiveVoicesByPitch.get(pitch)
+    if (!voices) {
+      voices = new Set()
+      this.heldLiveVoicesByPitch.set(pitch, voices)
+    }
+    voices.add(key)
+  }
+
+  // Returns true when the pitch should actually stop sounding — i.e. no
+  // other tracked voice still holds it.
+  private releaseLiveVoiceHeld(pitch: number, voiceId?: string): boolean {
+    const key = voiceId ?? `legacy:${pitch}`
+    const voices = this.heldLiveVoicesByPitch.get(pitch)
+    if (!voices) return true // nothing tracked — release unconditionally (legacy callers)
+    voices.delete(key)
+    if (voices.size > 0) return false
+    this.heldLiveVoicesByPitch.delete(pitch)
+    return true
   }
 
   // Scheduled variants for loop playback. Caller supplies an AudioContext time
@@ -300,6 +339,10 @@ export class SynthEngine implements AudioEngine {
   }
 
   private releaseAllInstruments(): void {
+    // Any in-flight live-voice ref-counts are meaningless once every
+    // instrument has been forcibly released — drop them so a later
+    // liveNoteOff for a pre-release voiceId can't wedge future ref-counting.
+    this.heldLiveVoicesByPitch.clear()
     for (const inst of this.instruments.values()) inst.releaseAll()
   }
 

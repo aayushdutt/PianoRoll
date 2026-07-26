@@ -86,10 +86,7 @@ export function PiPage() {
     socket?.close()
   })
 
-  const updateActual = (
-    next: boolean[],
-    onset?: { index: number; velocity: number },
-  ): void => {
+  const updateActual = (next: boolean[], onset?: { index: number; velocity: number }): void => {
     const previous = actual()
     const clockTime = services.clock.currentTime
     for (let index = 0; index < 88; index++) {

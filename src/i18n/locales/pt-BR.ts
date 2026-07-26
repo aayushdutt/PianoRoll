@@ -60,6 +60,17 @@ const ptBR: Messages = {
   'topStrip.midi.disconnectedMenu': 'Conectar um dispositivo MIDI',
   'topStrip.midi.blockedPill': 'Ativar MIDI',
   'topStrip.midi.pillFallback': 'MIDI',
+  'visualization.aria': 'Visualização do instrumento',
+  'visualization.piano.label': 'Piano',
+  'visualization.piano.aria': 'Mostrar visualização de piano',
+  'visualization.guitar.label': 'Violão',
+  'visualization.guitar.aria': 'Mostrar visualização de violão',
+  'visualization.learnPianoRequired':
+    'Esta atividade de aprendizagem requer a visualização de piano.',
+  'guitar.fretboard.aria': 'Braço de violão interativo',
+  'guitar.fretboard.position': 'Corda {string}, casa {fret}, nota {note}',
+  'guitar.unsupportedNote': '{note} está fora deste braço',
+  'guitar.unsupportedNotes': '{count} notas não podem ser posicionadas neste braço',
 
   // ── Appearance / customize popover ──────────────────────────
   'customize.aria': 'Aparência',

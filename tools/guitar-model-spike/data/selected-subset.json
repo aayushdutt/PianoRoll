@@ -1,0 +1,128 @@
+{
+  "$comment": "Deterministic 12-track subset of GuitarSet v1.1: one comp + one solo excerpt per player (00-05), chosen by ascending SHA-256 hash of track_id within each (player, part) group of 30 candidates. Re-generate with `node scripts/select-subset.mjs`; output is identical every run given the frozen input list.",
+  "generatedFrom": "data/guitarset-track-list.json",
+  "algorithm": "stable-hash-ordering:sha256(track_id) ascending, take first per (player, part) group",
+  "trackCount": 12,
+  "tracks": [
+    {
+      "player": "00",
+      "part": "comp",
+      "trackId": "00_SS1-68-E_comp",
+      "selectionHash": "024f780c1f779f6a6cc1c223019b7f873b5f419122489f3311d9b95502c3d566",
+      "candidatePoolSize": 30,
+      "styleTag": "SS1",
+      "tempo": 68,
+      "key": "E"
+    },
+    {
+      "player": "00",
+      "part": "solo",
+      "trackId": "00_BN1-129-Eb_solo",
+      "selectionHash": "0e8dbaa6a08cafc8c12448bb0e746037ddd62d309df35b53a90a6b7b75f0ec65",
+      "candidatePoolSize": 30,
+      "styleTag": "BN1",
+      "tempo": 129,
+      "key": "Eb"
+    },
+    {
+      "player": "01",
+      "part": "comp",
+      "trackId": "01_BN2-166-Ab_comp",
+      "selectionHash": "1403b95c29fe3dbb38c11ec53ffbda34fb8ec66ae822279a3b67b024f4207f3a",
+      "candidatePoolSize": 30,
+      "styleTag": "BN2",
+      "tempo": 166,
+      "key": "Ab"
+    },
+    {
+      "player": "01",
+      "part": "solo",
+      "trackId": "01_Jazz1-130-D_solo",
+      "selectionHash": "081c9b302bbc335f530ff6d9f9281b7462587c0315c8d15d2e8654481d90423d",
+      "candidatePoolSize": 30,
+      "styleTag": "Jazz1",
+      "tempo": 130,
+      "key": "D"
+    },
+    {
+      "player": "02",
+      "part": "comp",
+      "trackId": "02_Rock3-148-C_comp",
+      "selectionHash": "0481ce6517710cb1ee0e0769ccc0b30315b877ce54889400440094f32be3e4cc",
+      "candidatePoolSize": 30,
+      "styleTag": "Rock3",
+      "tempo": 148,
+      "key": "C"
+    },
+    {
+      "player": "02",
+      "part": "solo",
+      "trackId": "02_SS1-100-C#_solo",
+      "selectionHash": "0a2f14d74187be77715c9cdaf27e22806df566ca15615fc576b5d84fa1692a42",
+      "candidatePoolSize": 30,
+      "styleTag": "SS1",
+      "tempo": 100,
+      "key": "C#"
+    },
+    {
+      "player": "03",
+      "part": "comp",
+      "trackId": "03_Jazz1-200-B_comp",
+      "selectionHash": "0090bc05c468182b7fd6242a36aec8d6dd988e598a58fd38b639e8cbaa73aace",
+      "candidatePoolSize": 30,
+      "styleTag": "Jazz1",
+      "tempo": 200,
+      "key": "B"
+    },
+    {
+      "player": "03",
+      "part": "solo",
+      "trackId": "03_Jazz2-110-Bb_solo",
+      "selectionHash": "04ee96107324c4296722fbf02e34c1be212a4b3b8869c59a014da79d469b5178",
+      "candidatePoolSize": 30,
+      "styleTag": "Jazz2",
+      "tempo": 110,
+      "key": "Bb"
+    },
+    {
+      "player": "04",
+      "part": "comp",
+      "trackId": "04_SS3-98-C_comp",
+      "selectionHash": "03767556504e398d3c9469ffdb4bc658d645c3733113c31f4853da5dcabd0208",
+      "candidatePoolSize": 30,
+      "styleTag": "SS3",
+      "tempo": 98,
+      "key": "C"
+    },
+    {
+      "player": "04",
+      "part": "solo",
+      "trackId": "04_Jazz1-200-B_solo",
+      "selectionHash": "0a47b4a2fabb1215f3847aabf73e8bdacc223831745e76d1a397bf5002f425d1",
+      "candidatePoolSize": 30,
+      "styleTag": "Jazz1",
+      "tempo": 200,
+      "key": "B"
+    },
+    {
+      "player": "05",
+      "part": "comp",
+      "trackId": "05_SS1-68-E_comp",
+      "selectionHash": "090e6471ac278a68a6e53b1e39ce4c9845b3c373c38ac012394f626e507b12c9",
+      "candidatePoolSize": 30,
+      "styleTag": "SS1",
+      "tempo": 68,
+      "key": "E"
+    },
+    {
+      "player": "05",
+      "part": "solo",
+      "trackId": "05_Rock2-85-F_solo",
+      "selectionHash": "04f5692a8752f1b89703f7548f77dd929e19462e3d389d1c5b309c879a7272fb",
+      "candidatePoolSize": 30,
+      "styleTag": "Rock2",
+      "tempo": 85,
+      "key": "F"
+    }
+  ]
+}

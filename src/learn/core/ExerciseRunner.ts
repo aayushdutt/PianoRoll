@@ -49,6 +49,7 @@ export class ExerciseRunner {
   private readonly host: HTMLElement
   private readonly onClose: (reason: 'completed' | 'abandoned') => void
   private readonly nowMs: () => number
+  private launchGeneration = 0
 
   constructor(deps: ExerciseRunnerDeps) {
     this.services = deps.services
@@ -69,49 +70,72 @@ export class ExerciseRunner {
   }
 
   async launch(descriptor: ExerciseDescriptor): Promise<void> {
-    if (this.currentExercise) this.close('abandoned')
-
-    if (descriptor.preload) await descriptor.preload()
-
-    // Build the session + exercise up-front but don't publish them onto
-    // `this` until `mount` succeeds. If mount throws, a subsequent launch
-    // shouldn't observe a half-wired previous exercise.
+    const generation = ++this.launchGeneration
+    if (this.currentExercise) this.closeCurrent('abandoned')
+    let ex: Exercise | null = null
+    let mountAttempted = false
+    let startAttempted = false
     const session = new Session(this.nowMs)
-    this.session = session
-    const ctx: ExerciseContext = {
-      descriptor,
-      services: this.services,
-      learnState: this.learnState,
-      progress: this.progress,
-      overlay: this.overlay,
-      host: this.host,
-      onClose: (reason) => this.onClose(reason),
-      log: this.buildLog(descriptor),
-      storage: this.buildStorage(descriptor),
-    }
-
-    const ex = descriptor.factory(ctx)
     try {
+      if (descriptor.preload) await descriptor.preload()
+      if (generation !== this.launchGeneration) return
+      const ctx: ExerciseContext = {
+        descriptor,
+        services: this.services,
+        learnState: this.learnState,
+        progress: this.progress,
+        overlay: this.overlay,
+        host: this.host,
+        onClose: (reason) => this.onClose(reason),
+        log: this.buildLog(descriptor, session),
+        storage: this.buildStorage(descriptor),
+      }
+      ex = descriptor.factory(ctx)
+      mountAttempted = true
       await ex.mount(this.host)
+      if (generation !== this.launchGeneration) {
+        this.cleanupLocal(ex, true, true)
+        return
+      }
+      // Publish only after every awaited boundary has completed and this
+      // launch is still newest. Until here, session/exercise are local.
+      this.currentExercise = ex
+      this.currentDescriptor = descriptor
+      this.session = session
+      session.start()
+      if (generation !== this.launchGeneration) return
+      startAttempted = true
+      ex.start()
+      if (generation !== this.launchGeneration) return
+      this.subscribe(ex)
+      if (generation !== this.launchGeneration) {
+        this.unsubscribe()
+        return
+      }
+
+      trackEvent('exercise_started', {
+        exercise_id: descriptor.id,
+        category: descriptor.category,
+        difficulty: descriptor.difficulty,
+      })
     } catch (err) {
-      this.session = null
+      if (ex) this.cleanupLocal(ex, startAttempted || mountAttempted, mountAttempted)
+      if (this.currentExercise === ex && generation === this.launchGeneration) {
+        this.unsubscribe()
+        this.currentExercise = null
+        this.currentDescriptor = null
+        this.session = null
+      }
       throw err
     }
-
-    this.currentExercise = ex
-    this.currentDescriptor = descriptor
-    session.start()
-    ex.start()
-    this.subscribe(ex)
-
-    trackEvent('exercise_started', {
-      exercise_id: descriptor.id,
-      category: descriptor.category,
-      difficulty: descriptor.difficulty,
-    })
   }
 
   close(reason: 'completed' | 'abandoned' = 'completed'): ExerciseResult | null {
+    this.launchGeneration++
+    return this.closeCurrent(reason)
+  }
+
+  private closeCurrent(reason: 'completed' | 'abandoned'): ExerciseResult | null {
     const ex = this.currentExercise
     const desc = this.currentDescriptor
     const session = this.session
@@ -174,6 +198,19 @@ export class ExerciseRunner {
     return null
   }
 
+  private cleanupLocal(ex: Exercise, stop: boolean, unmount: boolean): void {
+    if (stop) {
+      try {
+        ex.stop()
+      } catch {}
+    }
+    if (unmount) {
+      try {
+        ex.unmount()
+      } catch {}
+    }
+  }
+
   // ── Internal helpers ────────────────────────────────────────────────────
 
   private subscribe(ex: Exercise): void {
@@ -203,8 +240,7 @@ export class ExerciseRunner {
     this.unsubs = []
   }
 
-  private buildLog(descriptor: ExerciseDescriptor): ExerciseLog {
-    const session = this.session!
+  private buildLog(descriptor: ExerciseDescriptor, session: Session): ExerciseLog {
     return {
       hit: (_pitch) => session.hit(),
       miss: (pitch, expected) => session.miss(pitch, expected),

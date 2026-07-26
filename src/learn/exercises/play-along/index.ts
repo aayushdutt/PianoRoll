@@ -211,6 +211,12 @@ class PlayAlongExercise implements Exercise {
   private onCleanPass(): void {
     // Subtle swell at the now-line — no sound, just a breath.
     const viewport = this.ctx.services.renderer.currentViewport
-    this.ctx.overlay.celebrationSwell(viewport.config.canvasWidth / 2, viewport.nowLineY, 0xfbd38d)
+    if (viewport) {
+      this.ctx.overlay.celebrationSwell(
+        viewport.config.canvasWidth / 2,
+        viewport.nowLineY,
+        0xfbd38d,
+      )
+    }
   }
 }

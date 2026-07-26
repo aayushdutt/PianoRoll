@@ -42,6 +42,7 @@
     "posthog-js": "^1.369.3",
     "solid-js": "^1.9.12",
     "tone": "^14.7.77",
+    "webmidi": "^2.5.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -40,4 +40,11 @@ public/local/
 # Leading slash anchors to repo root so `src/bench/` (the runner source) is
 # NOT ignored — without the slash this would match any directory named bench.
 /bench/
-docs
+docs/*
+# Exception: this spike's write-up is meant to be committed and discoverable
+# (see CLAUDE.md's docs/ convention), unlike the rest of the local-only docs/
+# directory the blanket rule above covers. `docs/*` (rather than a bare
+# `docs`) is required so git still traverses into docs/ to evaluate this
+# negation -- a bare directory-name pattern would exclude the directory
+# itself and negations can't re-include files under an excluded directory.
+!docs/GUITAR_TRANSCRIPTION_MODEL_EVALUATION.md

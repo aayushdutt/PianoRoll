@@ -92,10 +92,10 @@ test.describe('Live input (computer keyboard)', () => {
     const tonic = page.locator('#ts-chord-readout .ts-chord-readout-tonic')
 
     // Hold a C-major triad from the FL-style key map at octave 4:
-    //   c -> E (64), b -> G (67), and 'q' -> KeyQ -> offset 12 -> pitch 72 (C5).
+    //   z -> C (60), c -> E (64), and b -> G (67).
     // Multiple distinct pitches held simultaneously must resolve to a real chord
     // (tonic "C"), proving multi-note live capture — not just a single key.
-    await page.keyboard.down('q') // C5
+    await page.keyboard.down('z') // C4
     await page.keyboard.down('c') // E4
     await page.keyboard.down('b') // G4
 
@@ -104,7 +104,7 @@ test.describe('Live input (computer keyboard)', () => {
     await expect(tonic).toHaveText('C', { timeout: 15_000 })
 
     // Release all -> readout clears back to the placeholder.
-    await page.keyboard.up('q')
+    await page.keyboard.up('z')
     await page.keyboard.up('c')
     await page.keyboard.up('b')
     await expect(tonic).toHaveText(EMPTY_PLACEHOLDER, { timeout: 15_000 })
