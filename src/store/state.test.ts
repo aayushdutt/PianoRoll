@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { MidiFile } from '../core/midi/types'
 import { createEventSignal } from './eventSignal'
 import { createAppStore } from './state'
@@ -154,6 +154,52 @@ describe('createAppStore', () => {
     // watch() defers the initial read — only the post-batch snapshot fires.
     expect(snapshots.length).toBe(1)
     expect(snapshots[0]).toEqual({ mode: 'home', status: 'idle' })
+  })
+})
+
+// Visualization mode: persisted preference vs. Learn's temporary force.
+// `midee.visualizationMode` is the localStorage key (core/persistence.ts).
+describe('createAppStore visualization mode', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('defaults to piano when nothing is persisted', () => {
+    const store = createAppStore()
+    expect(store.state.visualizationMode).toBe('piano')
+    expect(store.state.visualizationForced).toBeNull()
+    expect(store.effectiveVisualizationMode).toBe('piano')
+  })
+
+  it('falls back to piano for an invalid persisted value', () => {
+    localStorage.setItem('midee.visualizationMode', 'banjo')
+    const store = createAppStore()
+    expect(store.state.visualizationMode).toBe('piano')
+  })
+
+  it('setVisualizationMode updates state, persists, and flows into effectiveVisualizationMode', () => {
+    const store = createAppStore()
+    store.setVisualizationMode('guitar')
+    expect(store.state.visualizationMode).toBe('guitar')
+    expect(store.effectiveVisualizationMode).toBe('guitar')
+    // A fresh store picks up the persisted choice.
+    expect(createAppStore().state.visualizationMode).toBe('guitar')
+  })
+
+  it('setVisualizationForced overrides the effective mode without touching the saved preference', () => {
+    const store = createAppStore()
+    store.setVisualizationMode('guitar')
+    store.setVisualizationForced('piano')
+    expect(store.effectiveVisualizationMode).toBe('piano')
+    // The preference itself is untouched — this is what "restore on exit"
+    // relies on.
+    expect(store.state.visualizationMode).toBe('guitar')
+  })
+
+  it('clearing the force restores the saved preference exactly', () => {
+    const store = createAppStore()
+    store.setVisualizationMode('guitar')
+    store.setVisualizationForced('piano')
+    store.setVisualizationForced(null)
+    expect(store.effectiveVisualizationMode).toBe('guitar')
   })
 })
 

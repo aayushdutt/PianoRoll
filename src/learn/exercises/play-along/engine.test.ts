@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MidiFile } from '../../../core/midi/types'
 import type { AppServices } from '../../../core/services'
 import { createLearnState, type LearnState } from '../../core/LearnState'
-import { PlayAlongEngine } from './engine'
+import { guitarPitchFilter, PlayAlongEngine } from './engine'
 
 // Fake clock that speaks to the same surface the engine uses. Tests tick
 // directly by calling `emit` with a time — no RAF, no AudioContext.
@@ -156,7 +156,10 @@ function makeServices(): {
     renderer,
     learnState,
     services: {
-      store: null as never,
+      // Only `effectiveVisualizationMode` is read (guitar pitch filtering) —
+      // these tests exercise piano-only behavior, so a fixed 'piano' is
+      // enough without standing up a full reactive store.
+      store: { effectiveVisualizationMode: 'piano' } as unknown as AppServices['store'],
       clock: clock as unknown as AppServices['clock'],
       synth: synth as unknown as AppServices['synth'],
       metronome: null as never,
@@ -166,7 +169,110 @@ function makeServices(): {
   }
 }
 
+function makeMidiWithUnsupportedGuitarNote(): MidiFile {
+  return {
+    name: 'guitar-drill.mid',
+    duration: 10,
+    bpm: 120,
+    timeSignature: [4, 4],
+    tracks: [
+      {
+        id: 'rh',
+        name: 'Right',
+        channel: 0,
+        instrument: 0,
+        isDrum: false,
+        color: 0xffffff,
+        colorIndex: 0,
+        notes: [
+          // Standard guitar tuning covers pitch 40 (low E) through 88 — 30 is
+          // below the lowest open string, so it's unsupported on the
+          // fretboard; 60 sits comfortably within range.
+          { pitch: 30, time: 2, duration: 0.5, velocity: 1 },
+          { pitch: 60, time: 2, duration: 0.5, velocity: 1 },
+        ],
+      },
+    ],
+  }
+}
+
+describe('PlayAlongEngine guitar visualization — unsupported-voice scoring', () => {
+  it('never requires more pitches than can be assigned to six strings', () => {
+    const required = guitarPitchFilter(new Set([40, 41, 42, 43, 44, 45, 46]))
+    expect(required.size).toBeLessThanOrEqual(6)
+    for (const pitch of required) expect([40, 41, 42, 43, 44, 45, 46]).toContain(pitch)
+  })
+
+  it('piano mode requires every pitch, unfiltered', () => {
+    const { services, learnState } = makeServices()
+    ;(
+      services.store as unknown as { effectiveVisualizationMode: string }
+    ).effectiveVisualizationMode = 'piano'
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidiWithUnsupportedGuitarNote())
+    expect(engine.practice.peekNextStep()?.pitches).toEqual(new Set([30, 60]))
+  })
+
+  it('guitar mode excludes the pitch with no fretboard position from what is required', () => {
+    const { services, learnState } = makeServices()
+    ;(
+      services.store as unknown as { effectiveVisualizationMode: string }
+    ).effectiveVisualizationMode = 'guitar'
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidiWithUnsupportedGuitarNote())
+    // 30 stays out of the required set — it's still part of the schedule the
+    // synth/renderer play, just not something wait-mode blocks on.
+    expect(engine.practice.peekNextStep()?.pitches).toEqual(new Set([60]))
+  })
+})
+
 describe('PlayAlongEngine', () => {
+  it('keeps an equal-pitch held bonus alive until every voice releases', () => {
+    const { services, clock, learnState } = makeServices()
+    const midi = makeMidi()
+    midi.tracks[0]!.notes = [{ pitch: 60, time: 2, duration: 1, velocity: 1 }]
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(midi)
+    engine.setWaitEnabled(true)
+    engine.play()
+    clock.emit(1.995)
+    engine.onNoteOn({
+      pitch: 60,
+      velocity: 1,
+      clockTime: 2,
+      source: 'midi',
+      voiceId: 'midi:a',
+    })
+    engine.onNoteOn({
+      pitch: 60,
+      velocity: 1,
+      clockTime: 2,
+      source: 'guitar',
+      voiceId: 'guitar:b',
+    })
+    clock.emit(2.1)
+    const before = engine.state.heldTicks
+    engine.onNoteOff({
+      pitch: 60,
+      velocity: 0,
+      clockTime: 2.2,
+      source: 'midi',
+      voiceId: 'midi:a',
+    })
+    clock.emit(2.2)
+    expect(engine.state.heldTicks).toBeGreaterThan(before)
+    const afterOne = engine.state.heldTicks
+    engine.onNoteOff({
+      pitch: 60,
+      velocity: 0,
+      clockTime: 2.3,
+      source: 'guitar',
+      voiceId: 'guitar:b',
+    })
+    clock.emit(2.3)
+    expect(engine.state.heldTicks).toBe(afterOne)
+  })
+
   it('applies speed preset to clock and synth', () => {
     const { services, clock, synth, learnState } = makeServices()
     const engine = new PlayAlongEngine({ services, learnState })

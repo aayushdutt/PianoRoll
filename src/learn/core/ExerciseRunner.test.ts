@@ -209,6 +209,157 @@ describe('ExerciseRunner', () => {
     expect(captured!.noteOnCalls).toBe(2)
   })
 
+  it('clears runner state and unmounts when start throws', async () => {
+    const bus = new InputBus()
+    const runner = makeRunner(
+      bus,
+      createLearnProgressStore(() => '2026-04-24'),
+    )
+    let exercise!: TestExercise
+    const descriptor: ExerciseDescriptor = {
+      id: 'test.start-failure',
+      title: 'Failure',
+      category: 'ear-training',
+      difficulty: 'beginner',
+      blurb: '',
+      factory: () => {
+        exercise = makeExercise(descriptor, null)
+        exercise.start = () => {
+          exercise.startCalls++
+          throw new Error('start failed')
+        }
+        return exercise
+      },
+    }
+    await expect(runner.launch(descriptor)).rejects.toThrow('start failed')
+    expect(runner.isActive).toBe(false)
+    expect(runner.activeId).toBeNull()
+    expect(exercise.stopCalls).toBe(1)
+    expect(exercise.unmountCalls).toBe(1)
+  })
+
+  it('keeps B active when A slow preload resolves after B succeeds', async () => {
+    const runner = makeRunner(
+      new InputBus(),
+      createLearnProgressStore(() => '2026-04-24'),
+    )
+    let resolvePreload!: () => void
+    const aFactory = vi.fn()
+    const a: ExerciseDescriptor = {
+      id: 'test.slow-preload',
+      title: 'A',
+      category: 'ear-training',
+      difficulty: 'beginner',
+      blurb: '',
+      preload: () => new Promise<void>((resolve) => (resolvePreload = resolve)),
+      factory: aFactory,
+    }
+    const b: ExerciseDescriptor = {
+      id: 'test.newer',
+      title: 'B',
+      category: 'ear-training',
+      difficulty: 'beginner',
+      blurb: '',
+      factory: () => makeExercise(b, null),
+    }
+    const launchingA = runner.launch(a)
+    await runner.launch(b)
+    resolvePreload()
+    await launchingA
+    expect(aFactory).not.toHaveBeenCalled()
+    expect(runner.activeId).toBe(b.id)
+  })
+
+  it('keeps B active and cleans only A when A slow mount resolves later', async () => {
+    const runner = makeRunner(
+      new InputBus(),
+      createLearnProgressStore(() => '2026-04-24'),
+    )
+    let resolveMount!: () => void
+    let exerciseA!: TestExercise
+    const a: ExerciseDescriptor = {
+      id: 'test.slow-mount',
+      title: 'A',
+      category: 'ear-training',
+      difficulty: 'beginner',
+      blurb: '',
+      factory: () => {
+        exerciseA = makeExercise(a, null)
+        exerciseA.mount = () => new Promise<void>((resolve) => (resolveMount = resolve))
+        return exerciseA
+      },
+    }
+    let exerciseB!: TestExercise
+    const b: ExerciseDescriptor = {
+      id: 'test.newer-mount',
+      title: 'B',
+      category: 'ear-training',
+      difficulty: 'beginner',
+      blurb: '',
+      factory: () => (exerciseB = makeExercise(b, null)),
+    }
+    const launchingA = runner.launch(a)
+    await Promise.resolve()
+    await runner.launch(b)
+    resolveMount()
+    await launchingA
+    expect(exerciseA.unmountCalls).toBe(1)
+    expect(exerciseA.stopCalls).toBe(1)
+    expect(exerciseB.unmountCalls).toBe(0)
+    expect(runner.activeId).toBe(b.id)
+  })
+
+  it('close during preload invalidates the pending launch', async () => {
+    const runner = makeRunner(
+      new InputBus(),
+      createLearnProgressStore(() => '2026-04-24'),
+    )
+    let resolvePreload!: () => void
+    const factory = vi.fn()
+    const descriptor: ExerciseDescriptor = {
+      id: 'test.cancel-preload',
+      title: 'Cancel',
+      category: 'ear-training',
+      difficulty: 'beginner',
+      blurb: '',
+      preload: () => new Promise<void>((resolve) => (resolvePreload = resolve)),
+      factory,
+    }
+    const launching = runner.launch(descriptor)
+    expect(runner.close('abandoned')).toBeNull()
+    resolvePreload()
+    await launching
+    expect(factory).not.toHaveBeenCalled()
+    expect(runner.isActive).toBe(false)
+  })
+
+  it('stops and unmounts local work when mount rejects after partial setup', async () => {
+    const runner = makeRunner(
+      new InputBus(),
+      createLearnProgressStore(() => '2026-04-24'),
+    )
+    let exercise!: TestExercise
+    const descriptor: ExerciseDescriptor = {
+      id: 'test.mount-failure',
+      title: 'Mount failure',
+      category: 'ear-training',
+      difficulty: 'beginner',
+      blurb: '',
+      factory: () => {
+        exercise = makeExercise(descriptor, null)
+        exercise.mount = async () => {
+          exercise.mountCalls++
+          throw new Error('mount failed')
+        }
+        return exercise
+      },
+    }
+    await expect(runner.launch(descriptor)).rejects.toThrow('mount failed')
+    expect(exercise.stopCalls).toBe(1)
+    expect(exercise.unmountCalls).toBe(1)
+    expect(runner.isActive).toBe(false)
+  })
+
   it('marks abandoned closes as incomplete regardless of exercise result', async () => {
     const bus = new InputBus()
     const progress = createLearnProgressStore(() => '2026-04-24')

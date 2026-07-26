@@ -119,6 +119,17 @@ const instrumentTriggers = vi.hoisted(
   () => [] as Array<{ note: string; duration: number; time: number; velocity: number }>,
 )
 
+// Records every created instrument runtime (one per instrument id, cached by
+// SynthEngine) so tests can inspect `triggerAttack`/`triggerRelease` calls —
+// used by the live-voice ref-counting tests below.
+const createdInstruments = vi.hoisted(
+  () =>
+    [] as Array<{
+      triggerAttack: ReturnType<typeof vi.fn>
+      triggerRelease: ReturnType<typeof vi.fn>
+    }>,
+)
+
 vi.mock('./instruments', async () => {
   // Pull in the real (tone-free) note-name table so slicing assertions read
   // human note names exactly as production would.
@@ -126,17 +137,21 @@ vi.mock('./instruments', async () => {
   return {
     INSTRUMENTS: [],
     midiToNoteName,
-    createInstrument: vi.fn(async () => ({
-      triggerAttack: vi.fn(),
-      triggerRelease: vi.fn(),
-      triggerAttackRelease: vi.fn(
-        (note: string, duration: number, time: number, velocity: number) => {
-          instrumentTriggers.push({ note, duration, time, velocity })
-        },
-      ),
-      releaseAll: vi.fn(),
-      dispose: vi.fn(),
-    })),
+    createInstrument: vi.fn(async () => {
+      const inst = {
+        triggerAttack: vi.fn(),
+        triggerRelease: vi.fn(),
+        triggerAttackRelease: vi.fn(
+          (note: string, duration: number, time: number, velocity: number) => {
+            instrumentTriggers.push({ note, duration, time, velocity })
+          },
+        ),
+        releaseAll: vi.fn(),
+        dispose: vi.fn(),
+      }
+      createdInstruments.push(inst)
+      return inst
+    }),
   }
 })
 
@@ -199,6 +214,7 @@ beforeEach(() => {
   holder.destinationVolume.value = 0
   holder.immediateTime = 0
   instrumentTriggers.length = 0
+  createdInstruments.length = 0
 })
 
 afterEach(() => {
@@ -512,5 +528,97 @@ describe('SynthEngine.play — guards', () => {
 
     expect(first.dispose).toHaveBeenCalled()
     expect(holder.parts.length).toBe(2)
+  })
+})
+
+// ── 7. live-voice equal-pitch reference counting ─────────────────────────────
+//
+// Multiple input sources (MIDI, computer keyboard, guitar fretboard) can hold
+// the same MIDI pitch simultaneously — e.g. two guitar strings fretted to the
+// same pitch, or a doubled note across MIDI + keyboard. Releasing one must not
+// silence the pitch while another source still holds it.
+
+describe('SynthEngine live-voice ref counting', () => {
+  it('two sources on the same pitch: releasing one leaves the note sounding', async () => {
+    const midi = makeMidi([track('a', [note(60, 0)])], 120)
+    const engine = await loadedEngine(midi)
+    const inst = createdInstruments[0]!
+
+    engine.liveNoteOn(64, 0.8, 'source-a:1')
+    engine.liveNoteOn(64, 0.8, 'source-b:1')
+    expect(inst.triggerAttack).toHaveBeenCalledTimes(2)
+
+    engine.liveNoteOff(64, 'source-a:1')
+    expect(inst.triggerRelease).not.toHaveBeenCalled()
+
+    engine.liveNoteOff(64, 'source-b:1')
+    expect(inst.triggerRelease).toHaveBeenCalledTimes(1)
+  })
+
+  it('releases immediately when only one voice ever held the pitch', async () => {
+    const midi = makeMidi([track('a', [note(60, 0)])], 120)
+    const engine = await loadedEngine(midi)
+    const inst = createdInstruments[0]!
+
+    engine.liveNoteOn(67, 0.8, 'source-a:1')
+    engine.liveNoteOff(67, 'source-a:1')
+    expect(inst.triggerRelease).toHaveBeenCalledTimes(1)
+  })
+
+  it('is order-independent — the last release (regardless of which source) silences it', async () => {
+    const midi = makeMidi([track('a', [note(60, 0)])], 120)
+    const engine = await loadedEngine(midi)
+    const inst = createdInstruments[0]!
+
+    engine.liveNoteOn(60, 0.8, 'guitar:string-1')
+    engine.liveNoteOn(60, 0.8, 'guitar:string-2')
+    engine.liveNoteOn(60, 0.8, 'guitar:string-3')
+    engine.liveNoteOff(60, 'guitar:string-2')
+    engine.liveNoteOff(60, 'guitar:string-3')
+    expect(inst.triggerRelease).not.toHaveBeenCalled()
+    engine.liveNoteOff(60, 'guitar:string-1')
+    expect(inst.triggerRelease).toHaveBeenCalledTimes(1)
+  })
+
+  it('a duplicate release for an already-cleared voice does not go negative and re-block release', async () => {
+    const midi = makeMidi([track('a', [note(60, 0)])], 120)
+    const engine = await loadedEngine(midi)
+    const inst = createdInstruments[0]!
+
+    engine.liveNoteOn(60, 0.8, 'v1')
+    engine.liveNoteOff(60, 'v1')
+    expect(inst.triggerRelease).toHaveBeenCalledTimes(1)
+    // A second, redundant note-on/off pair for the same pitch behaves fresh —
+    // the earlier pitch entry was already cleaned up.
+    engine.liveNoteOn(60, 0.8, 'v2')
+    engine.liveNoteOff(60, 'v2')
+    expect(inst.triggerRelease).toHaveBeenCalledTimes(2)
+  })
+
+  it('liveReleaseAll clears held-voice tracking so a stale note-off cannot suppress a fresh press', async () => {
+    const midi = makeMidi([track('a', [note(60, 0)])], 120)
+    const engine = await loadedEngine(midi)
+    const inst = createdInstruments[0]!
+
+    engine.liveNoteOn(60, 0.8, 'v1')
+    engine.liveNoteOn(60, 0.8, 'v2')
+    engine.liveReleaseAll()
+    inst.triggerRelease.mockClear()
+
+    // Tracking was wiped by liveReleaseAll — a fresh single voice must release
+    // on its own note-off instead of waiting for a phantom second release.
+    engine.liveNoteOn(60, 0.8, 'v3')
+    engine.liveNoteOff(60, 'v3')
+    expect(inst.triggerRelease).toHaveBeenCalledTimes(1)
+  })
+
+  it('omitted voiceId (legacy touch/mouse) still round-trips through its own pitch key', async () => {
+    const midi = makeMidi([track('a', [note(60, 0)])], 120)
+    const engine = await loadedEngine(midi)
+    const inst = createdInstruments[0]!
+
+    engine.liveNoteOn(72, 0.8)
+    engine.liveNoteOff(72)
+    expect(inst.triggerRelease).toHaveBeenCalledTimes(1)
   })
 })

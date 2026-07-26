@@ -1,0 +1,22 @@
+{
+  "name": "guitar-model-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "M1 research spike: feasibility evaluation of open-source guitar transcription models for Midee. Isolated from the root app's dependencies and build -- not part of the shipped product.",
+  "scripts": {
+    "select-subset": "node scripts/select-subset.mjs",
+    "fetch-subset": "node scripts/fetch-subset.mjs",
+    "run-basic-pitch": "node scripts/run-basic-pitch-node.mjs",
+    "measure": "node scripts/measure.mjs",
+    "build:browser-smoke": "vite build"
+  },
+  "dependencies": {
+    "@spotify/basic-pitch": "1.0.1",
+    "@tensorflow/tfjs": "^3.21.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^8.0.0"
+  }
+}

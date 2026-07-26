@@ -56,6 +56,58 @@ describe('LivePerformanceBus', () => {
     expect(offs).toEqual([60, 64])
   })
 
+  it('treats a guitar-sourced note-on/off like any other input source', () => {
+    // Guitar has no pedal of its own, but its note events must flow through
+    // the same fan-out as MIDI/keyboard — no special-cased source list to
+    // fall through.
+    const bus = createLivePerformanceBus()
+    const ons: string[] = []
+    bus.subscribeNotes(
+      (e) => ons.push(`${e.source}:${e.pitch}`),
+      () => {},
+    )
+    bus.routeNoteOn({
+      pitch: 45,
+      velocity: 0.8,
+      clockTime: 1,
+      source: 'guitar',
+      sourceId: 'guitar:fretboard',
+      voiceId: 'guitar:fretboard:pointer-1:1',
+      string: 0,
+      fret: 5,
+    })
+    expect(ons).toEqual(['guitar:45'])
+  })
+
+  it('keeps sustained equal pitches distinct by voice across channels and sources', () => {
+    const bus = createLivePerformanceBus()
+    const offs: string[] = []
+    bus.subscribeNotes(
+      () => {},
+      (event) => offs.push(event.voiceId ?? ''),
+    )
+    bus.routePedalDown('midi')
+    bus.routeNoteOff({
+      ...makeNoteOff(60),
+      source: 'midi',
+      sourceId: 'a',
+      channel: 0,
+      voiceId: 'a-0',
+    })
+    bus.routeNoteOff({
+      ...makeNoteOff(60),
+      source: 'midi',
+      sourceId: 'b',
+      channel: 1,
+      voiceId: 'b-1',
+    })
+
+    expect(bus.sustainedPitches).toEqual(new Set([60]))
+    expect(bus.sustainedVoiceIds).toEqual(new Set(['a-0', 'b-1']))
+    bus.routePedalUp('midi')
+    expect(offs).toEqual(['a-0', 'b-1'])
+  })
+
   it('pedal merge: OR of MIDI and keyboard sources', () => {
     const bus = createLivePerformanceBus()
 

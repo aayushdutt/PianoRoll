@@ -82,13 +82,59 @@ body {
   min-height: 100vh;
 }
 
-#pianoroll {
+#pianoroll,
+#guitar-surface {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   /* The pixi canvas handles its own gestures — disable browser-native
      panning/zooming so touch events reach the renderer cleanly. */
   touch-action: none;
+}
+
+.guitar-accessibility-grid {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.guitar-accessibility-grid__row,
+.guitar-accessibility-grid__cell,
+.guitar-accessibility-grid button {
+  pointer-events: none;
+}
+
+.guitar-accessibility-grid__cell {
+  position: absolute;
+}
+
+.guitar-accessibility-grid button {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.guitar-accessibility-grid button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+@media (forced-colors: active) {
+  .guitar-accessibility-grid button:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* Guitar-mode chrome: the keyboard-height drag seam only applies to the
+   piano surface. */
+body.visualization-guitar #kbd-resizer {
+  display: none;
 }
 
 #ui-overlay {
@@ -691,6 +737,13 @@ body {
     min-width: 0;
     padding: 0 11px;
   }
+  .ts-view-label {
+    display: none;
+  }
+  .ts-view-option {
+    min-width: 0;
+    padding: 0 8px;
+  }
   .ts-status {
     /* Box still stretches+shrinks with the track (see base rule); at this
        tier just hug the content to the left edge to sit nearer the strip. */
@@ -984,6 +1037,121 @@ body {
   border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Piano/Guitar visualization is intentionally separate from the sound
+   instrument menu. It uses the topbar's compact segmented-control language,
+   with miniature key/string marks that remain identifiable when labels hide. */
+.ts-visualization-selector {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ts-view-switch {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.ts-view-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 26px;
+  min-width: 58px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s var(--ease-out),
+    color 0.15s var(--ease-out);
+}
+
+.ts-view-switch:not(.is-disabled) .ts-view-option:hover {
+  color: var(--text-muted);
+}
+
+.ts-view-option.is-active {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.ts-view-option:has(.ts-view-input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ts-view-switch.is-disabled {
+  opacity: 0.48;
+}
+
+.ts-view-switch.is-disabled .ts-view-option {
+  cursor: not-allowed;
+}
+
+.ts-view-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.ts-view-glyph {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 11px;
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.ts-view-glyph--piano {
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, transparent 0 3px, currentColor 3px 4px);
+}
+
+.ts-view-glyph--guitar {
+  background: repeating-linear-gradient(0deg, transparent 0 1px, currentColor 1px 2px);
+}
+
+.ts-view-glyph--guitar::after {
+  position: absolute;
+  inset: 0 4px;
+  border-right: 1px solid currentColor;
+  border-left: 1px solid currentColor;
+  content: "";
+}
+
+.ts-view-disabled-reason {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: rgba(7, 9, 18, 0.94);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
 }
 
 .ts-mode-seg {

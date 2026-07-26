@@ -62,6 +62,7 @@ export class LearnController {
   // time `enter()` runs, the cached MIDI is the cleanest way to hand context
   // across the async boundary.
   private pendingMidi: MidiFile | null = null
+  private launchGeneration = 0
 
   constructor(private ctx: ModeContext) {
     this.hub = createLearnHub()
@@ -143,9 +144,15 @@ export class LearnController {
   }
 
   exit(): void {
+    this.launchGeneration++
     // Close any active exercise as abandoned — this is a mode-level swap,
     // not an explicit "I'm done" signal.
-    if (this.runner?.isActive) this.runner.close('abandoned')
+    // close() also invalidates an in-flight preload/mount even when no
+    // exercise has published yet.
+    this.runner?.close('abandoned')
+    // Release any piano force this session left behind — restores whatever
+    // the user's saved preference was without ever having written to it.
+    this.applyVisualizationForce(null)
     for (const off of this.unsubs) off()
     this.unsubs = []
     this.hub.unmount()
@@ -231,7 +238,11 @@ export class LearnController {
   private async consumeMidi(midi: MidiFile): Promise<void> {
     // A newly selected piece is a fresh practice session. Do not inherit the
     // previous exercise's playhead, hand focus, loop, or wait state.
-    if (this.runner?.isActive) this.runner.close('abandoned')
+    // Invalidate controller- and runner-level pending launch work before the
+    // fresh launch starts. A runner stays inactive while preload/mount is in
+    // flight, so checking `isActive` here would let that stale work survive.
+    this.launchGeneration++
+    this.runner?.close('abandoned')
     this.ctx.services.clock.pause()
     this.ctx.services.clock.seek(0)
     this.ctx.services.synth.pause()
@@ -256,6 +267,15 @@ export class LearnController {
 
   private async launchExercise(descriptor: ExerciseDescriptor): Promise<void> {
     if (!this.exerciseHost || !this.overlay) return
+    // Every Learn exercise except Play-Along is piano-only today (sight
+    // reading's staff, interval ear-training, etc. have no guitar
+    // equivalent) — force the surface to piano and disable the topbar
+    // selector for the duration. Play-Along clears the force so guitar stays
+    // available. `effectiveVisualizationMode`'s watch (see app.ts) picks up
+    // the change and switches the surface; the user's saved preference is
+    // never touched, so it's exactly what gets restored on exit.
+    const generation = ++this.launchGeneration
+    this.applyVisualizationForce(descriptor)
     // Close the hub view so the exercise has the whole overlay.
     this.showExerciseView()
     if (!this.runner) {
@@ -268,19 +288,33 @@ export class LearnController {
         onClose: (reason) => this.closeActiveExercise(reason),
       })
     }
-    await this.runner.launch(descriptor)
+    try {
+      await this.runner.launch(descriptor)
+    } catch (err) {
+      // A failed dynamic exercise launch must not strand Learn in an empty
+      // exercise view or leave the visualization selector forced to piano.
+      if (generation === this.launchGeneration) {
+        this.applyVisualizationForce(null)
+        this.showHubView()
+        console.error('[LearnController] Exercise launch failed:', err)
+      }
+    }
   }
 
   // Called by the runner's `onClose` (triggered from an exercise via
   // `ctx.onClose`) or by external callers (hub back button). Idempotent —
-  // returning with no active runner is a harmless no-op.
+  // returning with no runner is a harmless no-op. An inactive runner may
+  // still have preload/mount work pending, so it must also be closed.
   closeActiveExercise(reason: 'completed' | 'abandoned' = 'abandoned'): void {
-    if (!this.runner?.isActive) return
-    const lastDescriptor = this.runner.activeId
+    const runner = this.runner
+    if (!runner) return
+    this.launchGeneration++
+    const lastDescriptor = runner.activeId
     const lastMidi = this.learnState.state.loadedMidi
     const xpBefore = this.progress.xp
     const streakBefore = this.progress.streakDays
-    const result = this.runner.close(reason)
+    const result = runner.close(reason)
+    this.applyVisualizationForce(null)
     this.showHubView()
     this.clearLoadedLearnMidi()
     if (result && lastDescriptor) {
@@ -306,6 +340,14 @@ export class LearnController {
         })
       }
     }
+  }
+
+  // `null` restores the user's saved preference (never touched by this
+  // method — see `AppStore.setVisualizationForced`). A non-play-along
+  // descriptor forces piano; play-along (or no active exercise) clears it.
+  private applyVisualizationForce(descriptor: ExerciseDescriptor | null): void {
+    const forced = descriptor && descriptor.category !== 'play-along' ? 'piano' : null
+    this.ctx.services.store.setVisualizationForced(forced)
   }
 
   private relaunchById(id: string): void {

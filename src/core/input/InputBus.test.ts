@@ -34,6 +34,58 @@ describe('InputBus', () => {
     expect(received).toEqual([{ pitch: 60, velocity: 0, clockTime: 2.5, source: 'keyboard' }])
   })
 
+  it('preserves optional source, channel, and voice identity without requiring it', () => {
+    const bus = new InputBus()
+    const received: BusNoteEvent[] = []
+    bus.noteOn.subscribe((event) => event && received.push(event))
+    bus.emitNoteOn(
+      {
+        ...noteEvent(60),
+        sourceId: 'device-a',
+        channel: 3,
+        voiceId: 'device-a:1',
+      },
+      'midi',
+    )
+
+    expect(received[0]).toMatchObject({
+      pitch: 60,
+      source: 'midi',
+      sourceId: 'device-a',
+      channel: 3,
+      voiceId: 'device-a:1',
+    })
+  })
+
+  it('routes guitar fretboard hits with their sourceId/channel/voiceId intact', () => {
+    // Mirrors how `App` re-publishes `GuitarSurface.surfaceHits` — a fretboard
+    // tap/click carries its own identity (string/fret encoded into the
+    // sourceId, a per-press voiceId) the same way MIDI/keyboard input does.
+    const bus = new InputBus()
+    const received: BusNoteEvent[] = []
+    bus.noteOn.subscribe((e) => e && received.push(e))
+    bus.emitNoteOn(
+      {
+        pitch: 45,
+        velocity: 0.9,
+        clockTime: 1.5,
+        sourceId: 'guitar:fretboard',
+        voiceId: 'guitar:fretboard:pointer-1:3',
+        string: 0,
+        fret: 5,
+      },
+      'guitar',
+    )
+    expect(received[0]).toMatchObject({
+      pitch: 45,
+      source: 'guitar',
+      sourceId: 'guitar:fretboard',
+      voiceId: 'guitar:fretboard:pointer-1:3',
+      string: 0,
+      fret: 5,
+    })
+  })
+
   it('fans out pedal events to every subscriber', () => {
     const bus = new InputBus()
     const a: BusPedalEvent[] = []

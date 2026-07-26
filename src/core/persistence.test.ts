@@ -1,5 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { booleanPersisted, indexPersisted, jsonPersisted, numberPersisted } from './persistence'
+import {
+  booleanPersisted,
+  indexPersisted,
+  jsonPersisted,
+  numberPersisted,
+  stringEnumPersisted,
+} from './persistence'
 
 // Vitest runs in Node — no real DOM. Shim just enough of Storage for these
 // tests; reverted in afterAll so this file doesn't leak globals into others.
@@ -161,6 +167,34 @@ describe('numberPersisted', () => {
     expect(s.load()).toBe(0)
     s.save(100)
     expect(s.load()).toBe(100)
+  })
+})
+
+// Backs `midee.visualizationMode` (see store/state.ts) — invalid/missing
+// values must default to 'piano', never crash or silently pick 'guitar'.
+describe('stringEnumPersisted', () => {
+  const key = 'midee.test.enum'
+  const allowed = ['piano', 'guitar'] as const
+  beforeEach(() => localStorage.clear())
+
+  it('returns the fallback when the key is missing', () => {
+    expect(stringEnumPersisted(key, 'piano', allowed).load()).toBe('piano')
+  })
+
+  it('round-trips a valid value', () => {
+    const s = stringEnumPersisted(key, 'piano', allowed)
+    s.save('guitar')
+    expect(s.load()).toBe('guitar')
+  })
+
+  it('falls back for a value outside the allowed set', () => {
+    localStorage.setItem(key, 'banjo')
+    expect(stringEnumPersisted(key, 'piano', allowed).load()).toBe('piano')
+  })
+
+  it('falls back for an empty string', () => {
+    localStorage.setItem(key, '')
+    expect(stringEnumPersisted(key, 'piano', allowed).load()).toBe('piano')
   })
 })
 

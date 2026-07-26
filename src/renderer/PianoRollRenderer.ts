@@ -11,6 +11,12 @@ import { NoteRenderer } from './NoteRenderer'
 import { ParticleSystem } from './ParticleSystem'
 import type { RenderContext, RenderLayer } from './RenderLayer'
 import { darkTheme, getTrackColor, type Theme } from './theme'
+import type {
+  LiveVoiceSource,
+  VisualizationFrameSource,
+  VisualizationHitId,
+  VisualizationSurface,
+} from './VisualizationSurface'
 import { Viewport, visibleNoteRange } from './viewport'
 
 // Must match the `--keyboard-h` value in main.css :root and the reset value
@@ -74,8 +80,13 @@ const SUSTAIN_CADENCE: EmitCadence = {
 // that window is negligible next to an always-on loop.
 const IDLE_GRACE_FRAMES = 30
 
-export class PianoRollRenderer {
-  readonly activeKeys = createEventSignal<ReadonlyMap<number, number>>(new Map())
+// `implements VisualizationSurface` is the adaptation: every member below
+// already exists with the exact name/signature the interface expects (see
+// VisualizationSurface.ts's doc comment), so satisfying it costs no change
+// to piano behavior or public method semantics — it only asserts, via the
+// compiler, that this class stays a valid drop-in for `AppServices.renderer`.
+export class PianoRollRenderer implements VisualizationSurface {
+  readonly activeKeys = createEventSignal<ReadonlyMap<VisualizationHitId, number>>(new Map())
   private app!: Application
   private viewport!: Viewport
   private noteRenderer!: NoteRenderer
@@ -263,7 +274,7 @@ export class PianoRollRenderer {
     g.fill({ color: this.theme.nowLine, alpha: this.theme.nowLineAlpha })
   }
 
-  loadMidi(midi: MidiFile): void {
+  loadMidi(midi: VisualizationFrameSource): void {
     this.midi = midi
     this.visibleTrackIds = new Set(midi.tracks.map((t) => t.id))
     this.practiceFocusTrackIds = null
@@ -676,7 +687,7 @@ export class PianoRollRenderer {
     this.wake()
   }
 
-  setLiveNoteStore(store: LiveNoteStore): void {
+  setLiveNoteStore(store: LiveVoiceSource): void {
     this.liveStoreUnsub?.()
     this.liveNoteStore = store
     // A press/release/reset can arrive while the ticker is idle-stopped
@@ -698,19 +709,20 @@ export class PianoRollRenderer {
 
   // Hide/show the entire stage. Skips per-frame draw work (stage.visible=false
   // short-circuits child rendering in Pixi) and hides the underlying canvas so
-  // nothing leaks through DOM layers above. The body class lets CSS hide
-  // canvas-coupled chrome (e.g. the keyboard-resizer drag seam) in lockstep.
-  // Layout is preserved.
+  // nothing leaks through DOM layers above. Layout is preserved.
+  //
+  // Does NOT touch `body.canvas-hidden` — SurfaceRouter owns that class
+  // exclusively (it's the only thing that knows whether the *active* surface
+  // is hidden; this renderer doesn't know if it's even the active one).
   setVisible(visible: boolean): void {
     this.app.stage.visible = visible
     this.app.canvas.style.visibility = visible ? '' : 'hidden'
-    document.body.classList.toggle('canvas-hidden', !visible)
     // Coming back from hidden (sheet-music exercise → roll), the ticker may
     // be idle-stopped with a stale backbuffer — present the current state.
     if (visible) this.presentFrame()
   }
 
-  setLoopNoteStore(store: LiveNoteStore | null): void {
+  setLoopNoteStore(store: LiveVoiceSource | null): void {
     this.loopStoreUnsub?.()
     this.loopStoreUnsub = null
     this.loopNoteStore = store
@@ -728,8 +740,8 @@ export class PianoRollRenderer {
   // keyboard. The renderer overlays them with a soft pulse, distinct from the
   // press-state colour so the hint reads as guidance rather than playback.
   setPracticeHints(
-    pending: ReadonlySet<number> | null,
-    accepted: ReadonlySet<number> | null,
+    pending: ReadonlySet<VisualizationHitId> | null,
+    accepted: ReadonlySet<VisualizationHitId> | null,
   ): void {
     this.practiceHintPending = pending && pending.size > 0 ? pending : null
     this.practiceHintAccepted = accepted && accepted.size > 0 ? accepted : null

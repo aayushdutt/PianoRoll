@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js'
 import { createStore, type SetStoreFunction } from 'solid-js/store'
 import { render } from 'solid-js/web'
 import type { AppServices } from '../core/services'
+import type { VisualizationMode } from '../guitar/types'
 import { t } from '../i18n'
 import type { LiveLooperState } from '../midi/LiveLooper'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
@@ -66,6 +67,7 @@ export interface ControlsOptions {
   onSessionToggle?: () => void
   onChordToggle?: () => void
   onOctaveShift?: (delta: number) => void
+  onVisualizationChange?: (mode: VisualizationMode) => void
 }
 
 export class Controls {
@@ -141,6 +143,14 @@ export class Controls {
     const [volume, setVolumeSig] = createSignal(store.state.volume ?? 0.8)
     const [speed, setSpeedSig] = createSignal(store.state.speed ?? 1)
     const [zoom, setZoomSig] = createSignal(ZOOM_DEFAULT)
+    // Reflects the *effective* mode (Learn's force wins over the saved
+    // preference) so the selector shows what's actually on screen.
+    const [visualizationMode, setVisualizationMode] = createSignal<VisualizationMode>(
+      store.effectiveVisualizationMode,
+    )
+    const [visualizationDisabled, setVisualizationDisabled] = createSignal(
+      store.state.visualizationForced !== null,
+    )
 
     const [uiStore, setUi] = createStore<UiStoreShape>({
       context: {
@@ -197,6 +207,9 @@ export class Controls {
             onMidi={() => opts.onMidiConnect?.()}
             onRecord={() => opts.onRecord?.()}
             onLearnThis={() => opts.onLearnThis?.()}
+            visualizationMode={visualizationMode}
+            visualizationDisabled={visualizationDisabled}
+            onVisualizationChange={(m) => opts.onVisualizationChange?.(m)}
             registerEl={(el) => {
               this.topStripEl = el
               this.setupCompactObserver(el)
@@ -403,6 +416,14 @@ export class Controls {
           this.scrubber.max = String(d)
           this.durationEl.textContent = formatTime(d)
         },
+      ),
+      watch(
+        () => store.effectiveVisualizationMode,
+        (m) => setVisualizationMode(m),
+      ),
+      watch(
+        () => store.state.visualizationForced,
+        (forced) => setVisualizationDisabled(forced !== null),
       ),
     )
 

@@ -362,6 +362,117 @@ describe('PracticeEngine.setVisibleTracks', () => {
   })
 })
 
+// Guitar Play-Along: pitches a filter excludes (e.g. outside the fretboard's
+// range) stay audible/visible via the schedule/synth — this only tests what
+// wait-mode *requires*. Uses a fake "unsupported past 100" filter rather than
+// the real guitar profile so the engine's behavior is tested independent of
+// guitar/profile.ts (that has its own tests).
+const dropHighPitches = (pitches: ReadonlySet<number>): Set<number> =>
+  new Set([...pitches].filter((p) => p < 100))
+
+describe('PracticeEngine.setPitchFilter — unsupported-voice scoring', () => {
+  it('ends and advances an active wait when filtering removes the whole step', () => {
+    const { clock, engine, onWaitEnd } = makeEngine(
+      midiWithNotes([
+        { pitch: 60, time: 2 },
+        { pitch: 64, time: 5 },
+      ]),
+    )
+    clock.emit(2.01)
+    expect(engine.isWaiting).toBe(true)
+    engine.setPitchFilter((pitches) => new Set([...pitches].filter((pitch) => pitch !== 60)))
+    expect(onWaitEnd).toHaveBeenCalledWith(2.006)
+    expect(engine.isWaiting).toBe(false)
+    expect(engine.peekNextStep()?.time).toBe(5)
+  })
+
+  it('preserves articulation start time when an accepted pitch survives filtering', () => {
+    const { clock, engine } = makeEngine(
+      midiWithNotes([
+        { pitch: 60, time: 2 },
+        { pitch: 64, time: 2 },
+        { pitch: 67, time: 2 },
+      ]),
+    )
+    let nowMs = 1000
+    ;(engine as unknown as { nowMs: () => number }).nowMs = () => nowMs
+    clock.emit(2.01)
+    expect(engine.notePressed(60).kind).toBe('accepted')
+    engine.setPitchFilter((pitches) => new Set([...pitches].filter((pitch) => pitch !== 67)))
+    nowMs = 1123
+    expect(engine.notePressed(64)).toMatchObject({ kind: 'advanced', articulationMs: 123 })
+  })
+
+  it('narrows a mixed chord to only the pitches the filter allows', () => {
+    const { engine } = makeEngine(
+      midiWithNotes([
+        { pitch: 60, time: 2 },
+        { pitch: 130, time: 2 },
+      ]),
+    )
+    engine.setPitchFilter(dropHighPitches)
+    expect(engine.peekNextStep()?.pitches).toEqual(new Set([60]))
+  })
+
+  it('drops an all-unsupported step entirely so playback advances through it unblocked', () => {
+    const { clock, engine, onWaitStart } = makeEngine(
+      midiWithNotes([
+        { pitch: 130, time: 2 },
+        { pitch: 140, time: 2 },
+        { pitch: 60, time: 5 },
+      ]),
+    )
+    engine.setPitchFilter(dropHighPitches)
+    // The all-unsupported chord at t=2 must not appear as a step at all —
+    // the next (only) step is the supported one at t=5.
+    expect(engine.peekNextStep()?.time).toBe(5)
+
+    clock.emit(2)
+    expect(onWaitStart).not.toHaveBeenCalled()
+    expect(engine.isWaiting).toBe(false)
+
+    clock.emit(5 - 0.005)
+    expect(onWaitStart).toHaveBeenCalledTimes(1)
+    expect(engine.isWaiting).toBe(true)
+  })
+
+  it('an all-unsupported group between two supported ones does not stall either', () => {
+    const { clock, engine, onWaitStart } = makeEngine(
+      midiWithNotes([
+        { pitch: 60, time: 1 },
+        { pitch: 130, time: 3 },
+        { pitch: 64, time: 6 },
+      ]),
+    )
+    engine.setPitchFilter(dropHighPitches)
+    expect(engine.peekNextStep()?.time).toBe(1)
+    const first = engine.notePressed(60)
+    expect(first.kind).toBe('rejected') // not waiting yet at t=0
+    clock.emit(1 - 0.005)
+    expect(engine.notePressed(60).kind).toBe('advanced')
+    // Next step must skip straight to t=6 — the unsupported t=3 chord never
+    // became a step.
+    expect(engine.peekNextStep()?.time).toBe(6)
+    clock.emit(3)
+    expect(engine.isWaiting).toBe(false)
+    clock.emit(6 - 0.005)
+    expect(onWaitStart).toHaveBeenCalledTimes(2)
+  })
+
+  it('clearing the filter (null) restores every pitch as required again', () => {
+    const { engine } = makeEngine(
+      midiWithNotes([
+        { pitch: 60, time: 2 },
+        { pitch: 130, time: 2 },
+      ]),
+    )
+    engine.setPitchFilter(dropHighPitches)
+    expect(engine.peekNextStep()?.pitches).toEqual(new Set([60]))
+    engine.setPitchFilter(null)
+    expect(engine.peekNextStep()?.pitches).toEqual(new Set([60, 130]))
+  })
+})
+
 describe('PracticeEngine.toggle and dispose', () => {
   it('toggle() alternates enabled state and returns the new value', () => {
     const { engine } = makeEngine()

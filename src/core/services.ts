@@ -1,6 +1,6 @@
 import type { Metronome } from '../audio/Metronome'
 import type { SynthEngine } from '../audio/SynthEngine'
-import type { PianoRollRenderer } from '../renderer/PianoRollRenderer'
+import type { VisualizationSurface } from '../renderer/VisualizationSurface'
 import type { AppStore } from '../store/state'
 import type { MasterClock } from './clock/MasterClock'
 import type { InputBus } from './input/InputBus'
@@ -14,6 +14,11 @@ export interface AppServices {
   clock: MasterClock
   synth: SynthEngine
   metronome: Metronome
-  renderer: PianoRollRenderer
+  // Typed against the instrument-agnostic contract (see
+  // `renderer/VisualizationSurface.ts`), not the concrete `PianoRollRenderer`
+  // — the only implementation today, but call sites here shouldn't need to
+  // widen back to it. `app.ts` still owns and constructs the concrete
+  // `PianoRollRenderer` instance; this is only the seam other services see.
+  renderer: VisualizationSurface
   input: InputBus
 }

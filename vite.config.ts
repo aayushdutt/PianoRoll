@@ -2,6 +2,9 @@
 import { defineConfig, type Plugin } from 'vite'
 import solid from 'vite-plugin-solid'
 
+const nodeMajor = Number.parseInt(process.versions.node, 10)
+const testExecArgv = nodeMajor >= 25 ? ['--no-experimental-webstorage'] : []
+
 // Preload the body font (Inter 400) so the woff2 fetch starts in parallel
 // with HTML parse, not after CSS is parsed. Saves ~100-200 ms on LCP for
 // first-time visitors. Other weights / Instrument Serif / JetBrains Mono
@@ -77,6 +80,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    execArgv: testExecArgv,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./vitest.setup.ts'],
     coverage: {

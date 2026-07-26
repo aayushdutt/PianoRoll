@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { backdateEventTime, parseMidiMessage } from './MidiInputManager'
+import { describe, expect, it, vi } from 'vitest'
+import type { MasterClock } from '../core/clock/MasterClock'
+import { backdateEventTime, MidiInputManager, parseMidiMessage } from './MidiInputManager'
 
 // Only the pure decode/timing helpers are tested here. Device hot-plug and
 // `requestMIDIAccess` wiring need a real MIDIAccess and are covered by e2e.
@@ -41,12 +42,12 @@ describe('parseMidiMessage', () => {
     expect(parseMidiMessage([0x90], false)).toEqual({ kind: 'none' })
   })
 
-  it('decodes a note-on with normalised velocity, stripping the channel nibble', () => {
-    // 0x95 = note-on on channel 5; channel must not affect the result.
+  it('decodes a note-on with normalised velocity and a zero-based channel', () => {
     expect(parseMidiMessage([0x95, 60, 127], false)).toEqual({
       kind: 'noteOn',
       pitch: 60,
       velocity: 1,
+      channel: 5,
     })
     expect(parseMidiMessage([0x90, 64, 64], false)).toMatchObject({
       kind: 'noteOn',
@@ -55,21 +56,45 @@ describe('parseMidiMessage', () => {
   })
 
   it('decodes an explicit note-off (0x80)', () => {
-    expect(parseMidiMessage([0x80, 60, 64], false)).toEqual({ kind: 'noteOff', pitch: 60 })
+    expect(parseMidiMessage([0x8f, 60, 64], false)).toEqual({
+      kind: 'noteOff',
+      pitch: 60,
+      channel: 15,
+    })
   })
 
   it('coerces a velocity-0 note-on into a note-off (running-status hardware)', () => {
-    expect(parseMidiMessage([0x90, 60, 0], false)).toEqual({ kind: 'noteOff', pitch: 60 })
+    expect(parseMidiMessage([0x92, 60, 0], false)).toEqual({
+      kind: 'noteOff',
+      pitch: 60,
+      channel: 2,
+    })
   })
 
   it('emits pedal-down when CC64 crosses the >=64 threshold', () => {
-    expect(parseMidiMessage([0xb0, 64, 127], false)).toEqual({ kind: 'pedal', down: true })
-    expect(parseMidiMessage([0xb0, 64, 64], false)).toEqual({ kind: 'pedal', down: true })
+    expect(parseMidiMessage([0xb0, 64, 127], false)).toEqual({
+      kind: 'pedal',
+      down: true,
+      channel: 0,
+    })
+    expect(parseMidiMessage([0xb0, 64, 64], false)).toEqual({
+      kind: 'pedal',
+      down: true,
+      channel: 0,
+    })
   })
 
   it('emits pedal-up when CC64 is below the threshold', () => {
-    expect(parseMidiMessage([0xb0, 64, 63], true)).toEqual({ kind: 'pedal', down: false })
-    expect(parseMidiMessage([0xb0, 64, 0], true)).toEqual({ kind: 'pedal', down: false })
+    expect(parseMidiMessage([0xb0, 64, 63], true)).toEqual({
+      kind: 'pedal',
+      down: false,
+      channel: 0,
+    })
+    expect(parseMidiMessage([0xb0, 64, 0], true)).toEqual({
+      kind: 'pedal',
+      down: false,
+      channel: 0,
+    })
   })
 
   it('dedupes redundant same-state pedal messages', () => {
@@ -90,5 +115,52 @@ describe('parseMidiMessage', () => {
       kind: 'noteOn',
       pitch: 72,
     })
+  })
+})
+
+describe('MidiInputManager voice identity', () => {
+  it('pairs repeated notes FIFO per source/channel and releases voices on disconnect', async () => {
+    const input = {
+      id: 'device-a',
+      name: 'Controller',
+      state: 'connected',
+      onmidimessage: null as ((event: MIDIMessageEvent) => void) | null,
+    }
+    const access = {
+      inputs: new Map([['device-a', input]]),
+      onstatechange: null as (() => void) | null,
+    }
+    vi.stubGlobal('navigator', { requestMIDIAccess: vi.fn(async () => access) })
+    vi.spyOn(performance, 'now').mockReturnValue(100)
+    const clock = { currentTime: 10, speed: 1 } as MasterClock
+    const manager = new MidiInputManager(clock)
+    const ons: NonNullable<(typeof manager.noteOn)['value']>[] = []
+    const offs: NonNullable<(typeof manager.noteOff)['value']>[] = []
+    manager.noteOn.subscribe((event) => event && ons.push(event))
+    manager.noteOff.subscribe((event) => event && offs.push(event))
+    await manager.requestAccess()
+
+    const send = (bytes: number[]) =>
+      input.onmidimessage?.({ data: new Uint8Array(bytes), timeStamp: 100 } as MIDIMessageEvent)
+    send([0x91, 60, 100])
+    send([0x91, 60, 110])
+    send([0x92, 60, 120])
+    send([0x91, 60, 0])
+
+    expect(ons).toHaveLength(3)
+    expect(ons[0]).toMatchObject({ sourceId: 'device-a', channel: 1, pitch: 60 })
+    expect(ons[0]!.voiceId).not.toBe(ons[1]!.voiceId)
+    expect(ons[2]).toMatchObject({ channel: 2 })
+    expect(offs[0]!.voiceId).toBe(ons[0]!.voiceId)
+
+    input.state = 'disconnected'
+    access.onstatechange?.()
+    expect(offs.map((event) => event.voiceId)).toEqual([
+      ons[0]!.voiceId,
+      ons[1]!.voiceId,
+      ons[2]!.voiceId,
+    ])
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 })

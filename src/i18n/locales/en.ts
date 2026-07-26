@@ -81,6 +81,16 @@ export const en = {
   'topStrip.midi.disconnectedMenu': 'Connect a MIDI device',
   'topStrip.midi.blockedPill': 'Enable MIDI',
   'topStrip.midi.pillFallback': 'MIDI',
+  'visualization.aria': 'Visualization view',
+  'visualization.piano.label': 'Piano',
+  'visualization.piano.aria': 'Show piano visualization',
+  'visualization.guitar.label': 'Guitar',
+  'visualization.guitar.aria': 'Show guitar visualization',
+  'visualization.learnPianoRequired': 'This Learn activity requires the piano view.',
+  'guitar.fretboard.aria': 'Interactive guitar fretboard',
+  'guitar.fretboard.position': 'String {string}, fret {fret}, note {note}',
+  'guitar.unsupportedNote': '{note} is outside this fretboard',
+  'guitar.unsupportedNotes': '{count} notes cannot be placed on this fretboard',
 
   // ── Appearance / customize popover ──────────────────────────
   'customize.aria': 'Appearance',

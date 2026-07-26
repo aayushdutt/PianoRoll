@@ -26,8 +26,10 @@ import { createAppStore } from '../store/state'
 // `ctx` so tests can both drive the UI (clicks) and assert against the fakes
 // (`ctx.resetInteractionState`, `ctx.services.renderer.clearMidi`, …).
 
-/** A `vi.fn()`-backed renderer stub. Only the methods mode components call are
- * present; cast to the real type for the rest (never invoked in these tests). */
+/** A `vi.fn()`-backed renderer stub satisfying `AppServices['renderer']`
+ * (the `VisualizationSurface` contract — see `renderer/VisualizationSurface.ts`),
+ * not the concrete `PianoRollRenderer`. Only the methods mode components call
+ * are present; cast to the full type for the rest (never invoked in these tests). */
 function fakeRenderer(): AppServices['renderer'] {
   return {
     clearMidi: vi.fn(),

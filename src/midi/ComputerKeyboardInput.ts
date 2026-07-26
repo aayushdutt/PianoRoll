@@ -46,6 +46,7 @@ const NOTE_MAP: Record<string, number> = {
 }
 
 const DEFAULT_VELOCITY = 0.75
+const KEYBOARD_SOURCE_ID = 'computer-keyboard'
 
 // Reads the browser keydown/keyup stream and translates it into synthetic
 // MIDI note events. Only active while live mode is enabled.
@@ -59,7 +60,8 @@ export class ComputerKeyboardInput {
   readonly pedal = createEventSignal<boolean>(false)
 
   private active = false
-  private held = new Map<string, number>() // code → pitch (for correct release after octave change)
+  private held = new Map<string, { pitch: number; voiceId: string }>()
+  private nextVoiceId = 1
   private pedalHeld = false
 
   constructor(private readonly clock: MasterClock) {}
@@ -95,8 +97,14 @@ export class ComputerKeyboardInput {
 
   private releaseAllHeld(): void {
     const t = this.clock.currentTime
-    for (const [, pitch] of this.held) {
-      this.noteOff.set({ pitch, velocity: 0, clockTime: t })
+    for (const [, held] of this.held) {
+      this.noteOff.set({
+        pitch: held.pitch,
+        velocity: 0,
+        clockTime: t,
+        sourceId: KEYBOARD_SOURCE_ID,
+        voiceId: held.voiceId,
+      })
     }
     this.held.clear()
   }
@@ -136,8 +144,15 @@ export class ComputerKeyboardInput {
     const pitch = 12 * (this.octave.value + 1) + offset
     if (pitch < 21 || pitch > 108) return
 
-    this.held.set(e.code, pitch)
-    this.noteOn.set({ pitch, velocity: DEFAULT_VELOCITY, clockTime: this.clock.currentTime })
+    const voiceId = `keyboard:${this.nextVoiceId++}`
+    this.held.set(e.code, { pitch, voiceId })
+    this.noteOn.set({
+      pitch,
+      velocity: DEFAULT_VELOCITY,
+      clockTime: this.clock.currentTime,
+      sourceId: KEYBOARD_SOURCE_ID,
+      voiceId,
+    })
   }
 
   private onKeyUp = (e: KeyboardEvent): void => {
@@ -146,10 +161,16 @@ export class ComputerKeyboardInput {
       this.pedal.set(false)
       return
     }
-    const pitch = this.held.get(e.code)
-    if (pitch === undefined) return
+    const held = this.held.get(e.code)
+    if (held === undefined) return
     this.held.delete(e.code)
-    this.noteOff.set({ pitch, velocity: 0, clockTime: this.clock.currentTime })
+    this.noteOff.set({
+      pitch: held.pitch,
+      velocity: 0,
+      clockTime: this.clock.currentTime,
+      sourceId: KEYBOARD_SOURCE_ID,
+      voiceId: held.voiceId,
+    })
   }
 
   private shouldIgnore(e: KeyboardEvent): boolean {

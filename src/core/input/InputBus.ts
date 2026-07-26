@@ -4,7 +4,7 @@ import { createEventSignal } from '../../store/eventSignal'
 // Where a note/pedal event entered the app. Subscribers use this for telemetry
 // (per-source first-note counting) and occasionally to gate behavior — but the
 // default policy is "treat every source equally; the user pressed a key".
-export type InputSource = 'midi' | 'keyboard' | 'touch' | 'pi'
+export type InputSource = 'midi' | 'keyboard' | 'touch' | 'pi' | 'guitar'
 
 export interface BusNoteEvent extends MidiNoteEvent {
   source: InputSource

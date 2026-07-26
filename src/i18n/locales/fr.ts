@@ -63,6 +63,16 @@ const fr: Messages = {
   'topStrip.midi.disconnectedMenu': 'Connecter un périphérique MIDI',
   'topStrip.midi.blockedPill': 'Activer MIDI',
   'topStrip.midi.pillFallback': 'MIDI',
+  'visualization.aria': 'Vue de visualisation',
+  'visualization.piano.label': 'Piano',
+  'visualization.piano.aria': 'Afficher la visualisation piano',
+  'visualization.guitar.label': 'Guitare',
+  'visualization.guitar.aria': 'Afficher la visualisation guitare',
+  'visualization.learnPianoRequired': 'Cette activité d’apprentissage nécessite la vue piano.',
+  'guitar.fretboard.aria': 'Manche de guitare interactif',
+  'guitar.fretboard.position': 'Corde {string}, frette {fret}, note {note}',
+  'guitar.unsupportedNote': '{note} est hors de ce manche',
+  'guitar.unsupportedNotes': '{count} notes ne peuvent pas être placées sur ce manche',
 
   // ── Appearance / customize popover ──────────────────────────
   'customize.aria': 'Apparence',

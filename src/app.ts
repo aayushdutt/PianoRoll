@@ -26,6 +26,8 @@ import {
 // heavy VideoExporter chunk (see Promise.all removal below).
 import type { VideoExporter } from './export/VideoExporter'
 import { audioBufferToWav } from './export/wav'
+import { GuitarSurface } from './guitar/GuitarSurface'
+import type { VisualizationMode } from './guitar/types'
 import { setLocale, t } from './i18n'
 import { CaptureFanout } from './midi/CaptureFanout'
 import { ComputerKeyboardInput } from './midi/ComputerKeyboardInput'
@@ -41,6 +43,7 @@ import { setNextLiveOpts } from './modes/LiveMode'
 import { MODE_CAPTURES_LIVE, type ModeContext } from './modes/ModeController'
 import { PARTICLE_STYLES } from './renderer/ParticleSystem'
 import { PianoRollRenderer } from './renderer/PianoRollRenderer'
+import { SurfaceRouter } from './renderer/SurfaceRouter'
 import { THEMES, type Theme } from './renderer/theme'
 import type { AppMode, AppStore } from './store/state'
 import { watch } from './store/watch'
@@ -80,7 +83,23 @@ function countNotes(midi: { tracks: ReadonlyArray<{ notes: ReadonlyArray<unknown
 
 export class App {
   private clock = new MasterClock()
-  private renderer = new PianoRollRenderer()
+  // Piano is a concrete surface on its own canvas (see index.html),
+  // initialized eagerly at boot. Guitar is constructed lazily — the first
+  // time `SurfaceRouter` actually needs it — via `createGuitarSurface()` so a
+  // piano-only session never pays for a second Pixi/WebGL context. `surfaces`
+  // (the `SurfaceRouter`) is what `AppServices.renderer` actually resolves to
+  // — piano-specific chrome (particles, keyboard resize, track visibility,
+  // mouse-to-pitch, export pitch-fit/zoom) stays pinned to `pianoRenderer`
+  // directly since it has no guitar equivalent.
+  private pianoRenderer = new PianoRollRenderer()
+  private guitarCanvas!: HTMLCanvasElement
+  private surfaces = new SurfaceRouter(
+    this.pianoRenderer,
+    () => this.createGuitarSurface(),
+    (from, to) => {
+      if (from === 'piano' && to === 'guitar') this.releaseActivePianoPointerNote()
+    },
+  )
   private synth = new SynthEngine()
   private inputBus = new InputBus()
   midiInput!: MidiInputManager
@@ -189,6 +208,7 @@ export class App {
 
   async init(): Promise<void> {
     const canvas = document.querySelector<HTMLCanvasElement>('#pianoroll')!
+    const guitarCanvas = document.querySelector<HTMLCanvasElement>('#guitar-surface')!
     const overlay = document.querySelector<HTMLElement>('#ui-overlay')!
     this.overlay = overlay
 
@@ -196,10 +216,14 @@ export class App {
     // popovers, touch-friendly hit targets, etc.).
     installViewportClassSync()
 
-    await this.renderer.init(canvas)
-    this.renderer.attachClock(this.clock)
-    this.renderer.setLiveNoteStore(this.liveNotes)
-    this.renderer.setLoopNoteStore(this.loopNotes)
+    await this.pianoRenderer.init(canvas)
+    // Guitar's canvas element exists in the DOM from boot, but the
+    // GuitarSurface/Pixi context behind it is constructed lazily — see
+    // `createGuitarSurface()`.
+    this.guitarCanvas = guitarCanvas
+    this.surfaces.attachClock(this.clock)
+    this.surfaces.setLiveNoteStore(this.liveNotes)
+    this.surfaces.setLoopNoteStore(this.loopNotes)
 
     this.midiInput = new MidiInputManager(this.clock)
     this.keyboardInput = new ComputerKeyboardInput(this.clock)
@@ -252,7 +276,7 @@ export class App {
       clock: this.clock,
       synth: this.synth,
       metronome: this.metronome,
-      renderer: this.renderer,
+      renderer: this.surfaces,
       input: this.inputBus,
     }
 
@@ -262,12 +286,21 @@ export class App {
     this.unsubs.push(
       this.performanceBus.subscribeNotes(
         // Audio + visual: always fire so every key-press is heard and seen.
+        // Identity (sourceId/channel/voiceId) rides along so a surface
+        // rendering held live notes (e.g. the guitar fretboard) can tell
+        // apart overlapping voices instead of collapsing them by pitch.
         (evt) => {
-          this.synth.liveNoteOn(evt.pitch, evt.velocity)
-          this.liveNotes.press(evt.pitch, evt.velocity, evt.clockTime)
+          this.synth.liveNoteOn(evt.pitch, evt.velocity, evt.voiceId)
+          this.liveNotes.press(evt.pitch, evt.velocity, evt.clockTime, {
+            ...(evt.sourceId !== undefined ? { sourceId: evt.sourceId } : {}),
+            ...(evt.channel !== undefined ? { channel: evt.channel } : {}),
+            ...(evt.voiceId !== undefined ? { voiceId: evt.voiceId } : {}),
+            ...(evt.string !== undefined ? { string: evt.string } : {}),
+            ...(evt.fret !== undefined ? { fret: evt.fret } : {}),
+          })
         },
         (evt) => {
-          this.synth.liveNoteOff(evt.pitch)
+          this.synth.liveNoteOff(evt.pitch, evt.voiceId)
         },
       ),
       // Capture-mode note-off subscriber: looper + session recorder capture
@@ -313,7 +346,7 @@ export class App {
         this.synth.seek(t)
         this.liveNotes.reset()
       },
-      onZoom: (pps) => this.renderer.setZoom(pps),
+      onZoom: (pps) => this.pianoRenderer.setZoom(pps),
       onThemeCycle: () => this.cycleTheme(),
       onMidiConnect: () => void this.connectMidi(),
       onOpenTracks: () => this.trackPanel.toggle(),
@@ -356,6 +389,7 @@ export class App {
         if (delta < 0) this.keyboardInput.shiftOctaveDown()
         else this.keyboardInput.shiftOctaveUp()
       },
+      onVisualizationChange: (mode) => this.setVisualizationMode(mode),
     })
 
     const pushLoop = (): void =>
@@ -397,7 +431,8 @@ export class App {
 
     this.trackPanel = new TrackPanel(
       overlay,
-      this.renderer,
+      this.pianoRenderer.currentTheme,
+      (id, visible) => this.surfaces.setTrackVisible(id, visible),
       (id, enabled) => {
         this.synth.setTrackEnabled(id, enabled)
         trackEvent('track_toggled', { enabled })
@@ -424,8 +459,8 @@ export class App {
 
     this.kbdResizer = new KeyboardResizer(
       overlay,
-      () => this.renderer.currentKeyboardHeight,
-      (px) => this.renderer.setKeyboardHeight(px),
+      () => this.pianoRenderer.currentKeyboardHeight,
+      (px) => this.pianoRenderer.setKeyboardHeight(px),
     )
     this.kbdResizer.restoreSaved()
 
@@ -600,6 +635,29 @@ export class App {
       this.inputBus.noteOff.subscribe((evt) => {
         if (evt) this.handleLiveNoteOff(evt)
       }),
+      // Fretboard taps/clicks on the guitar surface — only fires while its
+      // canvas is visible and receiving pointer/keyboard events (see
+      // `FretboardInteraction`). Subscribed once on the router's stable
+      // `surfaceHits` signal (not the concrete, lazily-constructed
+      // GuitarSurface) so this keeps working across guitar being torn down
+      // and rebuilt and across mode switches. Re-publishes onto the same
+      // InputBus as MIDI and computer-keyboard input so audio, live state,
+      // capture, and reset all see one fan-out point regardless of source.
+      this.surfaces.surfaceHits.subscribe((hit) => {
+        if (!hit) return
+        const evt = {
+          pitch: hit.pitch,
+          velocity: hit.velocity,
+          clockTime: this.clock.currentTime,
+          sourceId: hit.sourceId,
+          voiceId: hit.voiceId,
+          ...(hit.channel !== undefined ? { channel: hit.channel } : {}),
+          ...(hit.string !== undefined ? { string: hit.string } : {}),
+          ...(hit.fret !== undefined ? { fret: hit.fret } : {}),
+        }
+        if (hit.type === 'note-on') this.inputBus.emitNoteOn(evt, 'guitar')
+        else this.inputBus.emitNoteOff(evt, 'guitar')
+      }),
     )
 
     // Mouse/touch on the on-screen keyboard — down to press, move to slide
@@ -634,7 +692,7 @@ export class App {
     document.addEventListener('visibilitychange', this.onVisibilityChange)
     window.addEventListener('blur', this.onWindowBlur)
     window.addEventListener('pointerdown', this.onFirstPointerDown, { passive: true })
-    window.addEventListener('keydown', this.onFirstKeyDown, { passive: true })
+    window.addEventListener('keydown', this.onFirstKeyDown, { capture: true, passive: true })
 
     this.modeContext = {
       services: this.services,
@@ -649,9 +707,79 @@ export class App {
       setLearnFileName: (name) => this.controls.updateLearnFileName(name),
     }
 
+    // Visualization surface: apply whatever's effective at boot (saved
+    // preference — Learn can't be forcing anything yet), then keep it in
+    // sync with every subsequent change (user selection or Learn force).
+    this.applyVisualizationMode(this.store.effectiveVisualizationMode)
+    this.unsubs.push(
+      watch(
+        () => this.store.effectiveVisualizationMode,
+        (mode) => this.applyVisualizationMode(mode),
+      ),
+    )
+
     // Start in home. <HomeMode/>'s onMount handles the side effects.
     this.services.store.enterHome()
     void this.autoConnectMidi()
+  }
+
+  // Switches which concrete surface is on screen. Never touches the
+  // selected output instrument (synth) — visualization and audio are
+  // orthogonal by design (see docs on VisualizationSurface). Fire-and-forget:
+  // the watch() call site is synchronous, and SurfaceRouter.setMode already
+  // resolves latest-request-wins internally, so a rapid run of calls here is
+  // safe to leave un-awaited — each just races to update the same router.
+  private applyVisualizationMode(mode: VisualizationMode): void {
+    void this.switchVisualizationSurface(mode)
+  }
+
+  private async switchVisualizationSurface(mode: VisualizationMode): Promise<void> {
+    if (mode === 'guitar' && this.surfaces.currentMode === 'piano') {
+      this.releaseActivePianoPointerNote()
+    }
+    try {
+      await this.surfaces.setMode(mode, this.clock.currentTime)
+    } catch (err) {
+      // Guitar's first-ever init failed (e.g. WebGL unavailable). Never leave
+      // this as an unhandled rejection, and never flip `visualization-guitar`
+      // body state for a switch that didn't actually happen.
+      console.error('Failed to switch visualization surface:', err)
+      // Only roll back when the failure came from the user's own saved
+      // preference — a Learn-mode force has no preference to roll back, and
+      // clobbering it here would fight Learn's own state ownership.
+      if (
+        this.store.state.visualizationForced === null &&
+        this.store.state.visualizationMode === 'guitar'
+      ) {
+        this.store.setVisualizationMode('piano')
+      }
+      return
+    }
+    // Derive from the router's actual resulting mode rather than the `mode`
+    // this call requested — a stale call that lost a latest-wins race
+    // resolves without throwing (SurfaceRouter no-ops it), and body state
+    // must track whichever switch really landed.
+    document.body.classList.toggle('visualization-guitar', this.surfaces.currentMode === 'guitar')
+  }
+
+  // Lazy factory passed to `SurfaceRouter` — constructs and initializes the
+  // guitar Pixi/WebGL context only the first time it's actually needed, so a
+  // piano-only session never pays for a second canvas context. `SurfaceRouter`
+  // caches the resulting surface (and, on failure, retries from scratch on
+  // the next switch attempt — see `ensureGuitar()`), so this runs at most
+  // once per successful construction.
+  private async createGuitarSurface(): Promise<GuitarSurface> {
+    const surface = new GuitarSurface()
+    await surface.init(this.guitarCanvas)
+    return surface
+  }
+
+  // Topbar selector callback — persists the user's choice. Application to
+  // the surface happens via the `effectiveVisualizationMode` watch above, so
+  // a Learn-mode force (which wins over the raw preference) never gets
+  // fought by this call.
+  private setVisualizationMode(mode: VisualizationMode): void {
+    this.store.setVisualizationMode(mode)
   }
 
   private releaseAllLiveNotes(): void {
@@ -712,7 +840,7 @@ export class App {
     // Looper + session captures are live-performance concerns — practice
     // key-presses (Learn) should not pollute a saved session recording.
     if (captures) {
-      this.renderer.burstParticleAt(evt.pitch)
+      this.pianoRenderer.burstParticleAt(evt.pitch)
       this.capture.captureNoteOn(evt.pitch, evt.velocity, evt.clockTime)
     }
 
@@ -731,8 +859,12 @@ export class App {
     if (mode === 'home') return
 
     // Visual key-up always fires — the roll reflects hand motion even while
-    // audio keeps ringing under the pedal.
-    this.liveNotes.release(evt.pitch, evt.clockTime)
+    // audio keeps ringing under the pedal. Release by voiceId when the
+    // source provided one (MIDI/keyboard/guitar all do) so overlapping
+    // same-pitch voices from different sources/strings don't release each
+    // other's held note; fall back to pitch for sources that don't (mouse).
+    if (evt.voiceId) this.liveNotes.releaseVoice(evt.voiceId, evt.clockTime)
+    else this.liveNotes.release(evt.pitch, evt.clockTime)
 
     // Route through the bus. When pedal is down the bus bookmarks the pitch;
     // when pedal lifts, bus subscribers fire for audio+visual release and
@@ -742,7 +874,7 @@ export class App {
 
   private onCanvasPointerDown = (e: PointerEvent): void => {
     if (this.store.state.status === 'exporting') return
-    const pitch = this.renderer.pitchAtClientPoint(e.clientX, e.clientY)
+    const pitch = this.pianoRenderer.pitchAtClientPoint(e.clientX, e.clientY)
     if (pitch === null) return
 
     this.primeInteractiveAudio()
@@ -765,7 +897,7 @@ export class App {
     // path, not a hover state.
     if (this.activeMouseNote === null) return
     if (this.store.state.status === 'exporting') return
-    const pitch = this.renderer.pitchAtClientPoint(e.clientX, e.clientY)
+    const pitch = this.pianoRenderer.pitchAtClientPoint(e.clientX, e.clientY)
     if (pitch === null || pitch === this.activeMouseNote) return
     const prev = this.activeMouseNote
     this.activeMouseNote = pitch
@@ -777,6 +909,10 @@ export class App {
   }
 
   private onCanvasPointerUp = (): void => {
+    this.releaseActivePianoPointerNote()
+  }
+
+  private releaseActivePianoPointerNote(): void {
     if (this.activeMouseNote === null) return
     const pitch = this.activeMouseNote
     this.activeMouseNote = null
@@ -815,7 +951,7 @@ export class App {
     const previousMidi = this.store.state.loadedMidi
     this.resetInteractionState()
     this.store.beginPlayLoad()
-    this.renderer.clearMidi()
+    this.surfaces.clearMidi()
     this.showLoading()
 
     try {
@@ -855,7 +991,7 @@ export class App {
         // effect never re-fires, yet clearMidi() above already wiped the
         // renderer.
         this.store.enterPlay()
-        this.renderer.loadMidi(previousMidi)
+        this.surfaces.loadMidi(previousMidi)
         this.trackPanel.render(previousMidi)
         this.dropzone.hide()
       } else if (previousMode === 'live') {
@@ -927,7 +1063,7 @@ export class App {
 
   private applyParticleStyle(): void {
     const info = PARTICLE_STYLES[this.particleIndex]!
-    this.renderer.setParticleStyle(info.id)
+    this.pianoRenderer.setParticleStyle(info.id)
     this.customizeMenu?.setParticle(this.particleIndex)
   }
 
@@ -986,39 +1122,56 @@ export class App {
     // render. Stop it for the duration; restored in the finally below.
     const metronomeWasRunning = this.metronome.running.value
     this.metronome.stop()
-    this.renderer.pauseAutoRender()
 
     const needsVideo = settings.output !== 'audio-only'
     const needsAudio = settings.output !== 'video-only'
 
+    // WAV/MP3 render entirely offline and never touch a visualization surface
+    // — no lease, no pause/resize. Video capture pins exactly one surface for
+    // the whole export via a lease so a visualization switch requested
+    // mid-export can't swap the canvas out from under the encoder; any switch
+    // attempted while the lease is held is deferred by SurfaceRouter and
+    // replayed (latest request wins) once we release() below.
+    const lease = needsVideo ? this.surfaces.acquireCaptureLease() : null
+    // Only the leased surface needs to stop ticking for capture — the other
+    // one is already paused+hidden from being inactive (see SurfaceRouter).
+    lease?.surface.pauseAutoRender()
+    const exportingPiano = lease !== null && lease.surface === this.pianoRenderer
+
     // Only resize the canvas when we're actually rendering video.
-    const originalCanvas = this.renderer.canvasSize
+    const originalCanvas = lease?.surface.canvasSize ?? null
     const target = needsVideo ? resolveExportDims(settings.resolution) : null
     const resized =
+      lease !== null &&
       target !== null &&
+      originalCanvas !== null &&
       (target.width !== originalCanvas.width || target.height !== originalCanvas.height)
-    if (resized) {
-      this.renderer.resize(target.width, target.height, 1)
+    if (resized && lease) {
+      lease.surface.resize(target.width, target.height, 1)
     }
 
     // Snapshot viewport state so we can restore after export. Vertical/Square
     // exports optionally zoom onto the piece's pitch range + override scroll
     // speed for a more cinematic feel; landscape exports leave both untouched.
-    const originalPps = this.renderer.currentPixelsPerSecond
-    const originalRange = this.renderer.pitchRange
+    // Piano-only: the guitar surface has no pitch-range/zoom concept — its
+    // fretboard layout already adapts to whatever canvas dimensions it gets.
+    const originalPps = this.pianoRenderer.currentPixelsPerSecond
+    const originalRange = this.pianoRenderer.pitchRange
     const isSocialFormat =
-      needsVideo && (settings.resolution === 'vertical' || settings.resolution === 'square')
+      exportingPiano &&
+      needsVideo &&
+      (settings.resolution === 'vertical' || settings.resolution === 'square')
     let pitchChanged = false
     let ppsChanged = false
     if (isSocialFormat) {
       if (settings.focus === 'fit') {
         const fit = fitPitchRange(midi)
-        this.renderer.setPitchRange(fit.min, fit.max)
+        this.pianoRenderer.setPitchRange(fit.min, fit.max)
         pitchChanged = true
       }
       const pps = speedToPps(settings.speed)
       if (pps !== originalPps) {
-        this.renderer.setZoom(pps)
+        this.pianoRenderer.setZoom(pps)
         ppsChanged = true
       }
     }
@@ -1090,8 +1243,16 @@ export class App {
       }
 
       exportStage = 'video_encode'
+      // needsVideo is true on every path that reaches here (audio-only
+      // returned above), so the lease was always acquired — this guard is
+      // just for narrowing.
+      if (!lease) throw new Error('video export requires a capture lease')
       const { VideoExporter } = await import('./export/VideoExporter')
-      const exporter = new VideoExporter(this.renderer.canvas)
+      if (import.meta.env.VITE_ENABLE_E2E === '1') {
+        lease.surface.canvas.dataset.e2eCaptureSource =
+          lease.surface === this.pianoRenderer ? 'piano' : 'guitar'
+      }
+      const exporter = new VideoExporter(lease.surface.canvas)
       this.currentExporter = exporter
 
       const exportAudio =
@@ -1107,7 +1268,7 @@ export class App {
         bitrate: resolveExportBitrate(settings.resolution),
         ...(exportAudio ? { audio: exportAudio } : {}),
         onSeek: (t) => this.clock.seek(t),
-        onRenderFrame: (t, dt) => this.renderer.renderManualFrame(t, dt),
+        onRenderFrame: (t, dt) => lease.surface.renderManualFrame(t, dt),
         onProgress: (stage, pct) => exportModal.updateProgress(stage, pct),
       })
       exportModal.close()
@@ -1130,15 +1291,36 @@ export class App {
       exportModal.close()
     } finally {
       this.currentExporter = null
-      if (resized) {
+      if (resized && lease && originalCanvas) {
         // Match window dimensions instead of the stale originalCanvas values
         // in case the window was resized while we were exporting.
-        this.renderer.resize(window.innerWidth, window.innerHeight, originalCanvas.resolution)
+        lease.surface.resize(window.innerWidth, window.innerHeight, originalCanvas.resolution)
       }
-      if (pitchChanged) this.renderer.setPitchRange(originalRange.min, originalRange.max)
-      if (ppsChanged) this.renderer.setZoom(originalPps)
-      this.renderer.resumeAutoRender()
+      if (pitchChanged) this.pianoRenderer.setPitchRange(originalRange.min, originalRange.max)
+      if (ppsChanged) this.pianoRenderer.setZoom(originalPps)
+      lease?.surface.resumeAutoRender()
+      // Restore the real playhead before replaying a deferred visualization
+      // request. Export swept the clock through synthetic frame times; the
+      // newly active surface must render at the restored time, not that stale
+      // request-time export position.
       this.clock.seek(resumeAt)
+      if (lease) {
+        try {
+          await lease.release(this.clock.currentTime)
+        } catch (err) {
+          console.error('Deferred visualization switch failed:', err)
+          document.body.classList.toggle(
+            'visualization-guitar',
+            this.surfaces.currentMode === 'guitar',
+          )
+          if (
+            this.store.state.visualizationForced === null &&
+            this.store.state.visualizationMode === 'guitar'
+          ) {
+            this.store.setVisualizationMode('piano')
+          }
+        }
+      }
       if (metronomeWasRunning) this.metronome.start()
       this.store.setState('status', 'ready')
       if (wasPlaying) {
@@ -1367,7 +1549,7 @@ export class App {
   private loadSessionAsFile(midi: import('./core/midi/types').MidiFile): void {
     this.resetInteractionState()
     this.store.beginPlayLoad()
-    this.renderer.clearMidi()
+    this.surfaces.clearMidi()
     this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
     this.store.completePlayLoad(midi)
     this.resetPlaybackTelemetry()
@@ -1464,7 +1646,7 @@ export class App {
       const midi = this.store.state.loadedMidi
       if (midi) {
         for (const track of midi.tracks) {
-          if (!this.renderer.isTrackVisible(track.id)) continue
+          if (!this.pianoRenderer.isTrackVisible(track.id)) continue
           if (track.isDrum) continue
           for (const note of track.notes) {
             if (note.time > currentTime) break
@@ -1478,6 +1660,7 @@ export class App {
   }
 
   resetInteractionState(): void {
+    this.releaseActivePianoPointerNote()
     this.clock.pause()
     this.clock.seek(0)
     this.synth.pause()
@@ -1508,11 +1691,11 @@ export class App {
     this.clock.prime()
     this.synth.primeLiveInput()
     window.removeEventListener('pointerdown', this.onFirstPointerDown)
-    window.removeEventListener('keydown', this.onFirstKeyDown)
+    window.removeEventListener('keydown', this.onFirstKeyDown, true)
   }
 
   private applyTheme(theme: Theme): void {
-    this.renderer.setTheme(theme)
+    this.surfaces.setTheme(theme)
     this.customizeMenu?.setTheme(this.themeIndex)
     this.trackPanel?.setTheme(theme)
     const accent = theme.uiAccentCSS
@@ -1549,16 +1732,17 @@ export class App {
   dispose(): void {
     for (const unsub of this.unsubs) unsub()
     this.unsubs = []
+    this.releaseActivePianoPointerNote()
     this.releaseAllLiveNotes()
     document.removeEventListener('visibilitychange', this.onVisibilityChange)
     window.removeEventListener('blur', this.onWindowBlur)
     window.removeEventListener('pointerdown', this.onFirstPointerDown)
-    window.removeEventListener('keydown', this.onFirstKeyDown)
-    this.renderer.canvas.removeEventListener('pointerdown', this.onCanvasPointerDown)
-    this.renderer.canvas.removeEventListener('pointermove', this.onCanvasPointerMove)
-    this.renderer.canvas.removeEventListener('pointerup', this.onCanvasPointerUp)
-    this.renderer.canvas.removeEventListener('pointercancel', this.onCanvasPointerUp)
-    this.renderer.canvas.removeEventListener('pointerleave', this.onCanvasPointerUp)
+    window.removeEventListener('keydown', this.onFirstKeyDown, true)
+    this.pianoRenderer.canvas.removeEventListener('pointerdown', this.onCanvasPointerDown)
+    this.pianoRenderer.canvas.removeEventListener('pointermove', this.onCanvasPointerMove)
+    this.pianoRenderer.canvas.removeEventListener('pointerup', this.onCanvasPointerUp)
+    this.pianoRenderer.canvas.removeEventListener('pointercancel', this.onCanvasPointerUp)
+    this.pianoRenderer.canvas.removeEventListener('pointerleave', this.onCanvasPointerUp)
     this.dropzone.dispose()
     this.controls.dispose()
     this.kbdResizer.dispose()
@@ -1570,7 +1754,7 @@ export class App {
     this.chordOverlay.dispose()
     this.customizeMenu.dispose()
     this.clock.dispose()
-    this.renderer.destroy()
+    this.surfaces.destroy()
     this.synth.dispose()
   }
 }
