@@ -3,11 +3,18 @@ import { render } from 'solid-js/web'
 import { t } from '../i18n'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
 import { icons } from './icons'
-import { SamplesGrid } from './SamplesGrid'
+import { type GridContents, SamplesGrid } from './SamplesGrid'
 
 export type LoadSource = 'drag' | 'picker'
 type DropHandler = (file: File, source: LoadSource) => void
 type SampleHandler = (sampleId: string) => void
+type RecentHandler = (recentId: string) => void
+
+function homeSamplesLabel(contents: GridContents): string {
+  if (contents === 'recents') return t('home.recentsOnly.label')
+  if (contents === 'mixed') return t('home.recents.label')
+  return t('home.samples.label')
+}
 
 function isMidiFile(name: string): boolean {
   const lower = name.toLowerCase()
@@ -30,9 +37,11 @@ interface DropZoneProps {
   onLiveMode?: (() => void) | undefined
   onLearnMode?: (() => void) | undefined
   onSample?: SampleHandler | undefined
+  onRecent?: RecentHandler | undefined
   hidden: () => boolean
   midiStatus: () => { status: MidiDeviceStatus; deviceName: string }
   triggerFilePicker: (fn: () => void) => void
+  registerRefreshGrid: (fn: () => void) => void
 }
 
 function DropZoneView(props: DropZoneProps) {
@@ -41,6 +50,7 @@ function DropZoneView(props: DropZoneProps) {
   let samplesHost!: HTMLDivElement
 
   const [dragOver, setDragOver] = createSignal(false)
+  const [gridContents, setGridContents] = createSignal<GridContents>('samples')
   const [coarse, setCoarse] = createSignal(
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(pointer: coarse)').matches
@@ -91,9 +101,16 @@ function DropZoneView(props: DropZoneProps) {
 
     // Legacy SamplesGrid class — mounts its own DOM. Replaced when T19
     // ports it to a Solid component.
-    const samples = new SamplesGrid()
-    samples.onSelect = (id) => props.onSample?.(id)
+    const samples = new SamplesGrid({
+      onSelectSample: (id) => props.onSample?.(id),
+      onSelectRecent: (id) => props.onRecent?.(id),
+      onContents: setGridContents,
+    })
     samplesHost.appendChild(samples.root)
+    // The dropzone is hidden rather than unmounted between sessions, so the
+    // grid must re-read recents each time Home comes back into view.
+    props.registerRefreshGrid(() => samples.refresh())
+    onCleanup(() => samples.dispose())
 
     // Expose openFilePicker up to the imperative class shell.
     props.triggerFilePicker(() => inputEl.click())
@@ -165,7 +182,7 @@ function DropZoneView(props: DropZoneProps) {
         </div>
 
         <div class="home-samples">
-          <div class="home-samples-label">{t('home.samples.label')}</div>
+          <div class="home-samples-label">{homeSamplesLabel(gridContents())}</div>
           <div class="home-samples-mount" ref={samplesHost} />
         </div>
 
@@ -229,6 +246,7 @@ export class DropZone {
   private hiddenSetter!: (v: boolean) => void
   private statusSetter!: (v: { status: MidiDeviceStatus; deviceName: string }) => void
   private filePicker: (() => void) | null = null
+  private refreshGrid: (() => void) | null = null
 
   constructor(
     container: HTMLElement,
@@ -236,6 +254,7 @@ export class DropZone {
     onLiveMode?: () => void,
     onSample?: SampleHandler,
     onLearnMode?: () => void,
+    onRecent?: RecentHandler,
   ) {
     const [hidden, setHidden] = createSignal(false)
     const [status, setStatus] = createSignal<{
@@ -255,10 +274,14 @@ export class DropZone {
           onLiveMode={onLiveMode}
           onLearnMode={onLearnMode}
           onSample={onSample}
+          onRecent={onRecent}
           hidden={hidden}
           midiStatus={status}
           triggerFilePicker={(fn) => {
             this.filePicker = fn
+          }}
+          registerRefreshGrid={(fn) => {
+            this.refreshGrid = fn
           }}
         />
       ),
@@ -276,6 +299,8 @@ export class DropZone {
 
   show(): void {
     this.hiddenSetter(false)
+    // Coming back Home after opening a file: that file is now a recent.
+    this.refreshGrid?.()
   }
 
   hide(): void {

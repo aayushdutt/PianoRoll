@@ -284,6 +284,20 @@ body {
   width: 100%;
 }
 
+/* Each grid cell wraps its card so the recent-card dismiss button has a
+   positioning context outside the card's own <button> (nesting buttons is
+   invalid HTML and breaks keyboard traversal). */
+.sample-card-slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.sample-card-slot > .sample-card {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Sample cards — static poster with a pitch-density sparkline across the top
    and metadata below. No hover animation; the "wow" happens on click. */
 .sample-card {
@@ -453,6 +467,76 @@ body {
   font-size: 10.5px;
   color: var(--text-muted);
   letter-spacing: 0.01em;
+}
+
+/* Recent cards — the user's own files. They keep the app accent (samples carry
+   their own per-piece colour) and lift it only in the border, so the row reads
+   as "yours first, demos after" without a second visual language. The resting
+   glow is deliberately faint; `.sample-card:hover` still wins on specificity
+   and takes over from here. */
+.sample-card--recent {
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  box-shadow: 0 0 14px -6px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.sample-card-tag {
+  align-self: flex-start;
+  margin-bottom: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 55%, #fff);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Dismiss affordance. Hidden until the slot is hovered so the resting card
+   stays as calm as a sample card. */
+.sample-card-forget {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 18, 0.72);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 0.15s,
+    transform 0.15s var(--ease-spring),
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.sample-card-slot:hover .sample-card-forget,
+.sample-card-forget:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.sample-card-forget:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* No hover on touch — without this the only way to drop a recent would be
+   invisible. */
+@media (pointer: coarse) {
+  .sample-card-forget {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .home-actions {

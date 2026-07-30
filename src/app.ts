@@ -4,12 +4,14 @@ import { MasterClock } from './core/clock/MasterClock'
 import { type BusNoteEvent, InputBus } from './core/input/InputBus'
 import { lazyHandle } from './core/lazyHandle'
 import { parseMidiFile } from './core/midi/parser'
+import type { MidiFile } from './core/midi/types'
 import { detectChord } from './core/music/ChordDetector'
 import {
   createLivePerformanceBus,
   type LivePerformanceBus,
 } from './core/performance/LivePerformanceBus'
 import { booleanPersisted, indexPersisted, numberPersisted } from './core/persistence'
+import { forgetRecent, readRecentMidi, rememberRecent } from './core/recentMidi'
 import { fetchSampleMidi, getSample } from './core/samples'
 import type { AppServices } from './core/services'
 import {
@@ -322,6 +324,13 @@ export class App {
         }
       },
       () => this.store.setState('mode', 'learn'),
+      (recentId) => {
+        if (this.store.state.mode === 'learn') {
+          void this.ensureLearnController().then((c) => c.loadRecent(recentId))
+        } else {
+          void this.loadRecent(recentId)
+        }
+      },
     )
 
     this.controls = new Controls({
@@ -849,6 +858,10 @@ export class App {
       // dropzone.hide off the new loadedMidi.
       this.store.completePlayLoad(midi)
       this.resetPlaybackTelemetry()
+      // Recorded only on the success path, so a file the parser choked on
+      // never comes back as a recent card. Fire-and-forget by design —
+      // storage failures must not touch the load.
+      void rememberRecent(file, midi)
       trackMidiLoaded({
         source,
         trackCount: midi.tracks.length,
@@ -856,6 +869,8 @@ export class App {
         durationS: Math.round(midi.duration),
         fileSizeKb: Math.round(file.size / 1024),
       })
+      // Same treatment a card gets: you asked for this file, so it plays.
+      this.autoplayAfterLoad()
     } catch (err) {
       console.error('Failed to load MIDI:', err)
       // Bucket the cause (not free-text — cardinality + PII) so we can see
@@ -1317,6 +1332,13 @@ export class App {
             void this.loadSample(id)
           }
         },
+        onRecent: (id) => {
+          if (resolveTarget() === 'learn') {
+            void this.ensureLearnController().then((c) => c.loadRecent(id))
+          } else {
+            void this.loadRecent(id)
+          }
+        },
       })
     })
   }
@@ -1355,13 +1377,57 @@ export class App {
       noteCount: countNotes(midi),
       durationS: Math.round(midi.duration),
     })
-    // Samples are a "watch it" gesture — start playback as soon as the synth
-    // is ready. Sample click counts as the user gesture that unlocks audio.
+    this.autoplayAfterLoad()
+  }
+
+  // Play-mode loader for a previously-opened file. The bytes are re-parsed
+  // from IndexedDB, so from here on it's the same path a sample takes — we
+  // hold a MidiFile, not a File.
+  private async loadRecent(recentId: string): Promise<void> {
+    this.primeInteractiveAudio()
+    let midi: MidiFile | null
+    try {
+      midi = await readRecentMidi(recentId)
+    } catch (err) {
+      // Stored bytes that no longer parse are dead weight — drop the entry so
+      // the broken card doesn't come back on the next visit.
+      console.error('[loadRecent] parse failed', err)
+      void forgetRecent(recentId)
+      midi = null
+    }
+    if (!midi) {
+      trackEvent('recent_load_failed', { target: 'play' })
+      this.showError(t('error.recent.loadFailed'))
+      return
+    }
+    this.loadSessionAsFile(midi)
+    this.resetPlaybackTelemetry()
+    trackMidiLoaded({
+      source: 'recent',
+      trackCount: midi.tracks.length,
+      noteCount: countNotes(midi),
+      durationS: Math.round(midi.duration),
+    })
+    this.autoplayAfterLoad()
+  }
+
+  // Opening a piece — card, drop, or file picker — is a "watch it" gesture, so
+  // playback starts on its own. The short delay is deliberate: the roll and
+  // track panel paint first, so motion begins from a settled layout instead of
+  // racing the mode transition.
+  //
+  // Re-checked inside the timeout, not before it: the user can hit space, seek,
+  // or leave Play during those 250 ms, and none of those should be overridden.
+  private autoplayAfterLoad(): void {
     setTimeout(() => {
-      if (this.store.state.mode === 'play' && this.store.state.status !== 'playing') {
-        this.clock.play()
-        this.store.setState('status', 'playing')
-      }
+      if (this.store.state.mode !== 'play' || this.store.state.status === 'playing') return
+      // Drag-and-drop does not grant user activation (unlike a click), so a
+      // file dropped into a fresh tab can leave audio suspended. Starting then
+      // would freeze the playhead at zero — leave it paused and let the user's
+      // next click, which does prime audio, be the thing that starts it.
+      if (this.clock.audioSuspended) return
+      this.clock.play()
+      this.store.setState('status', 'playing')
     }, 250)
   }
 

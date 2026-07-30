@@ -1,5 +1,6 @@
 import { parseMidiFile } from '../core/midi/parser'
 import type { MidiFile } from '../core/midi/types'
+import { forgetRecent, readRecentMidi, rememberRecent } from '../core/recentMidi'
 import { fetchSampleMidi, getSample } from '../core/samples'
 import { t } from '../i18n'
 import type { ExerciseDescriptor } from '../learn/core/Exercise'
@@ -177,6 +178,10 @@ export class LearnController {
     try {
       const midi = await parseMidiFile(file)
       await this.consumeMidi(midi)
+      // Recents are shared with Play: a file practised here is one click away
+      // from the home grid, and vice versa. Fire-and-forget — a storage
+      // failure must never surface as a failed load.
+      void rememberRecent(file, midi)
       trackMidiLoaded({
         source,
         target: 'learn',
@@ -226,6 +231,37 @@ export class LearnController {
       this.learnState.setState('status', 'ready')
       this.showError(t('error.sample.fetchFailed'))
     }
+  }
+
+  // Re-open a previously-loaded file from IndexedDB. Same shape as
+  // `loadSample`: we end up holding a parsed MidiFile, never a File.
+  async loadRecent(recentId: string): Promise<void> {
+    this.ctx.primeInteractiveAudio()
+    this.learnState.beginLoad()
+    let midi: MidiFile | null
+    try {
+      midi = await readRecentMidi(recentId)
+    } catch (err) {
+      // Bytes that no longer parse are dead weight — drop the entry so the
+      // broken card doesn't come back.
+      console.error('[LearnController] loadRecent parse failed:', err)
+      void forgetRecent(recentId)
+      midi = null
+    }
+    if (!midi) {
+      trackEvent('recent_load_failed', { target: 'learn' })
+      this.learnState.setState('status', 'ready')
+      this.showError(t('error.recent.loadFailed'))
+      return
+    }
+    await this.consumeMidi(midi)
+    trackMidiLoaded({
+      source: 'recent',
+      target: 'learn',
+      trackCount: midi.tracks.length,
+      noteCount: midi.tracks.reduce((n, tk) => n + tk.notes.length, 0),
+      durationS: Math.round(midi.duration),
+    })
   }
 
   private async consumeMidi(midi: MidiFile): Promise<void> {

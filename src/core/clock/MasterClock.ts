@@ -63,6 +63,21 @@ export class MasterClock {
     }
   }
 
+  /**
+   * True when the AudioContext is still suspended — i.e. `prime()` couldn't
+   * resume it because the browser hasn't seen a qualifying user gesture yet.
+   * Callers that start playback *on the user's behalf* check this first: the
+   * context clock doesn't tick while suspended, so playing anyway would park
+   * the playhead at zero while the UI claims it's playing.
+   */
+  get audioSuspended(): boolean {
+    try {
+      return (getContext().rawContext as AudioContext).state === 'suspended'
+    } catch {
+      return false
+    }
+  }
+
   play(): void {
     if (this._playing) return
     // AudioContext may be suspended (browser autoplay policy)

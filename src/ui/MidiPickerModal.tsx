@@ -8,11 +8,12 @@ import { createSignal, onCleanup, onMount } from 'solid-js'
 import { Portal, render } from 'solid-js/web'
 import { t } from '../i18n'
 import { icons } from './icons'
-import { SamplesGrid } from './SamplesGrid'
+import { type GridContents, SamplesGrid } from './SamplesGrid'
 
 interface OpenOpts {
   onFile: (file: File) => void
   onSample: (sampleId: string) => void
+  onRecent: (recentId: string) => void
   onCancel?: () => void
 }
 
@@ -21,7 +22,15 @@ interface ViewProps {
   isOpen: () => boolean
   onFile: (file: File) => void
   onSample: (id: string) => void
+  onRecent: (id: string) => void
   onClose: () => void
+  registerRefreshGrid: (fn: () => void) => void
+}
+
+function sectionLabel(contents: GridContents): string {
+  if (contents === 'recents') return t('midiPicker.recentsOnlyLabel')
+  if (contents === 'mixed') return t('midiPicker.recentsLabel')
+  return t('midiPicker.samplesLabel')
 }
 
 function isMidiFile(name: string): boolean {
@@ -33,15 +42,21 @@ function MidiPickerView(props: ViewProps) {
   let inputEl!: HTMLInputElement
   let samplesHost!: HTMLDivElement
   const [dragOver, setDragOver] = createSignal(false)
+  const [gridContents, setGridContents] = createSignal<GridContents>('samples')
 
   // Always-mounted card: keeps SamplesGrid hydration as a one-time cost rather
   // than re-running on every open, and lets the CSS open/close transition
-  // animate (a `<Show>` would just mount/unmount with no animation).
+  // animate (a `<Show>` would just mount/unmount with no animation). The flip
+  // side is that recents go stale between opens — hence the refresh hook.
   let samples: SamplesGrid | null = null
   onMount(() => {
-    samples = new SamplesGrid()
-    samples.onSelect = (id) => props.onSample(id)
+    samples = new SamplesGrid({
+      onSelectSample: (id) => props.onSample(id),
+      onSelectRecent: (id) => props.onRecent(id),
+      onContents: setGridContents,
+    })
     samplesHost.appendChild(samples.root)
+    props.registerRefreshGrid(() => samples?.refresh())
   })
   onCleanup(() => {
     samples?.dispose()
@@ -118,7 +133,7 @@ function MidiPickerView(props: ViewProps) {
           </button>
 
           <section class="midi-picker-samples">
-            <div class="midi-picker-section-label">{t('midiPicker.samplesLabel')}</div>
+            <div class="midi-picker-section-label">{sectionLabel(gridContents())}</div>
             <div class="midi-picker-samples-mount" ref={samplesHost} />
           </section>
 
@@ -145,6 +160,7 @@ export class MidiPickerModal {
   private readonly setIsOpen: (v: boolean) => void
   private readonly readIsOpen: () => boolean
   private currentOpts: OpenOpts | null = null
+  private refreshGrid: (() => void) | null = null
 
   private onKey = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return
@@ -170,7 +186,11 @@ export class MidiPickerModal {
           isOpen={isOpen}
           onFile={(f) => this.handleFile(f)}
           onSample={(id) => this.handleSample(id)}
+          onRecent={(id) => this.handleRecent(id)}
           onClose={() => this.cancel()}
+          registerRefreshGrid={(fn) => {
+            this.refreshGrid = fn
+          }}
         />
       ),
       wrapper,
@@ -180,6 +200,7 @@ export class MidiPickerModal {
 
   open(opts: OpenOpts): void {
     this.currentOpts = opts
+    this.refreshGrid?.()
     this.setIsOpen(true)
   }
 
@@ -214,5 +235,12 @@ export class MidiPickerModal {
     if (!opts) return
     this.close()
     opts.onSample(id)
+  }
+
+  private handleRecent(id: string): void {
+    const opts = this.currentOpts
+    if (!opts) return
+    this.close()
+    opts.onRecent(id)
   }
 }

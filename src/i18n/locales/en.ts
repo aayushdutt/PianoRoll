@@ -29,6 +29,11 @@ export const en = {
   'home.cta.learn.sub': 'Guided exercises · play-along pieces',
   'home.cta.learn.badge': 'New',
   'home.samples.label': 'or explore a sample',
+  'home.recents.label': 'jump back in, or explore a sample',
+  'home.recentsOnly.label': 'jump back in',
+  'card.recent.tag': 'Recent',
+  'card.recent.sub': 'Your upload · {duration}',
+  'card.recent.forget': 'Remove {name} from recents',
   'home.dropHint.html':
     'Drop <code>.mid</code> anywhere · play with <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>…',
   'home.midi.lookingFor': 'Looking for MIDI…',
@@ -226,6 +231,8 @@ export const en = {
   'error.midi.permissionDenied':
     'MIDI permission denied. Click again, or enable it via the 🔒 icon in your address bar.',
   'error.sample.fetchFailed': 'Could not load that sample - check your network and try again.',
+  'error.recent.loadFailed':
+    'Could not reopen that file - it may have been cleared from this browser.',
   'error.audio.renderFailed': 'Audio render failed - MP4 will be silent.',
   'error.export.generic': 'Export failed - check console for details.',
   'error.export.gpuLost': 'The graphics context was lost during export - try a lower resolution.',
@@ -421,6 +428,8 @@ export const en = {
   'midiPicker.dropTitle': 'Drop a MIDI file here',
   'midiPicker.dropSub': 'or click to choose from your computer',
   'midiPicker.samplesLabel': 'Or explore a sample',
+  'midiPicker.recentsLabel': 'Jump back in, or explore a sample',
+  'midiPicker.recentsOnlyLabel': 'Jump back in',
 
   // ── Instrument menu ─────────────────────────────────────────
   'instrument.title': 'Instrument',

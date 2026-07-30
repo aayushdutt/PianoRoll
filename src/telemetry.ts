@@ -77,7 +77,7 @@ export function trackSettled(event: string, properties: Record<string, unknown>,
 // us tie which pieces drive retention; nullable fields are always present so
 // the schema never varies.
 export function trackMidiLoaded(p: {
-  source: 'drag' | 'picker' | 'sample'
+  source: 'drag' | 'picker' | 'sample' | 'recent'
   target?: 'play' | 'learn'
   trackCount: number
   noteCount: number
@@ -325,6 +325,9 @@ type EventMap = {
   // Previously-silent failure paths now surfaced as first-class events.
   synth_load_failed: { source: string }
   sample_load_failed: { sample_id: string; target: 'play' | 'learn' }
+  // A recent card was clicked but the stored bytes were gone or unparseable —
+  // the entry is dropped, so this is the only trace it ever existed.
+  recent_load_failed: { target: 'play' | 'learn' }
   // A non-fatal export degradation: audio render failed but the (video-only /
   // av) export continued without sound. Distinct from export_failed.
   export_degraded: { stage: 'audio_render'; output: string }

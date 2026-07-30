@@ -15,6 +15,11 @@ const fr: Messages = {
   'home.cta.learn.sub': 'Exercices guidés · morceaux à jouer',
   'home.cta.learn.badge': 'Nouveau',
   'home.samples.label': 'ou explorez un exemple',
+  'home.recents.label': 'reprenez où vous en étiez, ou explorez un exemple',
+  'home.recentsOnly.label': 'reprenez où vous en étiez',
+  'card.recent.tag': 'Récent',
+  'card.recent.sub': 'Votre fichier · {duration}',
+  'card.recent.forget': 'Retirer {name} des récents',
   'home.dropHint.html':
     "Déposez un <code>.mid</code> n'importe où · jouez avec <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>…",
   'home.midi.lookingFor': "Recherche d'un MIDI…",
@@ -205,6 +210,8 @@ const fr: Messages = {
     "Autorisation MIDI refusée. Cliquez à nouveau, ou activez-la via l'icône 🔒 dans la barre d'adresse.",
   'error.sample.fetchFailed':
     'Impossible de charger cet exemple - vérifiez votre connexion et réessayez.',
+  'error.recent.loadFailed':
+    'Impossible de rouvrir ce fichier - il a peut-être été effacé de ce navigateur.',
   'error.audio.renderFailed': 'Échec du rendu audio - le MP4 sera silencieux.',
   'error.export.generic': "Échec de l'export - consultez la console pour plus de détails.",
   'error.export.gpuLost':
@@ -393,6 +400,8 @@ const fr: Messages = {
   'midiPicker.dropTitle': 'Déposez un fichier MIDI ici',
   'midiPicker.dropSub': 'ou cliquez pour choisir depuis votre ordinateur',
   'midiPicker.samplesLabel': 'Ou explorez un exemple',
+  'midiPicker.recentsLabel': 'Reprenez où vous en étiez, ou explorez un exemple',
+  'midiPicker.recentsOnlyLabel': 'Reprenez où vous en étiez',
 
   // ── Instrument menu ─────────────────────────────────────────
   'instrument.title': 'Instrument',

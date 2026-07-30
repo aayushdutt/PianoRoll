@@ -17,6 +17,11 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'home.cta.learn.sub': 'Ćwiczenia z prowadzeniem · utwory do grania razem',
   'home.cta.learn.badge': 'Nowość',
   'home.samples.label': 'albo odtwórz jeden z przykładów',
+  'home.recents.label': 'wróć do ostatniego pliku albo odtwórz przykład',
+  'home.recentsOnly.label': 'wróć do ostatniego pliku',
+  'card.recent.tag': 'Ostatnie',
+  'card.recent.sub': 'Twój plik · {duration}',
+  'card.recent.forget': 'Usuń {name} z ostatnich',
   'home.dropHint.html':
     'Wrzuć <code>.mid</code> gdziekolwiek · zagraj <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>…',
   'home.midi.lookingFor': 'Szukam MIDI…',
@@ -198,6 +203,8 @@ const pl: Messages & Record<PolishPluralKey, string> = {
     'Odmówiono dostępu do MIDI. Kliknij ponownie lub włącz je przez ikonę 🔒 na pasku adresu.',
   'error.sample.fetchFailed':
     'Nie udało się załadować tego przykładu - sprawdź połączenie i spróbuj ponownie.',
+  'error.recent.loadFailed':
+    'Nie udało się ponownie otworzyć tego pliku - mógł zostać usunięty z tej przeglądarki.',
   'error.audio.renderFailed': 'Renderowanie audio nie powiodło się - MP4 będzie bez dźwięku.',
   'error.export.generic': 'Eksport nie powiódł się - sprawdź szczegóły w konsoli.',
   'error.export.gpuLost':
@@ -380,6 +387,8 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'midiPicker.dropTitle': 'Upuść tutaj plik MIDI',
   'midiPicker.dropSub': 'lub kliknij, aby wybrać z komputera',
   'midiPicker.samplesLabel': 'Albo odtwórz jeden z przykładów',
+  'midiPicker.recentsLabel': 'Wróć do ostatniego pliku albo odtwórz przykład',
+  'midiPicker.recentsOnlyLabel': 'Wróć do ostatniego pliku',
 
   'instrument.title': 'Instrument',
   'instrument.aria': 'Wybierz instrument',

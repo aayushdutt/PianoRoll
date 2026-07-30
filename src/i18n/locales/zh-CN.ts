@@ -10,6 +10,11 @@ const zhCN: Messages = {
   'home.cta.learn.sub': '引导练习 · 跟弹曲目',
   'home.cta.learn.badge': '新',
   'home.samples.label': '或试试示例',
+  'home.recents.label': '继续上次的文件，或试试示例',
+  'home.recentsOnly.label': '继续上次的文件',
+  'card.recent.tag': '最近',
+  'card.recent.sub': '你的文件 · {duration}',
+  'card.recent.forget': '从最近列表中移除 {name}',
   'home.dropHint.html':
     '把 <code>.mid</code> 拖到任意位置 · 也可以用 <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>… 来弹奏',
   'home.midi.lookingFor': '正在寻找 MIDI…',
@@ -188,6 +193,7 @@ const zhCN: Messages = {
     'MIDI 已被阻止。点击地址栏中的锁形图标 → 站点设置 → 允许 MIDI，然后刷新页面。',
   'error.midi.permissionDenied': 'MIDI 权限被拒绝。请再试一次，或通过地址栏中的锁形图标手动启用。',
   'error.sample.fetchFailed': '无法加载该示例 · 请检查网络后重试。',
+  'error.recent.loadFailed': '无法重新打开该文件 · 它可能已从此浏览器中清除。',
   'error.audio.renderFailed': '音频渲染失败 · 导出的 MP4 将没有声音。',
   'error.export.generic': '导出失败 · 请查看控制台了解详情。',
   'error.export.gpuLost': '导出过程中图形上下文丢失 · 请尝试更低的分辨率。',
@@ -366,6 +372,8 @@ const zhCN: Messages = {
   'midiPicker.dropTitle': '将 MIDI 文件拖到这里',
   'midiPicker.dropSub': '或点击从电脑中选择',
   'midiPicker.samplesLabel': '或试试示例',
+  'midiPicker.recentsLabel': '继续上次的文件，或试试示例',
+  'midiPicker.recentsOnlyLabel': '继续上次的文件',
 
   'instrument.title': '乐器',
   'instrument.aria': '选择乐器',

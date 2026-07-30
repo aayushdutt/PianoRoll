@@ -12,6 +12,11 @@ const es: Messages = {
   'home.cta.learn.sub': 'Ejercicios guiados · piezas para practicar',
   'home.cta.learn.badge': 'Nuevo',
   'home.samples.label': 'o explora un ejemplo',
+  'home.recents.label': 'retoma donde lo dejaste, o explora un ejemplo',
+  'home.recentsOnly.label': 'retoma donde lo dejaste',
+  'card.recent.tag': 'Reciente',
+  'card.recent.sub': 'Tu archivo · {duration}',
+  'card.recent.forget': 'Quitar {name} de recientes',
   'home.dropHint.html':
     'Suelta un <code>.mid</code> en cualquier parte · toca con <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>…',
   'home.midi.lookingFor': 'Buscando MIDI…',
@@ -201,6 +206,8 @@ const es: Messages = {
     'Permiso MIDI denegado. Vuelve a hacer clic, o actívalo en el icono 🔒 de la barra de direcciones.',
   'error.sample.fetchFailed':
     'No se pudo cargar ese ejemplo - comprueba tu conexión y vuelve a intentarlo.',
+  'error.recent.loadFailed':
+    'No se pudo reabrir ese archivo - puede que se haya borrado de este navegador.',
   'error.audio.renderFailed': 'Falló el renderizado de audio - el MP4 será silencioso.',
   'error.export.generic': 'Falló la exportación - revisa la consola para más detalles.',
   'error.export.gpuLost':
@@ -389,6 +396,8 @@ const es: Messages = {
   'midiPicker.dropTitle': 'Suelta un archivo MIDI aquí',
   'midiPicker.dropSub': 'o haz clic para elegir desde tu ordenador',
   'midiPicker.samplesLabel': 'O explora un ejemplo',
+  'midiPicker.recentsLabel': 'Retoma donde lo dejaste, o explora un ejemplo',
+  'midiPicker.recentsOnlyLabel': 'Retoma donde lo dejaste',
 
   // ── Instrument menu ─────────────────────────────────────────
   'instrument.title': 'Instrumento',
