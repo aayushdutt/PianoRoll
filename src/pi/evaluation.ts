@@ -37,6 +37,12 @@ export interface EvaluationMetrics {
   recall: number
   medianAbsErrorMs: number
   p90AbsErrorMs: number
+  medianAbsOffsetErrorMs: number
+  p90AbsOffsetErrorMs: number
+  medianAbsDurationErrorMs: number
+  p90AbsDurationErrorMs: number
+  prematureReleases: number
+  stuckNotes: number
   ioiMedianMs: number
   ioiP90Ms: number
   cumulativeDriftMs: number
@@ -52,10 +58,11 @@ export interface EvaluationMetrics {
 }
 
 export interface EvaluationRun {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   id: string
   createdAt: string
   referenceName: string
+  sourceAudioName?: string
   referenceMidiBase64: string
   timingMode: TimingMode
   trace: EvaluationTraceRecord[]
@@ -90,10 +97,12 @@ export function traceEvents(
   const offs = trace
     .filter((record) => record.stage === 'off')
     .map((record) => ({
+      eventId: finiteNumber(record, 'eventId'),
       pitch: finiteNumber(record, 'pitch'),
-      time: finiteNumber(record, 'serverTime'),
+      audioTime: finiteNumber(record, 'audioTime'),
+      serverTime: finiteNumber(record, 'serverTime'),
     }))
-    .filter((item): item is { pitch: number; time: number } => item.pitch !== null)
+    .filter((item) => item.pitch !== null)
 
   return trace
     .filter((record) => record.stage === stage)
@@ -104,13 +113,21 @@ export function traceEvents(
           ? finiteNumber(record, 'audioTime')
           : finiteNumber(record, 'serverTime')
       if (pitch === null || time === null) return null
-      const off = offs.find((candidate) => candidate.pitch === pitch && candidate.time > time)
+      const eventId = finiteNumber(record, 'eventId')
+      const off = offs.find((candidate) => {
+        const candidateTime = stage === 'detected' ? candidate.audioTime : candidate.serverTime
+        if (candidateTime === null || candidateTime <= time) return false
+        if (eventId !== null && candidate.eventId !== null) return candidate.eventId === eventId
+        return candidate.pitch === pitch
+      })
+      const offTime =
+        off && (stage === 'detected' ? off.audioTime : off.serverTime)
       return {
         pitch,
         time,
-        duration: Math.max(0.05, Math.min(4, (off?.time ?? time + 0.25) - time)),
+        duration: Math.max(0.05, Math.min(30, (offTime ?? time + 0.25) - time)),
         velocity: Math.max(0, Math.min(1, (finiteNumber(record, 'velocity') ?? 100) / 127)),
-        ...(typeof record.eventId === 'number' ? { eventId: record.eventId } : {}),
+        ...(eventId !== null ? { eventId } : {}),
       }
     })
     .filter((event): event is EvalEvent => event !== null)
@@ -254,6 +271,16 @@ export function analyzeEvaluation(
   const timingMatch = matchEvents(reference, emitted, 0.25)
   const clusters = clusterMatches(timingMatch.matches)
   const errors = emittedMatch.matches.map((match) => Math.abs(match.error) * 1000)
+  const offsetErrors = emittedMatch.matches.map(
+    (match) =>
+      (match.actual.time +
+        match.actual.duration -
+        (match.reference.time + match.reference.duration)) *
+      1000,
+  )
+  const durationErrors = emittedMatch.matches.map(
+    (match) => (match.actual.duration - match.reference.duration) * 1000,
+  )
   const ioiErrors: number[] = []
   const hiccups: Hiccup[] = []
   for (let index = 1; index < clusters.length; index++) {
@@ -323,6 +350,14 @@ export function analyzeEvaluation(
     recall: reference.length ? emittedMatch.matches.length / reference.length : 0,
     medianAbsErrorMs: percentile(errors, 0.5),
     p90AbsErrorMs: percentile(errors, 0.9),
+    medianAbsOffsetErrorMs: percentile(offsetErrors.map(Math.abs), 0.5),
+    p90AbsOffsetErrorMs: percentile(offsetErrors.map(Math.abs), 0.9),
+    medianAbsDurationErrorMs: percentile(durationErrors.map(Math.abs), 0.5),
+    p90AbsDurationErrorMs: percentile(durationErrors.map(Math.abs), 0.9),
+    prematureReleases: offsetErrors.filter((error) => error < -50).length,
+    stuckNotes: trace.filter(
+      (record) => record.stage === 'off' && record.reason === 'max_duration',
+    ).length,
     ioiMedianMs: percentile(ioiErrors, 0.5),
     ioiP90Ms: percentile(ioiErrors, 0.9),
     cumulativeDriftMs,
@@ -372,7 +407,7 @@ export function parseEvaluationRun(value: unknown): EvaluationRun | null {
   if (!value || typeof value !== 'object') return null
   const run = value as Partial<EvaluationRun>
   if (
-    run.schemaVersion !== 1 ||
+    (run.schemaVersion !== 1 && run.schemaVersion !== 2) ||
     typeof run.id !== 'string' ||
     typeof run.createdAt !== 'string' ||
     typeof run.referenceName !== 'string' ||
@@ -383,5 +418,22 @@ export function parseEvaluationRun(value: unknown): EvaluationRun | null {
   ) {
     return null
   }
-  return run as EvaluationRun
+  const parsed = run as EvaluationRun
+  if (parsed.schemaVersion === 1) {
+    const metrics = parsed.metrics
+    return {
+      ...parsed,
+      schemaVersion: 2,
+      metrics: {
+        ...metrics,
+        medianAbsOffsetErrorMs: metrics.medianAbsOffsetErrorMs ?? 0,
+        p90AbsOffsetErrorMs: metrics.p90AbsOffsetErrorMs ?? 0,
+        medianAbsDurationErrorMs: metrics.medianAbsDurationErrorMs ?? 0,
+        p90AbsDurationErrorMs: metrics.p90AbsDurationErrorMs ?? 0,
+        prematureReleases: metrics.prematureReleases ?? 0,
+        stuckNotes: metrics.stuckNotes ?? 0,
+      },
+    }
+  }
+  return parsed
 }

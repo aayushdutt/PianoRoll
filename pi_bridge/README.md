@@ -29,6 +29,16 @@ velocity to its internal 0-1 range before sending the note through the normal
 input, visualization, and synthesizer path. A missing velocity uses `0.8` as a
 backward-compatible fallback.
 
+An optional sustain-pedal model uses a separate protocol message. Midee sends
+it through the same live input/synthesizer path as hardware CC64 and suppresses
+duplicate state:
+
+```json
+{"type":"pedal","down":true,"t":12.34,"confidence":0.91}
+```
+
+`clear_all` releases both monitored notes and the monitored pedal.
+
 The live bridge also supports buffered evaluation traces:
 
 ```json

@@ -1,6 +1,10 @@
 node_modules/
 dist/
 
+# Python bridge caches
+__pycache__/
+*.py[cod]
+
 # Logs
 *.log
 npm-debug.log*
@@ -40,6 +44,7 @@ public/local/
 # Leading slash anchors to repo root so `src/bench/` (the runner source) is
 # NOT ignored — without the slash this would match any directory named bench.
 /bench/
+/research/
 docs/*
 # Exception: this spike's write-up is meant to be committed and discoverable
 # (see CLAUDE.md's docs/ convention), unlike the rest of the local-only docs/

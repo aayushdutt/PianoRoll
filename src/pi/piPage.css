@@ -558,6 +558,96 @@
   padding: 16px;
 }
 
+.pi-eval__live {
+  display: flex;
+  min-height: 100%;
+  padding: clamp(22px, 4vw, 52px);
+  flex-direction: column;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(70, 217, 232, 0.07), transparent 38%),
+    linear-gradient(145deg, rgba(10, 17, 31, 0.72), rgba(8, 11, 20, 0.2));
+}
+
+.pi-eval__live-heading {
+  display: flex;
+  margin-bottom: 18px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.pi-eval__live-heading span {
+  color: var(--lab-cyan);
+  font: 700 9px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pi-eval__live-heading h3 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font: 700 clamp(22px, 3vw, 34px) var(--font);
+}
+
+.pi-eval__live-heading > strong {
+  color: var(--lab-green);
+  font: 700 30px var(--font-mono);
+}
+
+.pi-eval__live-stats {
+  display: grid;
+  margin-bottom: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pi-eval__live-stats > div {
+  display: flex;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--lab-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pi-eval__live-stats span {
+  color: var(--text-dim);
+  font: 600 8px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pi-eval__live-stats strong {
+  margin-top: 5px;
+  color: var(--text);
+  font: 650 16px var(--font-mono);
+}
+
+.pi-eval__live-charts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pi-eval__live-charts .pi-eval__chart {
+  min-height: 138px;
+}
+
+.pi-eval__live > p {
+  margin: 12px 0 0;
+  color: var(--text-dim);
+  font: 500 9px / 1.5 var(--font-mono);
+}
+
+@media (max-width: 900px) {
+  .pi-eval__live-stats,
+  .pi-eval__live-charts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .pi-eval__tabs {
   position: sticky;
   z-index: 2;
@@ -778,6 +868,8 @@
 }
 
 .pi-eval__error-marker.is-timing,
+.pi-eval__error-marker.is-early-release,
+.pi-eval__error-marker.is-late-release,
 .pi-eval__error-marker.is-drop {
   fill: var(--lab-red);
 }
@@ -835,6 +927,137 @@
 
 .pi-eval__legend-row .is-extra {
   background: var(--lab-violet);
+}
+
+.pi-score {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid var(--lab-line);
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #172033;
+}
+
+.pi-score__header {
+  display: flex;
+  min-height: 56px;
+  padding: 10px 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #dbe2ea;
+  background: #fff;
+}
+
+.pi-score__header div {
+  display: grid;
+  gap: 2px;
+}
+
+.pi-score__header span,
+.pi-score__header p,
+.pi-score footer {
+  color: #64748b;
+  font: 600 10px var(--font-mono);
+}
+
+.pi-score__header span {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pi-score__header strong {
+  font-size: 14px;
+}
+
+.pi-score__header p {
+  margin: 0;
+  text-align: right;
+}
+
+.pi-score__measures {
+  display: flex;
+  padding: 7px 10px;
+  overflow-x: auto;
+  gap: 4px;
+  border-bottom: 1px solid #dbe2ea;
+  background: #f1f5f9;
+}
+
+.pi-score__measures button {
+  position: relative;
+  min-width: 31px;
+  height: 28px;
+  padding: 0 7px;
+  border-color: #cbd5e1;
+  border-radius: 5px;
+  background: #fff;
+  color: #475569;
+  font: 650 10px var(--font-mono);
+}
+
+.pi-score__measures button:hover,
+.pi-score__measures button.is-current {
+  border-color: #0891b2;
+  background: #cffafe;
+  color: #0e7490;
+}
+
+.pi-score__measures button.has-errors {
+  border-bottom-color: #ef4444;
+  border-bottom-width: 2px;
+}
+
+.pi-score__measures i {
+  position: absolute;
+  top: -6px;
+  right: -5px;
+  display: grid;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: #ef4444;
+  color: #fff;
+  place-items: center;
+  font: 700 8px var(--font-mono);
+  font-style: normal;
+}
+
+.pi-score__viewport {
+  position: relative;
+  height: min(48vh, 500px);
+  overflow: auto;
+  background: #fff;
+}
+
+.pi-score__canvas {
+  min-height: 240px;
+  padding: 8px 10px 18px;
+}
+
+.pi-score__canvas svg {
+  display: block;
+}
+
+.pi-score__state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  background: rgba(255, 255, 255, 0.92);
+  color: #475569;
+  place-items: center;
+  font: 650 12px var(--font-mono);
+}
+
+.pi-score__state.is-error {
+  color: #b91c1c;
+}
+
+.pi-score footer {
+  padding: 8px 12px;
+  border-top: 1px solid #dbe2ea;
+  background: #f8fafc;
 }
 
 .pi-eval__diagnostic-grid {

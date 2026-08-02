@@ -7,6 +7,7 @@ import {
   flattenMidi,
   matchEvents,
   parseEvaluationRun,
+  traceEvents,
 } from './evaluation'
 import type { EvaluationTraceRecord } from './ledProtocol'
 
@@ -72,6 +73,35 @@ function traceFor(
 }
 
 describe('Pi reconstruction evaluation', () => {
+  it('reports release timing and stuck-note diagnostics', () => {
+    const midi = fixture(2)
+    midi.tracks[0]!.notes[0]!.duration = 1
+    const trace = [
+      { stage: 'emitted', serverTime: 0, audioTime: 0, pitch: 48, eventId: 1 },
+      {
+        stage: 'off',
+        serverTime: 0.4,
+        audioTime: 0.4,
+        pitch: 48,
+        eventId: 1,
+        reason: 'frame',
+      },
+      { stage: 'emitted', serverTime: 0.5, audioTime: 0.5, pitch: 49, eventId: 2 },
+      {
+        stage: 'off',
+        serverTime: 0.7,
+        audioTime: 0.7,
+        pitch: 49,
+        eventId: 2,
+        reason: 'max_duration',
+      },
+    ]
+    const metrics = analyzeEvaluation(midi, trace)
+    expect(metrics.prematureReleases).toBe(1)
+    expect(metrics.stuckNotes).toBe(1)
+    expect(metrics.p90AbsDurationErrorMs).toBeGreaterThan(0)
+  })
+
   it('recovers a constant offset without treating it as latency error', () => {
     const midi = fixture()
     const reference = flattenMidi(midi)
@@ -129,7 +159,32 @@ describe('Pi reconstruction evaluation', () => {
       trace: [],
       metrics: analyzeEvaluation(fixture(1), []),
     } satisfies EvaluationRun
-    expect(parseEvaluationRun(run)).toEqual(run)
-    expect(parseEvaluationRun({ ...run, schemaVersion: 2 })).toBeNull()
+    expect(parseEvaluationRun(run)).toMatchObject({ ...run, schemaVersion: 2 })
+    expect(parseEvaluationRun({ ...run, schemaVersion: 3 })).toBeNull()
+  })
+
+  it('pairs repeated same-pitch releases by event ID and timing domain', () => {
+    const trace: EvaluationTraceRecord[] = [
+      { stage: 'detected', serverTime: 1, audioTime: 10, eventId: 1, pitch: 60 },
+      { stage: 'detected', serverTime: 2, audioTime: 10.4, eventId: 2, pitch: 60 },
+      {
+        stage: 'off',
+        serverTime: 2.3,
+        audioTime: 10.7,
+        eventId: 2,
+        pitch: 60,
+      },
+      {
+        stage: 'off',
+        serverTime: 3,
+        audioTime: 10.35,
+        eventId: 1,
+        pitch: 60,
+      },
+    ]
+    const notes = traceEvents(trace, 'detected')
+    expect(notes).toHaveLength(2)
+    expect(notes[0]?.duration).toBeCloseTo(0.35)
+    expect(notes[1]?.duration).toBeCloseTo(0.3)
   })
 })

@@ -6,6 +6,7 @@ import { lazyHandle } from './core/lazyHandle'
 import { parseMidiFile } from './core/midi/parser'
 import { detectChord } from './core/music/ChordDetector'
 import {
+  connectInputPedalRouting,
   createLivePerformanceBus,
   type LivePerformanceBus,
 } from './core/performance/LivePerformanceBus'
@@ -191,7 +192,7 @@ export class App {
   private loopArmedLogged = false
   private loopRecordedLogged = false
   private prevLooperState: LiveLooperState = 'idle'
-  // Sustain pedal state managed by LivePerformanceBus — keyboard OR MIDI
+  // Sustain pedal state managed by LivePerformanceBus across all input sources.
   // sources merged with an OR. The bus owns sustained-pitches bookkeeping,
   // repress-release logic, and subscriber fan-out.
   private performanceBus!: LivePerformanceBus
@@ -267,7 +268,7 @@ export class App {
     // a single call. Eliminates the duplicated call pairs below.
     this.capture = new CaptureFanout(this.liveLooper, this.sessionRec)
 
-    // LivePerformanceBus owns pedal merge (keyboard OR MIDI), sustained-pitch
+    // LivePerformanceBus owns pedal merge across all input sources, sustained-pitch
     // bookkeeping, and subscriber fan-out for live performance events.
     this.performanceBus = createLivePerformanceBus()
 
@@ -589,8 +590,8 @@ export class App {
     // ── Live input wiring (MIDI device + computer keyboard) ───────────────
     // Each source re-publishes into the shared InputBus so downstream
     // consumers (the live-note handler here, and later exercise runners)
-    // see one fan-out point instead of three. Pedal sources are kept
-    // per-source because the bus merges them with an OR.
+    // see one fan-out point. Pedal sources are kept per-source because the
+    // performance bus merges them with an OR.
     this.unsubs.push(
       this.midiInput.noteOn.subscribe((evt) => {
         if (evt) this.inputBus.emitNoteOn(evt, 'midi')
@@ -600,15 +601,6 @@ export class App {
       }),
       this.midiInput.pedal.subscribe((down) => {
         this.inputBus.emitPedal(down, 'midi')
-        if (down) {
-          this.performanceBus.routePedalDown('midi')
-          if (!this.firstPedalLogged) {
-            this.firstPedalLogged = true
-            track('pedal_used', { source: 'midi' })
-          }
-        } else {
-          this.performanceBus.routePedalUp('midi')
-        }
       }),
       this.keyboardInput.noteOn.subscribe((evt) => {
         if (evt) this.inputBus.emitNoteOn(evt, 'keyboard')
@@ -618,14 +610,11 @@ export class App {
       }),
       this.keyboardInput.pedal.subscribe((down) => {
         this.inputBus.emitPedal(down, 'keyboard')
-        if (down) {
-          this.performanceBus.routePedalDown('keyboard')
-          if (!this.firstPedalLogged) {
-            this.firstPedalLogged = true
-            track('pedal_used', { source: 'keyboard' })
-          }
-        } else {
-          this.performanceBus.routePedalUp('keyboard')
+      }),
+      connectInputPedalRouting(this.inputBus, this.performanceBus, (source) => {
+        if (!this.firstPedalLogged) {
+          this.firstPedalLogged = true
+          track('pedal_used', { source })
         }
       }),
       this.keyboardInput.octave.subscribe((o) => this.controls.updateOctave(o)),

@@ -1,0 +1,4 @@
+numpy
+onnxruntime
+pytest
+websockets

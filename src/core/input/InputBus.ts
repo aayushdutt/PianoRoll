@@ -16,13 +16,13 @@ export interface BusPedalEvent {
 }
 
 // Single fan-out point for note-ons / note-offs / pedal events from any input
-// source (hardware MIDI, computer keyboard, on-screen touch). Producers call
+// source (hardware MIDI, computer keyboard, on-screen touch, Pi monitor). Producers call
 // the `emit*` methods; consumers (App live handler, exercise runners, ...)
 // subscribe to the signals.
 //
 // The bus is a transport layer — it does not merge multi-source pedal state.
 // Callers that need a "pedal is down from any source" view maintain their own
-// per-source flags and OR them (see App.applyPedalState). Keeping the bus
+// per-source flags and OR them (see connectInputPedalRouting). Keeping the bus
 // dumb means exercises can observe each source independently if they want.
 export class InputBus {
   readonly noteOn = createEventSignal<BusNoteEvent | null>(null)

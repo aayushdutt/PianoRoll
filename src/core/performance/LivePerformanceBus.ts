@@ -1,4 +1,4 @@
-import type { BusNoteEvent, InputSource } from '../input/InputBus'
+import type { BusNoteEvent, InputBus, InputSource } from '../input/InputBus'
 
 /** A note event that has passed through the LivePerformanceBus — enriched with
  *  the merged pedal state so subscribers don't each re-derive it. */
@@ -12,7 +12,7 @@ export interface RoutedNoteEvent {
   voiceId?: string
   string?: number
   fret?: number
-  /** True while any pedal source (MIDI or keyboard) is held. */
+  /** True while any pedal source is held. */
   pedalDown: boolean
 }
 
@@ -20,7 +20,7 @@ export type NoteSink = (evt: RoutedNoteEvent) => void
 export type PedalSink = (down: boolean) => void
 
 /** Central fan-out hub for live performance note/pedal events. Owns:
- *  1. Pedal merge — keyboard OR MIDI pedal = global sustain.
+ *  1. Pedal merge — every InputSource is ORed into global sustain.
  *  2. Sustained-pitches bookkeeping — repress-release logic.
  *  3. Subscriber fan-out — sinks receive normalised events.
  *
@@ -46,6 +46,25 @@ export interface LivePerformanceBus {
    *  clockTime), and fires pedal subscribers (false). Leaves no stale
    *  state that could defer the next note-off. */
   forceReleaseAll(clockTime: number): void
+}
+
+/** Route every InputBus pedal source through the shared sustain state machine.
+ * Keeping this subscription in one reusable function prevents producers such
+ * as the Pi monitor from being visible on InputBus but inaudible to the synth. */
+export function connectInputPedalRouting(
+  input: InputBus,
+  performance: LivePerformanceBus,
+  onPedalDown?: (source: InputSource) => void,
+): () => void {
+  return input.pedal.subscribe((event) => {
+    if (!event) return
+    if (event.down) {
+      performance.routePedalDown(event.source)
+      onPedalDown?.(event.source)
+    } else {
+      performance.routePedalUp(event.source)
+    }
+  })
 }
 
 export function createLivePerformanceBus(): LivePerformanceBus {

@@ -12,6 +12,7 @@ import { parseMidiFile } from '../core/midi/parser'
 import type { MidiFile } from '../core/midi/types'
 import { useApp } from '../store/AppCtx'
 import type { AudioPerceptualResult } from './audioPerception'
+import { EvaluationScore } from './EvaluationScore'
 import {
   analyzeEvaluation,
   type EvaluationRun,
@@ -29,7 +30,15 @@ const LAST_RUN_STORAGE_KEY = 'midee.piEvaluation.lastRun'
 interface TimelineErrorMarker {
   time: number
   magnitudeMs: number
-  kind: 'timing' | 'missing' | 'extra' | 'drop'
+  kind: 'timing' | 'early-release' | 'late-release' | 'missing' | 'extra' | 'drop'
+}
+
+interface LiveTelemetryPoint {
+  time: number
+  audioLevelDbfs: number
+  computeMs: number
+  slackMs: number
+  eventCount: number
 }
 
 function saveLastRun(run: EvaluationRun): void {
@@ -85,6 +94,15 @@ function downmix(buffer: AudioBuffer): Float32Array {
   return output
 }
 
+async function decodeSourceAudio(file: File): Promise<AudioBuffer> {
+  const context = new AudioContext()
+  try {
+    return await context.decodeAudioData(await file.arrayBuffer())
+  } finally {
+    await context.close()
+  }
+}
+
 function analyzeAudioInWorker(
   reference: AudioBuffer,
   reconstruction: AudioBuffer,
@@ -138,9 +156,12 @@ export function EvaluationDashboard(props: Props) {
   const { services } = useApp()
   const [midi, setMidi] = createSignal<MidiFile | null>(null)
   const [midiBytes, setMidiBytes] = createSignal<Uint8Array | null>(null)
+  const [sourceAudioFile, setSourceAudioFile] = createSignal<File | null>(null)
+  const [sourceAudioDuration, setSourceAudioDuration] = createSignal(0)
+  const [sourcePairValid, setSourcePairValid] = createSignal(false)
   const [timingMode, setTimingMode] = createSignal<TimingMode>('adaptive')
   const [state, setState] = createSignal(
-    'Load a MIDI. Playback uses the Windows default audio output.',
+    'Load a ground-truth MIDI and its paired WAV/audio file.',
   )
   const [run, setRun] = createSignal<EvaluationRun | null>(null)
   const [compareRun, setCompareRun] = createSignal<EvaluationRun | null>(null)
@@ -159,6 +180,7 @@ export function EvaluationDashboard(props: Props) {
   )
   const [isEvaluating, setIsEvaluating] = createSignal(false)
   const [piStatus, setPiStatus] = createSignal<PiStatusMessage | null>(null)
+  const [liveTelemetry, setLiveTelemetry] = createSignal<LiveTelemetryPoint[]>([])
   let evaluationActive = false
   let maximumAudioLevelDbfs = -120
   let playbackFrame = 0
@@ -168,11 +190,27 @@ export function EvaluationDashboard(props: Props) {
   let stoppedResolve: (() => void) | null = null
   let traceResolve: ((records: EvaluationTraceMessage['records']) => void) | null = null
   let traceChunks: Array<EvaluationTraceMessage['records'] | undefined> = []
+  let sourceAudio: HTMLAudioElement | null = null
+  let sourceAudioUrl: string | null = null
 
   createEffect(() => {
     const message = props.message()
     if (!message) return
-    if (message.type === 'status') setPiStatus(message)
+    if (message.type === 'status') {
+      setPiStatus(message)
+      if (evaluationActive) {
+        setLiveTelemetry((points) => [
+          ...points.slice(-119),
+          {
+            time: performance.now() / 1000,
+            audioLevelDbfs: message.audioLevelDbfs ?? -120,
+            computeMs: message.computeMs ?? 0,
+            slackMs: message.slackMs ?? 0,
+            eventCount: message.eventCount,
+          },
+        ])
+      }
+    }
     if (
       evaluationActive &&
       message.type === 'status' &&
@@ -212,6 +250,64 @@ export function EvaluationDashboard(props: Props) {
     }
   }
 
+  const loadSourceAudio = async (file: File): Promise<void> => {
+    sourceAudio?.pause()
+    if (sourceAudioUrl) URL.revokeObjectURL(sourceAudioUrl)
+    sourceAudioUrl = URL.createObjectURL(file)
+    const audio = new Audio(sourceAudioUrl)
+    audio.preload = 'auto'
+    await new Promise<void>((resolve, reject) => {
+      audio.addEventListener('loadedmetadata', () => resolve(), { once: true })
+      audio.addEventListener(
+        'error',
+        () => reject(new Error(`Unable to load source audio: ${file.name}`)),
+        { once: true },
+      )
+      audio.load()
+    })
+    sourceAudio = audio
+    setSourceAudioFile(file)
+    setSourceAudioDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
+    setState(
+      `${file.name}: ${formatTimelineTime(audio.duration)} source audio loaded for playback.`,
+    )
+  }
+
+  const loadEvaluationPair = async (files: FileList): Promise<void> => {
+    const selected = Array.from(files)
+    const midiFile = selected.find((file) => /\.(mid|midi)$/i.test(file.name))
+    const audioFile = selected.find((file) => !/\.(mid|midi)$/i.test(file.name))
+    if (selected.length < 1 || selected.length > 2 || (!midiFile && !audioFile)) {
+      setSourcePairValid(false)
+      setState('Select one MIDI, one WAV/audio file, or both matching files together.')
+      return
+    }
+    setSourcePairValid(false)
+    if (midiFile) await loadMidi(midiFile)
+    if (audioFile) await loadSourceAudio(audioFile)
+    const nextMidiName = midiFile?.name ?? midi()?.name
+    const nextAudioName = audioFile?.name ?? sourceAudioFile()?.name
+    if (!nextMidiName || !nextAudioName) {
+      setState(
+        midiFile
+          ? 'Reference MIDI loaded. Use the same control again to choose its paired audio.'
+          : 'Source audio loaded. Use the same control again to choose its paired MIDI.',
+      )
+      return
+    }
+    const stem = (name: string): string => name.replace(/\.[^.]+$/, '').toLowerCase()
+    if (stem(nextMidiName) !== stem(nextAudioName)) {
+      setState(
+        `Pair mismatch: ${nextMidiName} and ${nextAudioName} must share the same basename.`,
+      )
+      return
+    }
+    setSourcePairValid(true)
+    setState(
+      `Paired source loaded: ${nextAudioName} · MIDI retained as ground truth only.`,
+    )
+  }
+
   const waitForStarted = (): Promise<string> =>
     new Promise((resolve, reject) => {
       startedResolve = resolve
@@ -237,8 +333,10 @@ export function EvaluationDashboard(props: Props) {
   const runEvaluation = async (): Promise<void> => {
     const reference = midi()
     const bytes = midiBytes()
-    if (!reference || !bytes) {
-      setState('Load a reference MIDI first.')
+    const audioFile = sourceAudioFile()
+    const evaluationAudio = sourceAudio
+    if (!reference || !bytes || !audioFile || !evaluationAudio) {
+      setState('Load both the reference MIDI and paired source audio first.')
       return
     }
     if (!props.connected()) {
@@ -250,6 +348,7 @@ export function EvaluationDashboard(props: Props) {
       setAudioResult(null)
       setReconstructedMidi(null)
       setProgress(0)
+      setLiveTelemetry([])
       maximumAudioLevelDbfs = -120
       evaluationActive = true
       setIsEvaluating(true)
@@ -258,17 +357,19 @@ export function EvaluationDashboard(props: Props) {
       if (!props.send({ type: 'evaluation', action: 'start', timingMode: timingMode() })) {
         throw new Error('Pi WebSocket is disconnected.')
       }
+      // Start media while this call still has the Run button's user activation.
+      // Waiting for the Pi acknowledgement first can make Chrome reject play()
+      // for a local file because the transient activation has expired.
+      evaluationAudio.currentTime = 0
+      evaluationAudio.volume = 1
+      await evaluationAudio.play()
       const id = await started
-      await services.synth.setInstrument('digital')
-      services.synth.setSpeed(1)
-      await services.synth.load(reference)
-      await services.synth.play(0)
       const startedAt = performance.now()
       // Fixed mode deliberately adds 1.75 s of presentation buffer and both
       // modes include model lookahead/A2DP delay. Keep enough post-roll that the
       // final scheduled notes and releases arrive before trace stop.
       const postRollSeconds = timingMode() === 'fixed' ? 5 : 3
-      const durationMs = (reference.duration + postRollSeconds) * 1000
+      const durationMs = (evaluationAudio.duration + postRollSeconds) * 1000
       while (performance.now() - startedAt < durationMs) {
         await wait(250)
         const elapsedMs = performance.now() - startedAt
@@ -279,7 +380,7 @@ export function EvaluationDashboard(props: Props) {
           )
         }
       }
-      services.synth.pause()
+      evaluationAudio.pause()
       const stopped = waitForStopped()
       props.send({ type: 'evaluation', action: 'stop' })
       await stopped
@@ -296,24 +397,22 @@ export function EvaluationDashboard(props: Props) {
         detected.map((event) => ({ ...event, time: Math.max(0, event.time - offset) })),
       )
       setReconstructedMidi(reconstructed)
-      setState('Rendering canonical audio…')
+      setState('Analyzing source audio against the reconstruction…')
       const { renderAudioOffline } = await import('../audio/OfflineAudioRenderer')
-      const referenceAudio = await renderAudioOffline({
-        midi: reference,
-        instrumentId: 'digital',
-        volume: 0.8,
-      })
+      const referenceAudio = await decodeSourceAudio(audioFile)
       const reconstructionAudio = await renderAudioOffline({
         midi: reconstructed,
         instrumentId: 'digital',
         volume: 0.8,
+        sampleRate: referenceAudio.sampleRate,
       })
       const perceptual = await analyzeAudioInWorker(referenceAudio, reconstructionAudio)
       const completed: EvaluationRun = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id,
         createdAt: new Date().toISOString(),
         referenceName: reference.name,
+        sourceAudioName: audioFile.name,
         referenceMidiBase64: bytesToBase64(bytes),
         timingMode: timingMode(),
         trace,
@@ -328,7 +427,7 @@ export function EvaluationDashboard(props: Props) {
         `${timingMode()} complete: ${(metrics.recall * 100).toFixed(1)}% recall, ${metrics.hiccups50} hiccups`,
       )
     } catch (error) {
-      services.synth.pause()
+      evaluationAudio?.pause()
       props.send({ type: 'evaluation', action: 'stop' })
       setState(error instanceof Error ? error.message : 'Evaluation failed.')
     } finally {
@@ -367,6 +466,7 @@ export function EvaluationDashboard(props: Props) {
   }
 
   const stopAudio = (): void => {
+    sourceAudio?.pause()
     services.synth.pause()
     cancelAnimationFrame(playbackFrame)
     setPlaybackRunning(false)
@@ -413,6 +513,30 @@ export function EvaluationDashboard(props: Props) {
       150,
     ),
   )
+  const liveAudioPath = createMemo(() =>
+    chartPath(
+      liveTelemetry().map((point, index) => ({
+        time: index,
+        value: Math.max(-90, point.audioLevelDbfs),
+      })),
+      800,
+      150,
+    ),
+  )
+  const liveComputePath = createMemo(() =>
+    chartPath(
+      liveTelemetry().map((point, index) => ({ time: index, value: point.computeMs })),
+      800,
+      150,
+    ),
+  )
+  const liveSlackPath = createMemo(() =>
+    chartPath(
+      liveTelemetry().map((point, index) => ({ time: index, value: point.slackMs })),
+      800,
+      150,
+    ),
+  )
   const errorMarkers = createMemo<TimelineErrorMarker[]>(() => {
     const reference = midi()
     const reconstruction = reconstructedMidi()
@@ -425,6 +549,28 @@ export function EvaluationDashboard(props: Props) {
         magnitudeMs: Math.abs(match.error) * 1000,
         kind: 'timing',
       }))
+    markers.push(
+      ...alignment.matches
+        .filter(
+          (match) =>
+            Math.abs(
+              match.actual.time +
+                match.actual.duration -
+                (match.reference.time + match.reference.duration),
+            ) >= 0.05,
+        )
+        .map((match) => {
+          const error =
+            match.actual.time +
+            match.actual.duration -
+            (match.reference.time + match.reference.duration)
+          return {
+            time: match.reference.time + match.reference.duration,
+            magnitudeMs: Math.abs(error) * 1000,
+            kind: error < 0 ? ('early-release' as const) : ('late-release' as const),
+          }
+        }),
+    )
     markers.push(
       ...alignment.unmatchedReference.map((event) => ({
         time: event.time,
@@ -478,6 +624,8 @@ export function EvaluationDashboard(props: Props) {
 
   onCleanup(() => {
     cancelAnimationFrame(playbackFrame)
+    sourceAudio?.pause()
+    if (sourceAudioUrl) URL.revokeObjectURL(sourceAudioUrl)
     services.synth.pause()
   })
 
@@ -545,20 +693,23 @@ export function EvaluationDashboard(props: Props) {
         <div class="pi-eval__workspace">
           <aside class="pi-eval__setup">
             <section>
-              <span class="pi-eval__step">01 · Reference</span>
+              <span class="pi-eval__step">01 · Paired source</span>
               <label class="pi-eval__dropzone">
-                <strong>{midi()?.name ?? 'Choose reference MIDI'}</strong>
+                <strong>
+                  {sourceAudioFile()?.name ?? 'Choose paired WAV/audio + MIDI'}
+                </strong>
                 <span>
-                  {midi()
-                    ? `${flattenMidi(midi()!).length} notes · ${formatTimelineTime(midi()!.duration)}`
-                    : '.mid or .midi · used to generate the test audio'}
+                  {midi() && sourceAudioFile()
+                    ? `${flattenMidi(midi()!).length} reference notes · ${formatTimelineTime(sourceAudioDuration())} actual audio`
+                    : 'Select exactly two matching files · audio plays, MIDI scores'}
                 </span>
                 <input
                   type="file"
-                  accept=".mid,.midi"
+                  accept="audio/*,.wav,.flac,.mp3,.m4a,.ogg,.mid,.midi"
+                  multiple
                   onChange={(event) => {
-                    const file = event.currentTarget.files?.[0]
-                    if (file) void loadMidi(file)
+                    const files = event.currentTarget.files
+                    if (files) void loadEvaluationPair(files)
                   }}
                 />
               </label>
@@ -567,7 +718,7 @@ export function EvaluationDashboard(props: Props) {
             <section>
               <span class="pi-eval__step">02 · Audio route</span>
               <div class="pi-eval__route">
-                <span>Browser synth</span>
+                <span>Paired source audio</span>
                 <i>→</i>
                 <span>Windows</span>
                 <i>→</i>
@@ -616,7 +767,9 @@ export function EvaluationDashboard(props: Props) {
               <button
                 class="pi-eval__run"
                 type="button"
-                disabled={!midi() || !props.connected() || isEvaluating()}
+                disabled={
+                  !sourcePairValid() || !props.connected() || isEvaluating()
+                }
                 onClick={() => void runEvaluation()}
               >
                 {isEvaluating() ? 'Evaluation running…' : 'Run evaluation'}
@@ -712,19 +865,61 @@ export function EvaluationDashboard(props: Props) {
             <Show
               when={run()}
               fallback={
-                <div class="pi-eval__empty">
-                  <span>Ready for a controlled loop test</span>
-                  <h3>Load a MIDI, verify the Pi input meter, then run.</h3>
-                  <p>
-                    The result will include note accuracy, timing drift, tempo stability, audio
-                    severity, two replayable MIDIs, and a seekable error timeline.
-                  </p>
-                  <ol>
-                    <li>Choose the reference MIDI.</li>
-                    <li>Route Windows audio to the Pi Bluetooth endpoint.</li>
-                    <li>Run and leave this tab active until analysis completes.</li>
-                  </ol>
-                </div>
+                <Show
+                  when={isEvaluating()}
+                  fallback={
+                    <div class="pi-eval__empty">
+                      <span>Ready for a controlled loop test</span>
+                      <h3>Load a MIDI, verify the Pi input meter, then run.</h3>
+                      <p>
+                        The result will include note accuracy, timing drift, tempo stability,
+                        audio severity, two replayable MIDIs, and a seekable error timeline.
+                      </p>
+                      <ol>
+                        <li>Choose the reference MIDI.</li>
+                        <li>Route Windows audio to the Pi Bluetooth endpoint.</li>
+                        <li>Run and leave this tab active until analysis completes.</li>
+                      </ol>
+                    </div>
+                  }
+                >
+                  <div class="pi-eval__live">
+                    <div class="pi-eval__live-heading">
+                      <div>
+                        <span>Live Pi telemetry · decoded in real time</span>
+                        <h3>Evaluation in progress</h3>
+                      </div>
+                      <strong>{Math.round(progress() * 100)}%</strong>
+                    </div>
+                    <div class="pi-eval__live-stats">
+                      <Metric
+                        label="Input"
+                        value={`${(piStatus()?.audioLevelDbfs ?? -120).toFixed(0)} dBFS`}
+                      />
+                      <Metric
+                        label="Inference"
+                        value={`${(piStatus()?.computeMs ?? 0).toFixed(0)} ms`}
+                      />
+                      <Metric
+                        label="Slack"
+                        value={`${(piStatus()?.slackMs ?? 0).toFixed(0)} ms`}
+                      />
+                      <Metric
+                        label="Decoded events"
+                        value={String(piStatus()?.eventCount ?? 0)}
+                      />
+                    </div>
+                    <div class="pi-eval__live-charts">
+                      <Timeline title="Live input level (dBFS)" path={liveAudioPath()} />
+                      <Timeline title="Live inference time (ms)" path={liveComputePath()} />
+                      <Timeline title="Live scheduler slack (ms)" path={liveSlackPath()} />
+                    </div>
+                    <p>
+                      These traces come from the Pi status stream. Raw PCM waveform samples are
+                      not transmitted to the browser.
+                    </p>
+                  </div>
+                </Show>
               }
             >
               {(current) => (
@@ -754,6 +949,19 @@ export function EvaluationDashboard(props: Props) {
                         label="IOI p90"
                         value={`${current().metrics.ioiP90Ms.toFixed(1)} ms`}
                       />
+                      <Metric
+                        label="Offset p90"
+                        value={`${current().metrics.p90AbsOffsetErrorMs.toFixed(1)} ms`}
+                      />
+                      <Metric
+                        label="Duration p90"
+                        value={`${current().metrics.p90AbsDurationErrorMs.toFixed(1)} ms`}
+                      />
+                      <Metric
+                        label="Early releases"
+                        value={String(current().metrics.prematureReleases)}
+                      />
+                      <Metric label="Stuck notes" value={String(current().metrics.stuckNotes)} />
                       <Metric label="Hiccups" value={String(current().metrics.hiccups50)} />
                       <Metric
                         label="Suppressed"
@@ -814,6 +1022,18 @@ export function EvaluationDashboard(props: Props) {
                         cursorTime={playbackTime()}
                         onSeek={(time) => void playResult(playbackTarget(), time)}
                       />
+                      <Show when={playbackTarget() === 'reference' ? midi() : reconstructedMidi()}>
+                        {(scoreMidi) => (
+                          <EvaluationScore
+                            midi={scoreMidi()}
+                            cursorTime={playbackTime()}
+                            playing={playbackRunning()}
+                            markers={errorMarkers()}
+                            target={playbackTarget()}
+                            onSeek={(time) => void playResult(playbackTarget(), time)}
+                          />
+                        )}
+                      </Show>
                       <div class="pi-eval__legend-row">
                         <span>
                           <i class="is-cursor" /> Playback cursor
@@ -827,6 +1047,7 @@ export function EvaluationDashboard(props: Props) {
                         <span>
                           <i class="is-extra" /> Extra
                         </span>
+                        <span>Release markers show early/late note endings</span>
                         <span>Click anywhere to seek and play</span>
                       </div>
                     </div>

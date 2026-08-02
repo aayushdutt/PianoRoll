@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createLivePerformanceBus } from './LivePerformanceBus'
+import { InputBus } from '../input/InputBus'
+import { connectInputPedalRouting, createLivePerformanceBus } from './LivePerformanceBus'
 
 function makeNoteOn(pitch: number, vel = 1) {
   return { pitch, velocity: vel, clockTime: 1, source: 'keyboard' as const }
@@ -10,6 +11,28 @@ function makeNoteOff(pitch: number) {
 }
 
 describe('LivePerformanceBus', () => {
+  it('routes Pi InputBus pedal messages into sustain and release', () => {
+    const input = new InputBus()
+    const bus = createLivePerformanceBus()
+    const released: number[] = []
+    bus.subscribeNotes(
+      () => {},
+      (event) => released.push(event.pitch),
+    )
+    const disconnect = connectInputPedalRouting(input, bus)
+
+    input.emitPedal(true, 'pi')
+    bus.routeNoteOn({ ...makeNoteOn(60), source: 'pi' })
+    bus.routeNoteOff({ ...makeNoteOff(60), source: 'pi' })
+    expect(bus.pedalDown).toBe(true)
+    expect(bus.sustainedPitches).toEqual(new Set([60]))
+    expect(released).toEqual([])
+
+    input.emitPedal(false, 'pi')
+    expect(bus.pedalDown).toBe(false)
+    expect(released).toEqual([60])
+    disconnect()
+  })
   it('fan-out: noteOn reaches all on-note subscribers', () => {
     const bus = createLivePerformanceBus()
     const received: number[] = []

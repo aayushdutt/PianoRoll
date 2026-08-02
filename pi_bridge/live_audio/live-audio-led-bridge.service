@@ -1,0 +1,19 @@
+[Unit]
+Description=Live Bluetooth audio-to-MIDI LED WebSocket bridge
+After=pipewire.service wireplumber.service
+Wants=pipewire.service wireplumber.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ltq/pi-a2m
+ExecStart=/home/ltq/pi-a2m/.venv/bin/python /home/ltq/pi-a2m/live_audio_bridge.py --onnx /home/ltq/pi-a2m/keyup_framehead.onnx --pedal-onnx /home/ltq/pi-a2m/pedal-edge-10ms.onnx --pedal-threshold 0.3 --pedal-delay-frames 43 --pedal-past 1.0 --threads 2 --port 8765 --past 1.5 --hop 0.5 --lookahead 0.5 --max-catchup 1 --latency-budget 0.25 --threshold 0.75 --frame-off-threshold 0.5 --frame-release-debounce 3 --min-led-on-ms 100 --agc-max-gain-db 0
+Restart=on-failure
+RestartSec=2
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+Environment=WAIT_SECONDS=86400
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+
+[Install]
+WantedBy=default.target

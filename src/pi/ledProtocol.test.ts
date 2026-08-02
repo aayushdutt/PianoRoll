@@ -15,6 +15,17 @@ describe('LED harness protocol', () => {
     })
   })
 
+  it('accepts pedal state without changing LED outputs', () => {
+    const message = parseLedMessageJson(
+      '{"type":"pedal","down":true,"t":1.25,"confidence":0.91}',
+    )
+    expect(message).toEqual({
+      type: 'pedal', down: true, t: 1.25, confidence: 0.91,
+    })
+    const initial = Array.from({ length: LED_OUTPUT_COUNT }, () => false)
+    expect(applyLedMessage(initial, message!)).toEqual(initial)
+  })
+
   it('rejects out-of-range and malformed messages', () => {
     expect(parseLedMessageJson('{"type":"set","index":100,"on":true}')).toBeNull()
     expect(parseLedMessageJson('{not json')).toBeNull()

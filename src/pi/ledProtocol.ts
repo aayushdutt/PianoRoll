@@ -15,6 +15,14 @@ export interface LedClearMessage {
   type: 'clear_all'
 }
 
+export interface PedalMessage {
+  type: 'pedal'
+  down: boolean
+  t?: number
+  confidence?: number
+  sessionId?: string | null
+}
+
 export interface LedSnapshotMessage {
   type: 'snapshot'
   outputs: readonly boolean[]
@@ -30,9 +38,15 @@ export interface PiStatusMessage {
   duration: number
   eventCount: number
   threshold?: number
-  holdMs?: number
-  energyOff?: boolean
-  energyGate?: number
+  minLedOnMs?: number
+  releaseDecoder?: string
+  pedalDecoder?: string
+  pedalThreshold?: number
+  pedalDown?: boolean
+  pedalPastS?: number
+  frameOffThreshold?: number
+  frameReleaseDebounce?: number
+  agcGainDb?: number
   timingMode?: TimingMode
   traceSessionId?: string | null
   traceActive?: boolean
@@ -94,6 +108,7 @@ export interface EvaluationTraceMessage {
 export type LedMessage =
   | LedSetMessage
   | LedClearMessage
+  | PedalMessage
   | LedSnapshotMessage
   | PiStatusMessage
   | EvaluationStartedMessage
@@ -108,6 +123,15 @@ export function parseLedMessage(value: unknown): LedMessage | null {
   if (!value || typeof value !== 'object') return null
   const message = value as Record<string, unknown>
   if (message.type === 'clear_all') return { type: 'clear_all' }
+  if (message.type === 'pedal' && typeof message.down === 'boolean') {
+    const parsed: PedalMessage = { type: 'pedal', down: message.down }
+    if (typeof message.t === 'number') parsed.t = message.t
+    if (typeof message.confidence === 'number') parsed.confidence = message.confidence
+    if (typeof message.sessionId === 'string' || message.sessionId === null) {
+      parsed.sessionId = message.sessionId
+    }
+    return parsed
+  }
   if (
     message.type === 'status' &&
     ['idle', 'playing', 'paused', 'stopped', 'finished'].includes(String(message.state)) &&
@@ -125,9 +149,23 @@ export function parseLedMessage(value: unknown): LedMessage | null {
       eventCount: message.eventCount,
     }
     if (typeof message.threshold === 'number') status.threshold = message.threshold
-    if (typeof message.holdMs === 'number') status.holdMs = message.holdMs
-    if (typeof message.energyOff === 'boolean') status.energyOff = message.energyOff
-    if (typeof message.energyGate === 'number') status.energyGate = message.energyGate
+    if (typeof message.minLedOnMs === 'number') status.minLedOnMs = message.minLedOnMs
+    if (typeof message.releaseDecoder === 'string') {
+      status.releaseDecoder = message.releaseDecoder
+    }
+    if (typeof message.pedalDecoder === 'string') status.pedalDecoder = message.pedalDecoder
+    if (typeof message.pedalThreshold === 'number') {
+      status.pedalThreshold = message.pedalThreshold
+    }
+    if (typeof message.pedalDown === 'boolean') status.pedalDown = message.pedalDown
+    if (typeof message.pedalPastS === 'number') status.pedalPastS = message.pedalPastS
+    if (typeof message.frameOffThreshold === 'number') {
+      status.frameOffThreshold = message.frameOffThreshold
+    }
+    if (typeof message.frameReleaseDebounce === 'number') {
+      status.frameReleaseDebounce = message.frameReleaseDebounce
+    }
+    if (typeof message.agcGainDb === 'number') status.agcGainDb = message.agcGainDb
     if (message.timingMode === 'adaptive' || message.timingMode === 'fixed') {
       status.timingMode = message.timingMode
     }
@@ -236,6 +274,7 @@ export function midiVelocityToUnit(velocity: number | undefined, fallback = 0.8)
 export function applyLedMessage(outputs: readonly boolean[], message: LedMessage): boolean[] {
   if (
     message.type === 'status' ||
+    message.type === 'pedal' ||
     message.type === 'evaluation_started' ||
     message.type === 'evaluation_stopped' ||
     message.type === 'evaluation_trace'
