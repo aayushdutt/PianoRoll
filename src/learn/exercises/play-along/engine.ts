@@ -202,6 +202,13 @@ export class PlayAlongEngine {
     else this.play()
   }
 
+  // Back to the top of whatever the user is drilling: the loop region if one
+  // is set, otherwise the piece. Routes through seek() so the wait-mode resume
+  // gating and legato invalidation stay in one place.
+  restart(): void {
+    this.seek(this.state.loopRegion?.start ?? 0)
+  }
+
   seek(time: number): void {
     const clamped = Math.max(0, Math.min(this.state.duration || time, time))
     // Gate resume on the *actual* clock state, not `userWantsToPlay`. In

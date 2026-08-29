@@ -1573,6 +1573,9 @@ export class App {
     this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
     this.store.completePlayLoad(midi)
     this.resetPlaybackTelemetry()
+    // You just performed this and pressed Play — the strongest version of the
+    // "you asked for it, so it plays" rule the other loaders follow.
+    this.autoplayAfterLoad()
   }
 
   private async saveLoopAsMidi(): Promise<void> {

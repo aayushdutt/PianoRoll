@@ -1560,6 +1560,31 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.04);
 }
 
+.pa-hud__restart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.12s ease,
+    transform 0.12s var(--ease-spring);
+}
+.pa-hud__restart:hover {
+  color: var(--text);
+  transform: scale(1.08);
+}
+.pa-hud__restart:active {
+  transform: scale(0.94);
+}
+
 .pa-hud__play {
   display: inline-flex;
   align-items: center;
@@ -3198,6 +3223,29 @@ body {
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
+.pa-hud__mini-restart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.12s ease,
+    transform 0.12s var(--ease-spring);
+}
+.pa-hud__mini-restart:hover {
+  color: var(--text);
+  transform: scale(1.12);
+}
+.pa-hud__mini-restart:active {
+  transform: scale(0.92);
+}
 .pa-hud__mini-streak {
   display: inline-flex;
   align-items: center;
@@ -3436,7 +3484,10 @@ body {
 }
 
 .ctrl-icon {
-  color: var(--text-dim);
+  /* Matches .speed-val: volume / speed / zoom are peers in one cluster, so
+     they read at one contrast level. --text-dim left them visibly fainter
+     than the speed readout sitting between them. */
+  color: var(--text-muted);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -3461,6 +3512,27 @@ body {
   transition:
     height 0.15s var(--ease-out),
     box-shadow 0.15s var(--ease-out);
+}
+
+/* Detent marker. Layered ABOVE the progress fill (first background wins), so
+   the default value is visible on the track instead of being a feel-it-out
+   spot the snap silently teleports you to. */
+.mini-slider--detent {
+  background:
+    linear-gradient(
+      to right,
+      transparent calc(var(--detent) - 1px),
+      rgba(255, 255, 255, 0.45) calc(var(--detent) - 1px),
+      rgba(255, 255, 255, 0.45) calc(var(--detent) + 1px),
+      transparent calc(var(--detent) + 1px)
+    ),
+    linear-gradient(
+      to right,
+      var(--accent) 0,
+      var(--accent) var(--pct, 0%),
+      rgba(255, 255, 255, 0.06) var(--pct, 0%),
+      rgba(255, 255, 255, 0.06) 100%
+    );
 }
 
 .mini-slider:hover {
@@ -3959,7 +4031,12 @@ body {
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
-  min-width: 26px;
+  /* Fixed, not min-, and sized for the widest label formatSpeed() can emit
+     ("0.25x" = 5 chars, +headroom for letter-spacing). The value changes on
+     every frame of a drag; a box that grows from "1x" to "0.25x" shoves the
+     rest of the HUD sideways under the cursor mid-gesture. */
+  width: 5.5ch;
+  flex-shrink: 0;
   text-align: right;
   letter-spacing: 0.02em;
 }
@@ -6195,6 +6272,10 @@ body.canvas-hidden #kbd-resizer {
 .float-hud [data-tip]:active::after {
   transform: translateX(-50%) translateY(0);
 }
+.float-hud__reopen:has(.pa-hud__mini-restart:hover)::after {
+  opacity: 0;
+}
+
 /* On mobile portrait the HUD is docked at the top, so flip back to below. */
 @media (max-width: 640px) and (orientation: portrait) {
   .float-hud [data-tip]::after {

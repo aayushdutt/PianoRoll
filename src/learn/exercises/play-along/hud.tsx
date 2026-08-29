@@ -24,15 +24,17 @@ function fmtTime(t: number): string {
 }
 
 const PLAY_GLYPH =
-  '<svg class="pa-hud__play-icon pa-hud__play-icon--play" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><title>Play</title><path d="M4 3 L13 8 L4 13 Z"/></svg>'
+  '<svg class="pa-hud__play-icon pa-hud__play-icon--play" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M4 3 L13 8 L4 13 Z"/></svg>'
 const PAUSE_GLYPH =
-  '<svg class="pa-hud__play-icon pa-hud__play-icon--pause" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><title>Pause</title><rect x="4" y="3" width="3" height="10" rx="0.5"/><rect x="9" y="3" width="3" height="10" rx="0.5"/></svg>'
+  '<svg class="pa-hud__play-icon pa-hud__play-icon--pause" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="4" y="3" width="3" height="10" rx="0.5"/><rect x="9" y="3" width="3" height="10" rx="0.5"/></svg>'
 const LOOP_GLYPH =
-  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><title>Loop</title><path d="M3 8a5 5 0 0 1 8-4M13 8a5 5 0 0 1-8 4"/><path d="M11 2v3h-3M5 14v-3h3"/></svg>'
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a5 5 0 0 1 8-4M13 8a5 5 0 0 1-8 4"/><path d="M11 2v3h-3M5 14v-3h3"/></svg>'
 const CLOSE_X_GLYPH =
-  '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><title>Close</title><path d="M2 2l6 6M8 2l-6 6"/></svg>'
+  '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6"/></svg>'
+const RESTART_GLYPH =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2v3h-3"/></svg>'
 const WAIT_GLYPH =
-  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><title>Wait</title><path d="M4 3h8M4 13h8M6 3c0 2 4 3 4 5s-4 3-4 5"/></svg>'
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h8M4 13h8M6 3c0 2 4 3 4 5s-4 3-4 5"/></svg>'
 
 export interface PlayAlongHudOptions {
   engine: PlayAlongEngine
@@ -169,6 +171,21 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
       onReopen={() => setCollapsed(false)}
       collapsedContent={
         <span class="pa-hud__mini">
+          {/* The pill is a drag handle whose tap reopens the HUD, so this
+              button has to claim its own pointerdown or dragging the HUD by it
+              would either fail to drag or fire a restart on release. */}
+          <button
+            class="pa-hud__mini-restart"
+            type="button"
+            data-tip={t('learn.pa.restartTip')}
+            aria-label={t('learn.pa.restartAria')}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              engine.restart()
+            }}
+            innerHTML={RESTART_GLYPH}
+          />
           <Show when={engine.state.streak > 0}>
             <span
               class="pa-hud__mini-streak"
@@ -189,6 +206,14 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
     >
       <div class="pa-hud__body">
         <div class="pa-hud__transport">
+          <button
+            class="pa-hud__restart"
+            type="button"
+            data-tip={t('learn.pa.restartTip')}
+            aria-label={t('learn.pa.restartAria')}
+            onClick={() => engine.restart()}
+            innerHTML={RESTART_GLYPH}
+          />
           <button
             class="pa-hud__play"
             classList={{ 'is-playing': engine.state.userWantsToPlay }}

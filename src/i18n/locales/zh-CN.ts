@@ -343,6 +343,8 @@ const zhCN: Messages = {
   'learn.pa.loopMarkBLabel': '标记 B',
   'learn.pa.loopLabel': '循环',
   'learn.pa.loopXClear': '清空循环',
+  'learn.pa.restartTip': '重新开始 · 回到循环起点 (R)',
+  'learn.pa.restartAria': '重新开始',
   'learn.pa.waitTip': '等待模式 · 在每个和弦处暂停',
   'learn.pa.waitAria': '切换等待模式',
   'learn.pa.waitLabel': '等待',
@@ -409,7 +411,7 @@ const zhCN: Messages = {
   'tracks.notes.other': '{channel} 声部 · {count} 个音符',
 
   'postSession.title': '演奏已录制',
-  'postSession.openInFile.title': '在文件模式中打开',
+  'postSession.openInFile.title': '播放',
   'postSession.openInFile.sub': '把它显示成滚动钢琴卷帘 · 随时可以导出为 MP4。',
   'postSession.download.title': '下载 MIDI',
   'postSession.download.sub.html': '将 <code>.mid</code> 直接发送到你的 DAW。',

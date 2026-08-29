@@ -182,6 +182,11 @@ class PlayAlongExercise implements Exercise {
     if (e.code === 'KeyL') {
       e.preventDefault()
       this.markLoop()
+    } else if (e.code === 'KeyR') {
+      // The play → go back → repeat loop, without reaching for the scrubber
+      // (which the collapsed HUD doesn't show at all).
+      e.preventDefault()
+      this.engine.restart()
     } else if (e.code === 'BracketLeft') {
       e.preventDefault()
       this.stepSpeed(-1)

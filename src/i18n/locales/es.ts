@@ -366,6 +366,8 @@ const es: Messages = {
   'learn.pa.loopMarkBLabel': 'Marcar B',
   'learn.pa.loopLabel': 'Bucle',
   'learn.pa.loopXClear': 'Borrar bucle',
+  'learn.pa.restartTip': 'Reiniciar · volver al inicio del bucle (R)',
+  'learn.pa.restartAria': 'Reiniciar',
   'learn.pa.waitTip': 'Modo de espera · pausa en cada acorde',
   'learn.pa.waitAria': 'Alternar modo de espera',
   'learn.pa.waitLabel': 'Esperar',
@@ -436,7 +438,7 @@ const es: Messages = {
 
   // ── Post-session modal ─────────────────────────────────────
   'postSession.title': 'Sesión grabada',
-  'postSession.openInFile.title': 'Abrir en modo archivo',
+  'postSession.openInFile.title': 'Reproducir',
   'postSession.openInFile.sub':
     'Visualízala como un piano roll desplazándose - lista para exportar como MP4.',
   'postSession.download.title': 'Descargar MIDI',

@@ -395,6 +395,8 @@ export const en = {
   'learn.pa.loopMarkBLabel': 'Mark B',
   'learn.pa.loopLabel': 'Loop',
   'learn.pa.loopXClear': 'Clear loop',
+  'learn.pa.restartTip': 'Restart · back to the loop start (R)',
+  'learn.pa.restartAria': 'Restart',
   'learn.pa.waitTip': 'Wait mode · pauses at each chord',
   'learn.pa.waitAria': 'Toggle wait mode',
   'learn.pa.waitLabel': 'Wait',
@@ -470,7 +472,7 @@ export const en = {
 
   // ── Post-session modal ─────────────────────────────────────
   'postSession.title': 'Session recorded',
-  'postSession.openInFile.title': 'Open in file mode',
+  'postSession.openInFile.title': 'Play',
   'postSession.openInFile.sub': 'Visualize it as a rolling piano roll - ready to export as MP4.',
   'postSession.download.title': 'Download MIDI',
   'postSession.download.sub.html': 'Send <code>.mid</code> straight to your DAW.',

@@ -438,14 +438,18 @@ export function HudView(props: HudProps) {
           <input
             type="range"
             id="hud-speed"
-            class="mini-slider"
+            class="mini-slider mini-slider--detent"
             min="0.25"
             max="2"
             step="0.05"
             value={props.speed()}
-            style={{ '--pct': `${((props.speed() - 0.25) / 1.75) * 100}%` }}
+            style={{
+              '--pct': `${((props.speed() - 0.25) / 1.75) * 100}%`,
+              '--detent': `${((1 - 0.25) / 1.75) * 100}%`,
+            }}
             aria-label={t('hud.aria.speed')}
-            onInput={(e) => props.onSpeed(parseFloat(e.currentTarget.value))}
+            onInput={(e) => props.onSpeed(snapTo(parseFloat(e.currentTarget.value), 1, 0.07))}
+            onDblClick={() => props.onSpeed(1)}
           />
         </div>
 
@@ -456,16 +460,20 @@ export function HudView(props: HudProps) {
           <input
             type="range"
             id="hud-zoom"
-            class="mini-slider mini-slider--zoom"
+            class="mini-slider mini-slider--zoom mini-slider--detent"
             min={ZOOM_MIN}
             max={ZOOM_MAX}
             step="10"
             value={props.zoom()}
             style={{
               '--pct': `${((props.zoom() - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100}%`,
+              '--detent': `${((ZOOM_DEFAULT - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100}%`,
             }}
             aria-label={t('hud.aria.zoom')}
-            onInput={(e) => props.onZoom(parseFloat(e.currentTarget.value))}
+            onInput={(e) =>
+              props.onZoom(snapTo(parseFloat(e.currentTarget.value), ZOOM_DEFAULT, 15))
+            }
+            onDblClick={() => props.onZoom(ZOOM_DEFAULT)}
           />
         </div>
 
@@ -731,6 +739,13 @@ export function formatMMSS(s: number): string {
   const m = Math.floor(s / 60)
   const sec = Math.floor(s % 60)
   return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+}
+
+// Magnetic detent. The mini-sliders are only 60-64px wide, so a step is ~1.2-1.7px
+// and the default value is a target you can reach by arithmetic but never by
+// feel. Pull to it whenever the drag lands close enough.
+export function snapTo(value: number, target: number, tolerance: number): number {
+  return Math.abs(value - target) <= tolerance ? target : value
 }
 
 export function formatSpeed(s: number): string {

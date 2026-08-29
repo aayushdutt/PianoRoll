@@ -358,6 +358,8 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'learn.pa.loopMarkBLabel': 'Znak B',
   'learn.pa.loopLabel': 'Pętla',
   'learn.pa.loopXClear': 'Wyczyść pętlę',
+  'learn.pa.restartTip': 'Od nowa · powrót na początek pętli (R)',
+  'learn.pa.restartAria': 'Zacznij od nowa',
   'learn.pa.waitTip': 'Tryb czekania · pauza przy każdym akordzie',
   'learn.pa.waitAria': 'Przełącz tryb czekania',
   'learn.pa.waitLabel': 'Czekaj',
@@ -426,7 +428,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'tracks.notes.other': 'kan. {channel} · {count} nuty',
 
   'postSession.title': 'Sesja nagrana',
-  'postSession.openInFile.title': 'Otwórz w trybie pliku',
+  'postSession.openInFile.title': 'Odtwórz',
   'postSession.openInFile.sub': 'Pokaż jako przewijający się pianoroll - gotowy do eksportu MP4.',
   'postSession.download.title': 'Pobierz MIDI',
   'postSession.download.sub.html': 'Wyślij <code>.mid</code> prosto do swojego DAW.',

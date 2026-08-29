@@ -190,6 +190,23 @@ describe('PlayAlongEngine', () => {
     expect(synth.speed).toBe(1)
   })
 
+  it('restarts to the loop start, or to zero when no loop is set', () => {
+    const { services, clock, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi())
+
+    clock.currentTime = 12
+    engine.restart()
+    expect(clock.currentTime).toBe(0)
+
+    // With a region marked, "back to the top" means the top of the drill.
+    clock.currentTime = 10
+    engine.setLoopFromBars(4, 10, 60, 120)
+    clock.currentTime = 7
+    engine.restart()
+    expect(clock.currentTime).toBeCloseTo(2)
+  })
+
   it('wraps the clock when the playhead reaches the loop end and counts a clean pass', () => {
     const { services, clock, learnState } = makeServices()
     const onCleanPass = vi.fn()

@@ -366,6 +366,8 @@ const ptBR: Messages = {
   'learn.pa.loopMarkBLabel': 'Marcar B',
   'learn.pa.loopLabel': 'Loop',
   'learn.pa.loopXClear': 'Limpar loop',
+  'learn.pa.restartTip': 'Reiniciar · voltar ao início do loop (R)',
+  'learn.pa.restartAria': 'Reiniciar',
   'learn.pa.waitTip': 'Modo de espera · pausa em cada acorde',
   'learn.pa.waitAria': 'Alternar modo de espera',
   'learn.pa.waitLabel': 'Esperar',
@@ -436,7 +438,7 @@ const ptBR: Messages = {
 
   // ── Post-session modal ─────────────────────────────────────
   'postSession.title': 'Sessão gravada',
-  'postSession.openInFile.title': 'Abrir em modo arquivo',
+  'postSession.openInFile.title': 'Reproduzir',
   'postSession.openInFile.sub':
     'Visualize-a como um piano roll rolando - pronta para exportar como MP4.',
   'postSession.download.title': 'Baixar MIDI',
