@@ -333,6 +333,16 @@ export function TopStripView(props: TopStripProps) {
 }
 
 export function HudView(props: HudProps) {
+  // What unmuting returns to. Dragging the slider to 0 by hand is also a mute,
+  // so only ever record an audible level — and fall back to full rather than
+  // unmuting into silence if the session started at 0.
+  let lastAudible = 1
+  createEffect(() => {
+    const v = props.volume()
+    if (v > 0) lastAudible = v
+  })
+  const restoreVolume = (): number => (lastAudible > 0 ? lastAudible : 1)
+
   return (
     <FloatingHud
       id="hud"
@@ -415,8 +425,18 @@ export function HudView(props: HudProps) {
 
         <div class="hud-divider hud-group--transport" />
 
-        <div class="ctrl-group" data-tip={t('hud.volume')}>
-          <span class="ctrl-icon" innerHTML={icons.volume()} />
+        {/* Tooltips live on the two children, NOT on the group: a data-tip
+            nested inside another data-tip renders both bubbles at once. */}
+        <div class="ctrl-group">
+          <button
+            type="button"
+            class="ctrl-icon ctrl-icon--btn"
+            data-tip={props.volume() === 0 ? t('hud.unmute') : t('hud.mute')}
+            aria-label={props.volume() === 0 ? t('hud.unmute') : t('hud.mute')}
+            aria-pressed={props.volume() === 0}
+            onClick={() => props.onVolume(props.volume() === 0 ? restoreVolume() : 0)}
+            innerHTML={props.volume() === 0 ? icons.volumeMuted() : icons.volume()}
+          />
           <input
             type="range"
             id="hud-volume"
@@ -425,37 +445,42 @@ export function HudView(props: HudProps) {
             max="1"
             step="0.02"
             value={props.volume()}
+            /* The tooltip CSS matches :active as well as :hover, so this stays
+               up during the drag and reads out live. */
+            data-tip={`${t('hud.volume')} · ${Math.round(props.volume() * 100)}%`}
             style={{ '--pct': `${props.volume() * 100}%` }}
             aria-label={t('hud.aria.volume')}
             onInput={(e) => props.onVolume(parseFloat(e.currentTarget.value))}
           />
         </div>
 
+        {/* Every other neighbouring group is separated; without this the bare
+            chip reads as part of the volume control sitting beside it. */}
+        <div class="hud-divider hud-group--transport" />
+
         <div class="ctrl-group hud-group--transport" data-tip={t('hud.speed')}>
-          <span class="speed-val" id="hud-speed-val">
-            {props.speedLabel()}
-          </span>
-          <input
-            type="range"
-            id="hud-speed"
-            class="mini-slider mini-slider--detent"
-            min="0.25"
-            max="2"
-            step="0.05"
-            value={props.speed()}
-            style={{
-              '--pct': `${((props.speed() - 0.25) / 1.75) * 100}%`,
-              '--detent': `${((1 - 0.25) / 1.75) * 100}%`,
-            }}
+          {/* Shift reverses — that also covers the keyboard, since Enter on a
+              focused button fires a click carrying the modifier. */}
+          <button
+            type="button"
+            class="speed-chip"
+            id="hud-speed-val"
+            data-off={props.speed() === 1 ? undefined : ''}
             aria-label={t('hud.aria.speed')}
-            onInput={(e) => props.onSpeed(snapTo(parseFloat(e.currentTarget.value), 1, 0.07))}
-            onDblClick={() => props.onSpeed(1)}
-          />
+            onClick={(e) => props.onSpeed(stepSpeedPreset(props.speed(), e.shiftKey ? -1 : 1))}
+          >
+            {props.speedLabel()}
+          </button>
         </div>
 
         <div class="hud-divider" />
 
-        <div class="ctrl-group" data-tip={t('hud.zoom')}>
+        {/* Percentage of the default, not raw pixels-per-second: 200 means
+            nothing to a user, "100%" places you against the norm. */}
+        <div
+          class="ctrl-group"
+          data-tip={`${t('hud.zoom')} · ${Math.round((props.zoom() / ZOOM_DEFAULT) * 100)}%`}
+        >
           <span class="ctrl-icon" innerHTML={icons.zoom()} />
           <input
             type="range"
@@ -470,9 +495,16 @@ export function HudView(props: HudProps) {
               '--detent': `${((ZOOM_DEFAULT - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100}%`,
             }}
             aria-label={t('hud.aria.zoom')}
-            onInput={(e) =>
-              props.onZoom(snapTo(parseFloat(e.currentTarget.value), ZOOM_DEFAULT, 15))
-            }
+            onInput={(e) => {
+              const el = e.currentTarget
+              const snapped = snapTo(parseFloat(el.value), ZOOM_DEFAULT, 15)
+              // Pin the element itself. Writing the same value back to the
+              // signal is a no-op in Solid, so without this the store snaps but
+              // the DOM keeps the value the browser just set — the thumb slides
+              // free across the whole detent band while zoom sits at default.
+              if (parseFloat(el.value) !== snapped) el.value = String(snapped)
+              props.onZoom(snapped)
+            }}
             onDblClick={() => props.onZoom(ZOOM_DEFAULT)}
           />
         </div>
@@ -739,6 +771,25 @@ export function formatMMSS(s: number): string {
   const m = Math.floor(s / 60)
   const sec = Math.floor(s % 60)
   return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+}
+
+// Speed is a discrete chip, not a slider: a 60px track over 0.25-2 at step 0.05
+// is 36 steps of ~1.7px, and nobody is meaningfully choosing 1.05x over 1.10x.
+// These are the values people actually practise and watch at.
+export const SPEED_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2] as const
+
+// Cycle to the next/previous preset, wrapping at both ends. `current` may be an
+// arbitrary value (a persisted setting from the old slider, or a URL param), so
+// we resolve to the nearest preset first rather than assuming an exact match.
+export function stepSpeedPreset(current: number, delta: number): number {
+  let nearest = 0
+  for (let i = 1; i < SPEED_PRESETS.length; i++) {
+    if (Math.abs(SPEED_PRESETS[i]! - current) < Math.abs(SPEED_PRESETS[nearest]! - current)) {
+      nearest = i
+    }
+  }
+  const len = SPEED_PRESETS.length
+  return SPEED_PRESETS[(((nearest + delta) % len) + len) % len]!
 }
 
 // Magnetic detent. The mini-sliders are only 60-64px wide, so a step is ~1.2-1.7px

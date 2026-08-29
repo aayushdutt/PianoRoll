@@ -3483,8 +3483,26 @@ body {
   flex-shrink: 0;
 }
 
+/* Clickable variant (volume mute). Bare like the static icon — the row's
+   affordance convention is a hover highlight, not persistent chrome. */
+.ctrl-icon--btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  transition: color 0.12s ease;
+}
+.ctrl-icon--btn:hover {
+  color: var(--text);
+}
+.ctrl-icon--btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .ctrl-icon {
-  /* Matches .speed-val: volume / speed / zoom are peers in one cluster, so
+  /* Matches .speed-chip: volume / speed / zoom are peers in one cluster, so
      they read at one contrast level. --text-dim left them visibly fainter
      than the speed readout sitting between them. */
   color: var(--text-muted);
@@ -4026,26 +4044,61 @@ body {
   background: var(--accent-soft);
 }
 
-.speed-val {
+/* Click-to-cycle speed readout (replaced a 60px slider: 36 steps of ~1.7px was
+   never a control anyone could aim). Deliberately styled as a .time-display
+   that happens to be clickable, but keeping the quiet 1px outline .hud-loop-btn
+   uses: in this bar, passive readouts (.time-display, .hud-metro-bpm) are bare
+   and interactive things are outlined. What it must NOT do is carry accent
+   chrome — the play button is the only element allowed to be loud. */
+.speed-chip {
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
-  /* Fixed, not min-, and sized for the widest label formatSpeed() can emit
-     ("0.25x" = 5 chars, +headroom for letter-spacing). The value changes on
-     every frame of a drag; a box that grows from "1x" to "0.25x" shoves the
-     rest of the HUD sideways under the cursor mid-gesture. */
-  width: 5.5ch;
+  /* Fixed, and sized for the widest label formatSpeed() emits ("0.25x") plus
+     padding, so cycling never resizes the box and shoves the HUD sideways. */
+  width: 6.5ch;
   flex-shrink: 0;
-  text-align: right;
+  text-align: center;
   letter-spacing: 0.02em;
+  padding: 3px 0;
+  background: none;
+  /* Same outline weight as .hud-loop-btn — enough to read as a control and to
+     hold its own edge against the volume slider next to it, quiet enough to
+     disappear into the bar at rest. */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.speed-chip:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--text);
+}
+.speed-chip:active {
+  transform: scale(0.95);
+}
+.speed-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* Off-default is worth noticing — you can leave it at 0.5x and wonder why
+   playback drags — but colour alone carries that. No border, no fill. */
+.speed-chip[data-off] {
+  color: var(--accent);
 }
 
 /* Disable controls during export */
 #hud.hud--exporting .btn-play,
 #hud.hud--exporting .btn-skip,
 #hud.hud--exporting .scrubber,
-#hud.hud--exporting .mini-slider {
+#hud.hud--exporting .mini-slider,
+#hud.hud--exporting .speed-chip,
+#hud.hud--exporting .ctrl-icon--btn {
   opacity: 0.25;
   pointer-events: none;
 }

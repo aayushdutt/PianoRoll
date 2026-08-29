@@ -3,6 +3,7 @@ import { createStore, type SetStoreFunction } from 'solid-js/store'
 import { render } from 'solid-js/web'
 import type { AppServices } from '../core/services'
 import { t } from '../i18n'
+import { isTextEntryTarget } from '../learn/core/keyboard'
 import type { LiveLooperState } from '../midi/LiveLooper'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
 import type { AppMode } from '../store/state'
@@ -119,6 +120,19 @@ export class Controls {
     if (m === 'play' || m === 'live') this.wakeUp()
   }
   private onKeyDownDoc = (e: KeyboardEvent): void => this.handleKey(e)
+
+  // A HUD button clicked with the mouse keeps focus, and then Space "activates
+  // the focused button" instead of toggling playback — so pressing Space after
+  // touching skip / speed / mute did nothing useful. Drop focus on mouse
+  // clicks only: a keyboard-synthesised click reports detail === 0 and keeps
+  // its focus, so Tab-then-Space still activates the button you are on.
+  // Sliders are deliberately excluded — click-then-arrow-key must keep working.
+  // Scoped to .float-hud so play-along and sight-reading behave identically.
+  private onClickDoc = (e: MouseEvent): void => {
+    if (e.detail === 0) return
+    const btn = (e.target as HTMLElement | null)?.closest?.('button')
+    if (btn?.closest('.float-hud')) btn.blur()
+  }
 
   constructor(private opts: ControlsOptions) {
     const { store } = opts.services
@@ -442,6 +456,7 @@ export class Controls {
 
     document.addEventListener('mousemove', this.onMouseMoveDoc)
     document.addEventListener('keydown', this.onKeyDownDoc)
+    document.addEventListener('click', this.onClickDoc)
 
     this.refreshUi()
   }
@@ -525,6 +540,7 @@ export class Controls {
     this.unsubs = []
     document.removeEventListener('mousemove', this.onMouseMoveDoc)
     document.removeEventListener('keydown', this.onKeyDownDoc)
+    document.removeEventListener('click', this.onClickDoc)
     this.disposeRoot?.()
     this.disposeRoot = null
     this.compactRO?.disconnect()
@@ -610,7 +626,18 @@ export class Controls {
 
   private handleKey(e: KeyboardEvent): void {
     const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+    if (isTextEntryTarget(target)) return
+
+    // Arrows belong to a focused slider; skipping the transport from there
+    // would fight the control the user is actually holding.
+    if (
+      (e.code === 'ArrowLeft' || e.code === 'ArrowRight') &&
+      target instanceof HTMLInputElement &&
+      target.type === 'range'
+    ) {
+      return
+    }
+
     const mode = this.opts.services.store.state.mode
 
     if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.code === 'KeyP') {
