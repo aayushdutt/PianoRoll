@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { barSnap, barsToSeconds, makeRegionFromBars, ramp, wrapIfAtEnd } from './LoopRegion'
+import { barSnap, barsToSeconds, makeRegionFromBars, wrapIfAtEnd } from './LoopRegion'
 
 describe('barsToSeconds', () => {
   it('converts bar count to seconds at the given BPM', () => {
@@ -86,41 +86,5 @@ describe('wrapIfAtEnd', () => {
     // Tight epsilon → have to be essentially at end.
     expect(wrapIfAtEnd(19.997, { start: 10, end: 20 }, 0.001)).toBeNull()
     expect(wrapIfAtEnd(19.9995, { start: 10, end: 20 }, 0.001)).toBe(10)
-  })
-})
-
-describe('ramp', () => {
-  it('returns the first preset when no passes have cleared', () => {
-    expect(ramp(0)).toBe(60)
-  })
-
-  it('advances one preset per clean pass by default', () => {
-    expect(ramp(1)).toBe(70)
-    expect(ramp(2)).toBe(80)
-    expect(ramp(3)).toBe(90)
-    expect(ramp(4)).toBe(100)
-  })
-
-  it('clamps at the last preset after more passes', () => {
-    // A player on a tear stays at 100% — no secret "doubled tempo" tier.
-    expect(ramp(100)).toBe(100)
-  })
-
-  it('supports a custom "clean passes per step" threshold', () => {
-    // Needs 3 clean passes to step. 0..2 → preset[0], 3..5 → preset[1].
-    expect(ramp(0, [60, 80, 100], 3)).toBe(60)
-    expect(ramp(2, [60, 80, 100], 3)).toBe(60)
-    expect(ramp(3, [60, 80, 100], 3)).toBe(80)
-    expect(ramp(9, [60, 80, 100], 3)).toBe(100)
-  })
-
-  it('returns 100 for an empty presets array', () => {
-    expect(ramp(0, [])).toBe(100)
-    expect(ramp(5, [])).toBe(100)
-  })
-
-  it('treats negative passes the same as zero — returns the first preset', () => {
-    expect(ramp(-1)).toBe(60)
-    expect(ramp(-99)).toBe(60)
   })
 })

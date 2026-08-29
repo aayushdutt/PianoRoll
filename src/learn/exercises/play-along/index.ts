@@ -1,6 +1,6 @@
 // Play-along exercise — Exercise integration class.
 // Composes PracticeEngine (wait-mode), LoopRegion helpers (loop set/clear +
-// wrap + ramp), and a shared LearnOverlay (target zone + loop band) against
+// wrap), and a shared LearnOverlay (target zone + loop band) against
 // the Exercise interface consumed by the learn runner. Reads the MIDI from
 // LearnState (loaded before launch); the hub gates the start-card when none
 // is loaded.
@@ -43,7 +43,7 @@ export const playAlongDescriptor: ExerciseDescriptor = {
 }
 
 // Synthesia-class play-along. Composes PracticeEngine (wait mode), LoopRegion
-// helpers (loop set/clear + wrap + ramp), and a shared LearnOverlay (target
+// helpers (loop set/clear + wrap), and a shared LearnOverlay (target
 // zone + loop band) behind a single Exercise surface. Reads the MIDI from
 // the shared app store — it must be loaded before launch; the hub gates the
 // card when it isn't.

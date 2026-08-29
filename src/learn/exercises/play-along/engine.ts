@@ -6,10 +6,10 @@ import type { AppServices } from '../../../core/services'
 import { watch } from '../../../store/watch'
 import type { LearnState } from '../../core/LearnState'
 import { classifyArticulation } from '../../core/scoring'
-import { type LoopRegion, makeRegionFromBars, ramp, wrapIfAtEnd } from '../../engines/LoopRegion'
+import { type LoopRegion, makeRegionFromBars, wrapIfAtEnd } from '../../engines/LoopRegion'
 import { PracticeEngine } from '../../engines/PracticeEngine'
 
-// Composes wait-mode (PracticeEngine) with loop-region + tempo-ramp + a
+// Composes wait-mode (PracticeEngine) with loop-region + a
 // graded score model. UI reads off `engine.state.*`; nothing here touches
 // the DOM. Lifecycle: `attach(midi)` then `setEnabled(true)`; `detach()` to
 // release.
@@ -39,7 +39,6 @@ export interface PlayAlongState {
   loopMark: number | null
   speedPct: number
   hand: HandFilter
-  tempoRampEnabled: boolean
   cleanPasses: number
 
   // Score buckets. Wait-mode never punishes below `good` — articulation
@@ -88,7 +87,6 @@ export class PlayAlongEngine {
       loopMark: null,
       speedPct: 100,
       hand: 'both',
-      tempoRampEnabled: false,
       cleanPasses: 0,
       perfect: 0,
       good: 0,
@@ -284,11 +282,6 @@ export class PlayAlongEngine {
     this.resumeAfterPracticeFilterChange()
   }
 
-  setTempoRamp(enabled: boolean): void {
-    this.setState('tempoRampEnabled', enabled)
-    if (enabled) this.applyRampedSpeed()
-  }
-
   setLoopFromBars(
     bars: number | null,
     playhead: number,
@@ -356,14 +349,6 @@ export class PlayAlongEngine {
     this.opts.services.synth.setSpeed(base)
   }
 
-  private applyRampedSpeed(): void {
-    const next = ramp(this.state.cleanPasses, [...DEFAULT_SPEED_PRESETS])
-    if (next !== this.state.speedPct) {
-      this.setState('speedPct', next)
-      this.applySpeed()
-    }
-  }
-
   private applyHand(midi: import('../../../core/midi/types').MidiFile | null): void {
     if (!midi) return
     // Clear stale held-eligible entries — switching hands invalidates the
@@ -427,7 +412,6 @@ export class PlayAlongEngine {
       this.heldEligible.clear()
       this.setState('cleanPasses', this.state.cleanPasses + 1)
       this.opts.onCleanPass?.()
-      if (this.state.tempoRampEnabled) this.applyRampedSpeed()
     }
   }
 

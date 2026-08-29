@@ -373,9 +373,6 @@ const fr: Messages = {
   'learn.pa.waitTip': 'Mode attente · pause à chaque accord',
   'learn.pa.waitAria': 'Activer/désactiver le mode attente',
   'learn.pa.waitLabel': 'Attente',
-  'learn.pa.rampTip': 'Auto-vitesse · accélère après des passages propres',
-  'learn.pa.rampAria': 'Activer/désactiver la rampe de tempo',
-  'learn.pa.rampLabel': 'Rampe',
 
   'learn.streak.tip': 'Série de pratique · 14 derniers jours',
   'learn.streak.label': 'jours de série',

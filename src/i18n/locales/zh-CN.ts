@@ -346,9 +346,6 @@ const zhCN: Messages = {
   'learn.pa.waitTip': '等待模式 · 在每个和弦处暂停',
   'learn.pa.waitAria': '切换等待模式',
   'learn.pa.waitLabel': '等待',
-  'learn.pa.rampTip': '自动加速 · 连续顺利通过后逐步提速',
-  'learn.pa.rampAria': '切换速度渐进',
-  'learn.pa.rampLabel': '渐进',
 
   'learn.streak.tip': '练习连续天数 · 最近 14 天',
   'learn.streak.label': '连续天数',

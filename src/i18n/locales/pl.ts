@@ -361,9 +361,6 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'learn.pa.waitTip': 'Tryb czekania · pauza przy każdym akordzie',
   'learn.pa.waitAria': 'Przełącz tryb czekania',
   'learn.pa.waitLabel': 'Czekaj',
-  'learn.pa.rampTip': 'Autotempo · przyspiesza po czystych przejściach',
-  'learn.pa.rampAria': 'Przełącz narastanie tempa',
-  'learn.pa.rampLabel': 'Narastanie',
 
   'learn.streak.tip': 'Seria ćwiczeń · ostatnie 14 dni',
   'learn.streak.label': 'dni streaku',

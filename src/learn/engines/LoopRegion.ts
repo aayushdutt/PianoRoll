@@ -70,20 +70,3 @@ export function wrapIfAtEnd(time: number, region: LoopRegion, epsilon = 0.005): 
   if (time >= region.end - epsilon) return region.start
   return null
 }
-
-// Decide the next tempo percent given how many consecutive clean passes the
-// user has made. `presets` is an ascending list of tempo % values (e.g.
-// [60, 70, 80, 90, 100]); once past the last entry we stay at 100%. `onPass`
-// is the threshold of clean passes needed per step — default 1 so the tempo
-// ramps on every clean run; bump higher for stricter "mastery before
-// moving on" UX.
-export function ramp(
-  passesClean: number,
-  presets: readonly number[] = [60, 70, 80, 90, 100],
-  onPass = 1,
-): number {
-  if (presets.length === 0) return 100
-  if (passesClean <= 0) return presets[0] ?? 100
-  const idx = Math.min(presets.length - 1, Math.floor(passesClean / Math.max(1, onPass)))
-  return presets[idx] ?? 100
-}

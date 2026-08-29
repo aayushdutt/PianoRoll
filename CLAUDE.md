@@ -75,4 +75,3 @@ Add a rule only after an agent **repeats** the same mistake. Otherwise put detai
 
 ## Other rules
 
-- Never commit the code, when user asks for commit msg, just print it in code block

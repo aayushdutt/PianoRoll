@@ -206,23 +206,19 @@ describe('PlayAlongEngine', () => {
     expect(onCleanPass).toHaveBeenCalledOnce()
   })
 
-  it('ramp-toggles bump the tempo preset on each clean pass when enabled', () => {
+  it('holds the chosen tempo across clean passes', () => {
     const { services, clock, learnState } = makeServices()
     const engine = new PlayAlongEngine({ services, learnState })
     engine.attach(makeMidi())
-    engine.setTempoRamp(true)
-    // Base: 60 (first preset), since zero clean passes → ramp returns 60.
-    // Using custom presets is the engine's concern — verify the public
-    // behavior: clean pass flips us to the next preset.
     engine.setSpeedPreset(60)
     engine.setLoopFromBars(4, 10, 60, 120)
     clock.currentTime = 10
     clock.emit(10.001)
-    // After one clean pass + ramp on: moved up from 60 → 80.
-    expect(engine.state.speedPct).toBe(80)
     clock.currentTime = 10
     clock.emit(10.001)
-    expect(engine.state.speedPct).toBe(100)
+    // Looping never rewrites the user's speed now that the auto-ramp is gone.
+    expect(engine.state.speedPct).toBe(60)
+    expect(engine.state.cleanPasses).toBe(2)
   })
 
   it('pauses clock + synth on attach even if a prior session left them running', () => {

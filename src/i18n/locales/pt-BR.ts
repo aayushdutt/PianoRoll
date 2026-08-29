@@ -369,9 +369,6 @@ const ptBR: Messages = {
   'learn.pa.waitTip': 'Modo de espera · pausa em cada acorde',
   'learn.pa.waitAria': 'Alternar modo de espera',
   'learn.pa.waitLabel': 'Esperar',
-  'learn.pa.rampTip': 'Velocidade automática · acelera após passagens limpas',
-  'learn.pa.rampAria': 'Alternar rampa de tempo',
-  'learn.pa.rampLabel': 'Rampa',
 
   'learn.streak.tip': 'Sequência de prática · últimos 14 dias',
   'learn.streak.label': 'dias seguidos',

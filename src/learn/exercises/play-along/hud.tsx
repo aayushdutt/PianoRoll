@@ -33,8 +33,6 @@ const CLOSE_X_GLYPH =
   '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><title>Close</title><path d="M2 2l6 6M8 2l-6 6"/></svg>'
 const WAIT_GLYPH =
   '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><title>Wait</title><path d="M4 3h8M4 13h8M6 3c0 2 4 3 4 5s-4 3-4 5"/></svg>'
-const RAMP_GLYPH =
-  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><title>Ramp</title><path d="M2 13 L14 3"/><path d="M9 3 L14 3 L14 8"/></svg>'
 
 export interface PlayAlongHudOptions {
   engine: PlayAlongEngine
@@ -140,7 +138,6 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
   onCleanup(tickUnsub)
 
   const isWaitOn = () => engine.practice.isEnabled
-  const isRampOn = () => engine.state.tempoRampEnabled
 
   const loopBandStyle = createMemo<Record<string, string>>(() => {
     const dur = engine.state.duration
@@ -383,17 +380,6 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
           >
             <span innerHTML={WAIT_GLYPH} />
             <span>{t('learn.pa.waitLabel')}</span>
-          </button>
-          <button
-            class="pa-hud__pill"
-            type="button"
-            aria-pressed={isRampOn()}
-            data-tip={t('learn.pa.rampTip')}
-            aria-label={t('learn.pa.rampAria')}
-            onClick={() => engine.setTempoRamp(!isRampOn())}
-          >
-            <span innerHTML={RAMP_GLYPH} />
-            <span>{t('learn.pa.rampLabel')}</span>
           </button>
         </div>
       </div>

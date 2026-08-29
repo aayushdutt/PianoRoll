@@ -369,9 +369,6 @@ const es: Messages = {
   'learn.pa.waitTip': 'Modo de espera · pausa en cada acorde',
   'learn.pa.waitAria': 'Alternar modo de espera',
   'learn.pa.waitLabel': 'Esperar',
-  'learn.pa.rampTip': 'Velocidad automática · acelera tras pasadas limpias',
-  'learn.pa.rampAria': 'Alternar rampa de tempo',
-  'learn.pa.rampLabel': 'Rampa',
 
   'learn.streak.tip': 'Racha de práctica · últimos 14 días',
   'learn.streak.label': 'días de racha',

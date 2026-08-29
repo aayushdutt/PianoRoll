@@ -1784,7 +1784,7 @@ body {
   filter: brightness(1.06);
 }
 
-/* Icon + label pill (Wait / Ramp / Loop). Off = quiet outline, on = accent. */
+/* Icon + label pill (Wait / Loop). Off = quiet outline, on = accent. */
 .pa-hud__pill {
   display: inline-flex;
   align-items: center;

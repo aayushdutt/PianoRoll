@@ -398,9 +398,6 @@ export const en = {
   'learn.pa.waitTip': 'Wait mode · pauses at each chord',
   'learn.pa.waitAria': 'Toggle wait mode',
   'learn.pa.waitLabel': 'Wait',
-  'learn.pa.rampTip': 'Auto-speed · ramps up on clean passes',
-  'learn.pa.rampAria': 'Toggle tempo ramp',
-  'learn.pa.rampLabel': 'Ramp',
 
   // Streak row (Learn hub topbar).
   'learn.streak.tip': 'Practice streak · last 14 days',
