@@ -2147,6 +2147,20 @@ body {
   .pa-hud__stats-breakdown {
     display: none;
   }
+
+  /* The transport row has hard floors (two 38px time readouts that refuse to
+     shrink, plus an 80px scrubber). Once their total exceeds the 1fr track,
+     grid lets the content overflow the track rather than clip it, so the
+     transport spills into the meta column and lands under the streak chip.
+     Total duration is the one thing here that never changes during a session,
+     so it sheds first — the scrubber still shows position. */
+  .pa-hud__time--muted {
+    display: none;
+  }
+  /* ...and let the scrubber give back the rest instead of forcing the overflow. */
+  .pa-hud__scrubber-wrap {
+    min-width: 56px;
+  }
 }
 
 /* ─── Intervals (ear training) ─────────────────────────── */
