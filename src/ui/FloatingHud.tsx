@@ -20,6 +20,11 @@ import { icons } from './icons'
 
 export interface FloatingHudProps {
   storageKey: string
+  // Which edge the HUD hangs off before the user drags it. Saved positions are
+  // deltas FROM this anchor, so it must be a real anchor rather than a big
+  // default offset — otherwise the HUD would sit correctly on one viewport and
+  // drift on every other. Defaults to 'bottom' (just above the keyboard).
+  anchor?: 'top' | 'bottom'
   idleMs?: number
   // Extra CSS classes on the root element (layout overrides, mode modifiers, etc.)
   class?: string
@@ -156,6 +161,9 @@ export function FloatingHud(props: FloatingHudProps) {
   }
 
   // Cached CSS layout vars — updated once on mount and on resize.
+  // Keep in step with .float-hud--top in main.css.
+  const TOP_ANCHOR_Y = 84
+
   let cachedKbdH = 120
   let cachedHudGap = 14
 
@@ -175,7 +183,10 @@ export function FloatingHud(props: FloatingHudProps) {
     const kh = cachedKbdH
     const gap = cachedHudGap
     const defaultLeft = (window.innerWidth - rect.width) / 2
-    const defaultTop = window.innerHeight - kh - gap - rect.height
+    // Mirrors the CSS anchor below; TOP_ANCHOR_Y clears the top strip, which is
+    // also why the clamp floor below is 80.
+    const defaultTop =
+      props.anchor === 'top' ? TOP_ANCHOR_Y : window.innerHeight - kh - gap - rect.height
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
     const nextLeft = clamp(
       defaultLeft + offsetX(),
@@ -290,6 +301,7 @@ export function FloatingHud(props: FloatingHudProps) {
   }
 
   const rootClassList = () => ({
+    'float-hud--top': props.anchor === 'top',
     'float-hud--dragging': dragging(),
     'float-hud--pinned': pinned(),
     'float-hud--idle': idle() && !pinned() && !dragging(),

@@ -3016,6 +3016,16 @@ body {
   transition: opacity 0.35s var(--ease-out, cubic-bezier(0.15, 0.88, 0.35, 1));
 }
 
+/* Top-anchored variant. MUST follow .float-hud: same specificity, so only the
+   later rule can clear the `bottom` set above — with both applied, an absolutely
+   positioned element stretches between the two edges instead of moving.
+   84px clears the top strip; keep in step with TOP_ANCHOR_Y in FloatingHud.tsx,
+   which the drag clamp uses. */
+.float-hud--top {
+  top: 84px;
+  bottom: auto;
+}
+
 /* Idle: learn HUDs dim to 28%; main HUD (#hud) overrides to fully hide.
    Hover is handled in JS (idle is suppressed while pointing at the pill), so
    the fade tracks idle() alone — keeping the HUD and top-strip dim in sync. */

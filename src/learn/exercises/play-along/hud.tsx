@@ -210,6 +210,15 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
   return (
     <FloatingHud
       class="pa-hud"
+      // Notes fall toward the now-line just above the keyboard, so the bottom
+      // is where the reading happens; the top shows notes seconds away, which
+      // is the cheapest place to cover.
+      anchor="top"
+      // Key deliberately NOT bumped with the anchor change. Saved offsets are
+      // deltas from the old bottom anchor, but clampOffset() runs on mount and
+      // pulls any stale value into view, rewriting the delta — so nobody is
+      // stranded, and someone who deliberately positioned the HUD keeps a
+      // position rather than having it wiped.
       storageKey="midee.learn.pa"
       idleEnabled={() => engine.state.userWantsToPlay}
       collapsed={collapsed}
