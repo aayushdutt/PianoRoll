@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatSpeed, SPEED_PRESETS, stepSpeedPreset } from './ControlsView'
+import { formatSpeed, SPEED_PRESETS, snapTo, stepSpeedPreset } from './ControlsView'
 
 describe('stepSpeedPreset', () => {
   it('walks forward and backward through the presets', () => {
@@ -32,5 +32,28 @@ describe('stepSpeedPreset', () => {
       '1.5x',
       '2x',
     ])
+  })
+})
+
+describe('snapTo', () => {
+  it('pulls a value inside the tolerance onto the target', () => {
+    expect(snapTo(195, 200, 15)).toBe(200)
+    expect(snapTo(215, 200, 15)).toBe(200)
+  })
+
+  it('leaves a value outside the tolerance untouched', () => {
+    expect(snapTo(180, 200, 15)).toBe(180)
+    expect(snapTo(230, 200, 15)).toBe(230)
+  })
+
+  it('treats the tolerance as inclusive at both edges', () => {
+    expect(snapTo(185, 200, 15)).toBe(200)
+    expect(snapTo(215, 200, 15)).toBe(200)
+  })
+
+  it('works for fractional detents (the sight-reading note gap)', () => {
+    expect(snapTo(0.95, 1, 0.12)).toBe(1)
+    expect(snapTo(1.1, 1, 0.12)).toBe(1)
+    expect(snapTo(1.3, 1, 0.12)).toBe(1.3)
   })
 })

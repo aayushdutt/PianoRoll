@@ -3,7 +3,7 @@ import { createStore, type SetStoreFunction } from 'solid-js/store'
 import { render } from 'solid-js/web'
 import type { AppServices } from '../core/services'
 import { t } from '../i18n'
-import { isTextEntryTarget } from '../learn/core/keyboard'
+import { isSpaceActivatedControl, isTextEntryTarget } from '../learn/core/keyboard'
 import type { LiveLooperState } from '../midi/LiveLooper'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
 import type { AppMode } from '../store/state'
@@ -58,13 +58,13 @@ export interface ControlsOptions {
   onHome?: () => void
   onInstrumentCycle?: () => void
   onParticleCycle?: () => void
-  onLoopToggle?: () => void
-  onLoopClear?: () => void
+  onLoopToggle?: (method: 'shortcut' | 'button') => void
+  onLoopClear?: (method: 'shortcut' | 'button') => void
   onLoopSave?: () => void
-  onLoopUndo?: () => void
-  onMetronomeToggle?: () => void
+  onLoopUndo?: (method: 'shortcut' | 'button') => void
+  onMetronomeToggle?: (method: 'shortcut' | 'button') => void
   onMetronomeBpmChange?: (bpm: number) => void
-  onSessionToggle?: () => void
+  onSessionToggle?: (method: 'shortcut' | 'button') => void
   onChordToggle?: () => void
   onOctaveShift?: (delta: number) => void
 }
@@ -272,7 +272,7 @@ export class Controls {
               opts.onZoom?.(v)
               trackEventSettled('zoom_changed', { zoom: Math.round(v) })
             }}
-            onMetroToggle={() => opts.onMetronomeToggle?.()}
+            onMetroToggle={() => opts.onMetronomeToggle?.('button')}
             onBpmDec={() => this.bumpBpm(-1)}
             onBpmInc={() => this.bumpBpm(+1)}
             onBpmWheel={(e) => {
@@ -280,11 +280,11 @@ export class Controls {
               const step = e.shiftKey ? 10 : 1
               this.bumpBpm(dir * step)
             }}
-            onSession={() => opts.onSessionToggle?.()}
-            onLoop={() => opts.onLoopToggle?.()}
-            onLoopUndo={() => opts.onLoopUndo?.()}
+            onSession={() => opts.onSessionToggle?.('button')}
+            onLoop={() => opts.onLoopToggle?.('button')}
+            onLoopUndo={() => opts.onLoopUndo?.('button')}
             onLoopSave={() => opts.onLoopSave?.()}
-            onLoopClear={() => opts.onLoopClear?.()}
+            onLoopClear={() => opts.onLoopClear?.('button')}
             onScrubberDown={() => {
               this.isScrubbing = true
               this.wakeUp()
@@ -628,6 +628,12 @@ export class Controls {
     const target = e.target as HTMLElement
     if (isTextEntryTarget(target)) return
 
+    // Space belongs to a focused button/checkbox/radio, which use it natively.
+    // Mouse clicks no longer leave focus on HUD buttons (see onClickDoc), so a
+    // control focused here got there by keyboard and must keep its own Space —
+    // otherwise a Tab-focused track toggle can never be operated.
+    if (e.code === 'Space' && isSpaceActivatedControl(target)) return
+
     // Arrows belong to a focused slider; skipping the transport from there
     // would fight the control the user is actually holding.
     if (
@@ -685,12 +691,12 @@ export class Controls {
     if (mode === 'live') {
       if (e.code === 'Tab') {
         e.preventDefault()
-        this.opts.onSessionToggle?.()
+        this.opts.onSessionToggle?.('shortcut')
         return
       }
       if (e.code === 'Backquote') {
         e.preventDefault()
-        this.opts.onMetronomeToggle?.()
+        this.opts.onMetronomeToggle?.('shortcut')
         return
       }
 
@@ -700,23 +706,23 @@ export class Controls {
         switch (e.code) {
           case 'KeyR':
             e.preventDefault()
-            this.opts.onSessionToggle?.()
+            this.opts.onSessionToggle?.('shortcut')
             break
           case 'KeyL':
             e.preventDefault()
-            this.opts.onLoopToggle?.()
+            this.opts.onLoopToggle?.('shortcut')
             break
           case 'KeyU':
             e.preventDefault()
-            this.opts.onLoopUndo?.()
+            this.opts.onLoopUndo?.('shortcut')
             break
           case 'KeyC':
             e.preventDefault()
-            this.opts.onLoopClear?.()
+            this.opts.onLoopClear?.('shortcut')
             break
           case 'KeyM':
             e.preventDefault()
-            this.opts.onMetronomeToggle?.()
+            this.opts.onMetronomeToggle?.('shortcut')
             break
         }
       }

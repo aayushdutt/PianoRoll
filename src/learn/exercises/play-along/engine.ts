@@ -15,12 +15,38 @@ import { PracticeEngine } from '../../engines/PracticeEngine'
 // release.
 
 export type HandFilter = 'left' | 'right' | 'both'
-export const DEFAULT_SPEED_PRESETS = [60, 80, 100] as const
+export const DEFAULT_SPEED_PRESETS = [40, 60, 80, 100, 120] as const
+
+// Step through the presets, wrapping at both ends. `current` is resolved by
+// lookup rather than assumed to be a member, so a value set elsewhere cannot
+// strand the caller. Shared by the HUD chip and the [ / ] shortcuts so the two
+// cannot disagree about what happens at the ends.
+export function cycleSpeedPreset(current: number, delta: number): number {
+  const presets = DEFAULT_SPEED_PRESETS as readonly number[]
+  const idx = presets.indexOf(current)
+  const from = idx >= 0 ? idx : 0
+  const len = presets.length
+  return presets[(((from + delta) % len) + len) % len] ?? 100
+}
 
 // Held-bonus eligibility extends this far past a chord's latest scheduled
 // note-end. Past it, "still holding" stops earning ticks — the song moved
 // on and the user is just leaving fingers down.
 const HELD_GRACE_SEC = 0.05
+
+// Seed span when the loop is switched on, before the user trims it. Plain
+// seconds, not bars: the seed is a starting point the user immediately drags,
+// and nothing snaps the handles to bars afterwards — so bar precision here was
+// destroyed by the first drag while costing a tempo dependency.
+const DEFAULT_LOOP_SEC = 8
+// ...but never less than this share of the piece. The handles sit just outside
+// the region, so the gap between them IS the loop's width on screen; on a long
+// file a fixed 8 s collapses to a few pixels and the pair stops reading as two
+// separate handles with something between them.
+const MIN_LOOP_FRACTION = 0.08
+// Floor on a dragged region. Below this the wrap helper refuses to loop and the
+// two handles become impossible to separate again.
+const MIN_LOOP_SEC = 0.25
 
 export interface EngineOptions {
   services: AppServices
@@ -33,10 +59,6 @@ export interface EngineOptions {
 export interface PlayAlongState {
   // Active loop region (start, end). Null = loop off.
   loopRegion: LoopRegion | null
-  // Half-set state for the mark-style UX: A has been placed at this time but
-  // B has not. The HUD renders this as a single tick on the scrubber so the
-  // user can see their pending mark before completing the pair.
-  loopMark: number | null
   speedPct: number
   hand: HandFilter
   cleanPasses: number
@@ -79,12 +101,13 @@ export class PlayAlongEngine {
   private pressedPitches = new Set<number>()
   // pitch → song-time expiry. Populated on chord clear, pruned per tick.
   private heldEligible = new Map<number, number>()
+  // True only while a loop handle is being dragged — see beginLoopEdit.
+  private editingLoop = false
 
   constructor(private opts: EngineOptions) {
     this.services = opts.services
     const [state, setState] = createStore<PlayAlongState>({
       loopRegion: null,
-      loopMark: null,
       speedPct: 100,
       hand: 'both',
       cleanPasses: 0,
@@ -296,56 +319,74 @@ export class PlayAlongEngine {
     bpm: number,
   ): LoopRegion | null {
     const region = bars === null ? null : makeRegionFromBars(playhead, bars, bpm, pieceDuration)
-    batch(() => {
-      this.setState('loopRegion', region)
-      this.setState('loopMark', null)
-    })
+    this.setState('loopRegion', region)
     return region
   }
 
-  // Mark-style loop UX: three-state cycle driven by repeated calls.
-  //   1st call: place A at `time` (sets `loopMark`, no active region yet).
-  //   2nd call: place B at `time` and activate the region (clears `loopMark`,
-  //             sets `loopRegion` to the ordered [min,max] of A and B).
-  //   3rd call: clear both (loop off, returns to idle).
-  // Returns the resulting state for callers that want to react synchronously.
-  markLoopPoint(time: number): { region: LoopRegion | null; mark: number | null } {
-    const dur = this.state.duration
-    const t = Math.max(0, dur > 0 ? Math.min(dur, time) : time)
+  // Loop on/off. Turning it ON seeds a region at the playhead rather than
+  // asking the user to catch two moments as the music runs — the handles are
+  // then dragged to trim it. Seeding forward (not backward) matches "loop from
+  // here"; if there isn't room ahead, the span slides back to fit.
+  toggleLoop(playhead: number): LoopRegion | null {
     if (this.state.loopRegion) {
-      // Active → clear.
-      batch(() => {
-        this.setState('loopRegion', null)
-        this.setState('loopMark', null)
-      })
-      return { region: null, mark: null }
+      this.clearLoop()
+      return null
     }
-    if (this.state.loopMark === null) {
-      // Idle → place A.
-      this.setState('loopMark', t)
-      return { region: null, mark: t }
+    const dur = this.state.duration
+    if (dur <= 0) return null
+    const span = Math.min(Math.max(DEFAULT_LOOP_SEC, dur * MIN_LOOP_FRACTION), dur)
+    const start = Math.max(0, Math.min(Math.max(0, playhead), dur - span))
+    const region: LoopRegion = { start, end: Math.min(dur, start + span) }
+    this.setState('loopRegion', region)
+    this.snapPlayheadIntoLoop()
+    return region
+  }
+
+  // Bracket a handle drag. Between these two calls the playhead may sit on the
+  // loop boundary without that counting as completing a pass.
+  beginLoopEdit(): void {
+    this.editingLoop = true
+  }
+
+  endLoopEdit(): void {
+    this.editingLoop = false
+    this.snapPlayheadIntoLoop()
+  }
+
+  // Pull the playhead inside the loop if it fell outside. A playhead PAST the
+  // end self-corrects (wrapIfAtEnd fires on the next tick), but one BEFORE the
+  // start does not — playback just runs through the lead-in until it reaches
+  // the end, so the first pass plays material the user did not select.
+  snapPlayheadIntoLoop(): void {
+    const region = this.state.loopRegion
+    if (!region) return
+    const t = this.opts.services.clock.currentTime
+    if (t >= region.start && t < region.end) return
+    this.seek(region.start)
+  }
+
+  // Drag one edge. The opposite edge is fixed, and the moving edge is stopped
+  // MIN_LOOP_SEC short of it so a handle dragged past its partner parks instead
+  // of inverting the region (which `wrapIfAtEnd` would refuse to loop at all).
+  setLoopEdge(edge: 'start' | 'end', time: number): LoopRegion | null {
+    const region = this.state.loopRegion
+    if (!region) return null
+    const dur = this.state.duration || time
+    const t = Math.max(0, Math.min(dur, time))
+    const next: LoopRegion =
+      edge === 'start'
+        ? { start: Math.min(t, region.end - MIN_LOOP_SEC), end: region.end }
+        : { start: region.start, end: Math.max(t, region.start + MIN_LOOP_SEC) }
+    const clamped: LoopRegion = {
+      start: Math.max(0, next.start),
+      end: Math.min(dur, next.end),
     }
-    // Half-set → place B and activate. A degenerate same-spot click (within
-    // 50 ms — a double-click on the same playhead) clears instead of building
-    // a zero-length region the wrap helper would refuse anyway.
-    const a = this.state.loopMark
-    if (Math.abs(t - a) < 0.05) {
-      this.setState('loopMark', null)
-      return { region: null, mark: null }
-    }
-    const region: LoopRegion = { start: Math.min(a, t), end: Math.max(a, t) }
-    batch(() => {
-      this.setState('loopRegion', region)
-      this.setState('loopMark', null)
-    })
-    return { region, mark: null }
+    this.setState('loopRegion', clamped)
+    return clamped
   }
 
   clearLoop(): void {
-    batch(() => {
-      this.setState('loopRegion', null)
-      this.setState('loopMark', null)
-    })
+    this.setState('loopRegion', null)
   }
 
   // ── Internal ──────────────────────────────────────────────────────────
@@ -397,13 +438,25 @@ export class PlayAlongEngine {
     // once to reposition.) See docs/done/SOLID_MIGRATION_PLAN.md §2 rule 4.
     this.tickHeldBonus(time)
     const dur = this.state.duration
-    if (dur > 0 && time >= dur && this.state.isPlaying) {
+    const region = this.state.loopRegion
+    // While an edge is being dragged the playhead is parked ON that edge so the
+    // user can see what they are trimming to. Wrapping there would bounce the
+    // view back to the loop start the instant they reached the end handle,
+    // count a phantom clean pass, and fire the celebration swell.
+    const looping = region !== null && !this.editingLoop
+
+    // End-of-piece stop, checked AFTER the loop is ruled out. wrapIfAtEnd's 5 ms
+    // epsilon is far smaller than a ~16.7 ms tick, so a loop ending exactly at
+    // `dur` would usually skip past the wrap window and hit this branch instead
+    // — pausing at the end rather than looping. That is the common case, not an
+    // edge one: toggleLoop slides its seeded span back to end at `dur` when the
+    // playhead is near the end, and setLoopEdge clamps `end` to `dur`.
+    if (!looping && dur > 0 && time >= dur && this.state.isPlaying) {
       this.pause()
       this.opts.services.clock.seek(dur)
       return
     }
-    const region = this.state.loopRegion
-    if (!region) return
+    if (!region || this.editingLoop) return
     const wrapTo = wrapIfAtEnd(time, region)
     if (wrapTo !== null) {
       this.opts.services.clock.seek(wrapTo)

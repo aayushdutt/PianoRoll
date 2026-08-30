@@ -58,7 +58,7 @@ const CATEGORY_ICON: Record<ExerciseCategory, string> = {
   'play-along':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M12 6v10M17 8v6"/></svg>',
   'sight-reading':
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 11h16M4 16h10"/><circle cx="18" cy="16" r="2"/></svg>',
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.4 21.2c-1.9 0-3.4-1.3-3.4-3 0-1.5 1.1-2.6 2.6-2.6 1.3 0 2.3.9 2.3 2.1 0 1-.7 1.8-1.7 1.8"/><path d="M11.6 18.6 10 8.9C9.6 6.4 10.4 3 12.4 2.8c1.4-.1 2.2 1.3 2.2 2.9 0 2.6-1.9 4.6-4 6.2-1.9 1.5-3.6 2.8-3.6 4.9 0 2 1.6 3.6 3.9 3.6"/></svg>',
   'ear-training':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 18a5 5 0 0 1 0-10 3 3 0 1 1 6 0v10"/><path d="M14 14h4"/></svg>',
   theory:

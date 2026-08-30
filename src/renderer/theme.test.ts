@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MidiTrack } from '../core/midi/types'
-import { getTrackColor, THEMES } from './theme'
+import { getTrackColor, THEMES, type Theme, uiAccentHex } from './theme'
 
 const track = (colorIndex: number): MidiTrack => ({
   id: 't',
@@ -28,5 +28,27 @@ describe('getTrackColor', () => {
     const len = theme.trackColors.length
     expect(getTrackColor(track(len), theme)).toBe(theme.trackColors[0])
     expect(getTrackColor(track(len + 3), theme)).toBe(theme.trackColors[3])
+  })
+})
+
+describe('uiAccentHex', () => {
+  it('converts a #rrggbb accent to the number Pixi wants', () => {
+    expect(uiAccentHex({ uiAccentCSS: '#f97316' } as Theme)).toBe(0xf97316)
+    expect(uiAccentHex({ uiAccentCSS: '#6366f1' } as Theme)).toBe(0x6366f1)
+  })
+
+  it('converts every built-in theme', () => {
+    for (const theme of THEMES) {
+      const hex = uiAccentHex(theme)
+      expect(Number.isFinite(hex)).toBe(true)
+      expect(hex).toBeGreaterThanOrEqual(0)
+      expect(hex).toBeLessThanOrEqual(0xffffff)
+    }
+  })
+
+  it('falls back rather than returning NaN for an unparseable accent', () => {
+    // A NaN colour makes Pixi draw black, which would look like the loop band
+    // vanishing rather than an obviously wrong colour.
+    expect(uiAccentHex({ uiAccentCSS: 'rebeccapurple' } as Theme)).toBe(0xf97316)
   })
 })

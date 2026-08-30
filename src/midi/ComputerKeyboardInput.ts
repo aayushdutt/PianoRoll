@@ -53,9 +53,20 @@ export class ComputerKeyboardInput {
   readonly noteOn = createEventSignal<MidiNoteEvent | null>(null)
   readonly noteOff = createEventSignal<MidiNoteEvent | null>(null)
   readonly octave = createEventSignal<number>(DEFAULT_OCTAVE)
-  // Software stand-in for a sustain pedal: Space-bar hold mirrors a damper.
-  // Useful for users without hardware pedals; merged with the MIDI-device
-  // pedal upstream in App so either source can engage sustain.
+  // Software sustain pedal — currently UNBOUND, see below. Kept as a signal so
+  // the App wiring (and the MIDI-device pedal merged with it in
+  // LivePerformanceBus) is untouched: players with hardware pedals are
+  // unaffected by this.
+  //
+  // Space used to be the damper, but Space is now the transport key in every
+  // mode. The obvious replacement, Shift, cannot work: every command letter in
+  // live mode (R L U C M P) is ALSO a note key, which is exactly why commands
+  // live behind Shift — so Shift is structurally the command modifier and
+  // cannot simultaneously be a pedal you hold while playing. Cmd/Ctrl/Alt are
+  // owned by the browser un-preventably (Cmd+W, Ctrl+R). Parked until usage
+  // data says whether the Shift command layer is worth keeping; if it is not,
+  // Shift becomes the pedal, and if it is, the pedal moves to right-Shift with
+  // the command layer on left-Shift.
   readonly pedal = createEventSignal<boolean>(false)
 
   private active = false
@@ -104,17 +115,6 @@ export class ComputerKeyboardInput {
   private onKeyDown = (e: KeyboardEvent): void => {
     if (this.shouldIgnore(e)) return
 
-    // Spacebar = software sustain pedal (hold to engage, release to lift).
-    // Placed before arrow-key handling so auto-repeat doesn't re-emit.
-    if (e.code === 'Space') {
-      e.preventDefault()
-      if (!this.pedalHeld) {
-        this.pedalHeld = true
-        this.pedal.set(true)
-      }
-      return
-    }
-
     if (e.code === 'ArrowDown') {
       e.preventDefault()
       this.shiftOctaveDown()
@@ -141,11 +141,6 @@ export class ComputerKeyboardInput {
   }
 
   private onKeyUp = (e: KeyboardEvent): void => {
-    if (e.code === 'Space' && this.pedalHeld) {
-      this.pedalHeld = false
-      this.pedal.set(false)
-      return
-    }
     const pitch = this.held.get(e.code)
     if (pitch === undefined) return
     this.held.delete(e.code)

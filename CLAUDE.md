@@ -73,5 +73,3 @@ Longer plans live in **`docs/`** — open the specific doc when needed; don’t 
 
 Add a rule only after an agent **repeats** the same mistake. Otherwise put detail in `docs/` or comments next to the tricky code.
 
-## Other rules
-

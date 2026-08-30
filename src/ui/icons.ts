@@ -40,15 +40,15 @@ export const icons = {
       `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>`,
     ),
 
-  // Vertical scale, not magnification: this control changes note HEIGHT, so a
-  // magnifier read as "zoom the canvas" and needed the tooltip to explain it.
-  // Two rails with a double-arrow between them says "taller / shorter".
   volumeMuted: (size: Size = 13): string =>
     svgStroke(
       size,
       `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/>`,
     ),
 
+  // Vertical scale, not magnification: this control changes note HEIGHT, so a
+  // magnifier read as "zoom the canvas" and needed the tooltip to explain it.
+  // A double-headed vertical arrow says "taller / shorter".
   zoom: (size: Size = 13): string =>
     svgStroke(
       size,

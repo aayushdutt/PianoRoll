@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isKeyboardShortcutIgnored, isTextEntryTarget } from './keyboard'
+import { isKeyboardShortcutIgnored, isSpaceActivatedControl, isTextEntryTarget } from './keyboard'
 
 function input(type: string): HTMLInputElement {
   const el = document.createElement('input')
@@ -60,5 +60,33 @@ describe('isKeyboardShortcutIgnored', () => {
 
   it('still defers to a focused text field', () => {
     expect(isKeyboardShortcutIgnored(keyEvent(input('text')))).toBe(true)
+  })
+})
+
+describe('isSpaceActivatedControl', () => {
+  it('is true for controls that use Space themselves', () => {
+    expect(isSpaceActivatedControl(document.createElement('button'))).toBe(true)
+    expect(isSpaceActivatedControl(input('checkbox'))).toBe(true)
+    expect(isSpaceActivatedControl(input('radio'))).toBe(true)
+    const div = document.createElement('div')
+    div.setAttribute('role', 'button')
+    expect(isSpaceActivatedControl(div)).toBe(true)
+  })
+
+  it('is true for a checkbox — the track-toggle regression', () => {
+    // Narrowing INPUT_TAGS to free the range slider also freed checkboxes, so a
+    // Tab-focused track-visibility toggle had its Space stolen by the global
+    // play/pause and could not be operated by keyboard at all.
+    expect(isSpaceActivatedControl(input('checkbox'))).toBe(true)
+  })
+
+  it('is false for a range slider, which only uses arrows', () => {
+    expect(isSpaceActivatedControl(input('range'))).toBe(false)
+  })
+
+  it('is false for plain elements, text inputs and null', () => {
+    expect(isSpaceActivatedControl(document.createElement('div'))).toBe(false)
+    expect(isSpaceActivatedControl(input('text'))).toBe(false)
+    expect(isSpaceActivatedControl(null)).toBe(false)
   })
 })

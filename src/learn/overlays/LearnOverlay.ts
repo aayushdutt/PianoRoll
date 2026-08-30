@@ -154,8 +154,12 @@ export class LearnOverlay implements RenderLayer {
     const time = ctx.time
     const startY = ctx.viewport.timeOffsetToY(startTime - time)
     const endY = ctx.viewport.timeOffsetToY(endTime - time)
-    const top = Math.min(startY, endY)
-    const bottom = Math.max(startY, endY)
+    // Clamp into the roll. The band spans the full canvas width, and an
+    // unclamped range runs straight over the keyboard at the bottom (and off
+    // the top), which reads as the loop bleeding into the piano.
+    const maxY = ctx.viewport.nowLineY
+    const top = Math.max(0, Math.min(startY, endY))
+    const bottom = Math.min(maxY, Math.max(startY, endY))
     const height = bottom - top
     if (height <= 0) return
     const w = ctx.viewport.config.canvasWidth

@@ -27,6 +27,14 @@ export interface Theme {
   trackColors: number[]
 }
 
+// Pixi colours are numbers; `uiAccentCSS` is the string form the CSS custom
+// properties consume. Falls back to the Sunset accent if a theme ever carries
+// something that is not a plain #rrggbb.
+export function uiAccentHex(theme: Theme): number {
+  const parsed = Number.parseInt(theme.uiAccentCSS.replace('#', ''), 16)
+  return Number.isFinite(parsed) ? parsed : 0xf97316
+}
+
 export function getTrackColor(track: MidiTrack, theme: Theme): number {
   return theme.trackColors[track.colorIndex % theme.trackColors.length]!
 }

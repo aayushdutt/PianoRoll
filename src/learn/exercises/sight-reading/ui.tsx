@@ -4,6 +4,7 @@
 
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { t } from '../../../i18n'
+import { snapTo } from '../../../ui/ControlsView'
 import { FloatingHud } from '../../../ui/FloatingHud'
 import { icons } from '../../../ui/icons'
 import { computeXp } from '../../core/scoring'
@@ -223,17 +224,27 @@ function SrControlBar(props: SightReadHudOptions) {
         <span class="sr-hud__gap-icon" aria-hidden="true" innerHTML={icons.sparkles(12)} />
         <input
           type="range"
-          class="mini-slider sr-hud__gap-slider"
+          class="mini-slider mini-slider--detent sr-hud__gap-slider"
           min="0.3"
           max="2.5"
           step="0.1"
           value={engine.state.noteGap}
           style={{
             '--pct': `${((engine.state.noteGap - 0.3) / (2.5 - 0.3)) * 100}%`,
+            '--detent': `${((1 - 0.3) / (2.5 - 0.3)) * 100}%`,
           }}
           aria-label={t('learn.sr.gapAria')}
           data-tip={t('learn.sr.gapTip')}
-          onInput={(e) => engine.setNoteGap(parseFloat(e.currentTarget.value))}
+          onInput={(e) => {
+            const el = e.currentTarget
+            const snapped = snapTo(parseFloat(el.value), 1, 0.12)
+            // Pin the element too: writing an unchanged value back to the store
+            // is a no-op, so the DOM would keep whatever the browser just set
+            // and the thumb would slide free across the detent band.
+            if (parseFloat(el.value) !== snapped) el.value = String(snapped)
+            engine.setNoteGap(snapped)
+          }}
+          onDblClick={() => engine.setNoteGap(1)}
         />
         <span class="sr-hud__gap-val" data-tip={t('learn.sr.gapTip')}>
           {gapLabel()}

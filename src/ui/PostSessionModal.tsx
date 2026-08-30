@@ -9,7 +9,7 @@ import { trackEvent } from '../telemetry'
 import { icons } from './icons'
 import { FEEDBACK_URL } from './utils'
 
-export type SessionAction = 'open-in-file' | 'download' | 'discard'
+export type SessionAction = 'play' | 'download' | 'discard'
 
 interface ViewProps {
   container: HTMLElement
@@ -45,12 +45,12 @@ function PostSessionView(props: ViewProps) {
             <button
               type="button"
               class="post-session-option post-session-option--primary"
-              onClick={() => props.onAction('open-in-file')}
+              onClick={() => props.onAction('play')}
             >
               <span class="post-session-option-icon" innerHTML={icons.timeline()} />
               <span class="post-session-option-body">
-                <span class="post-session-option-title">{t('postSession.openInFile.title')}</span>
-                <span class="post-session-option-sub">{t('postSession.openInFile.sub')}</span>
+                <span class="post-session-option-title">{t('postSession.play.title')}</span>
+                <span class="post-session-option-sub">{t('postSession.play.sub')}</span>
               </span>
             </button>
 

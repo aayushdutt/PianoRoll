@@ -356,19 +356,25 @@ export class App {
       onHome: () => this.enterHomeMode(),
       onInstrumentCycle: () => this.cycleInstrument(),
       onParticleCycle: () => this.cycleParticleStyle(),
-      onLoopToggle: () => this.liveLooper.toggle(),
-      onLoopClear: () => {
+      onLoopToggle: (method) => {
+        trackEvent('live_action', { action: 'loop_toggle', method })
+        this.liveLooper.toggle()
+      },
+      onLoopClear: (method) => {
+        trackEvent('live_action', { action: 'loop_clear', method })
         const layers = this.liveLooper.layerCount.value
         this.liveLooper.clear()
         if (layers > 0) track('loop_cleared', { layers })
       },
       onLoopSave: () => void this.saveLoopAsMidi(),
-      onLoopUndo: () => {
+      onLoopUndo: (method) => {
+        trackEvent('live_action', { action: 'loop_undo', method })
         const before = this.liveLooper.layerCount.value
         this.liveLooper.undo()
         if (before > 0) track('loop_undone', { layers_before: before })
       },
-      onMetronomeToggle: () => {
+      onMetronomeToggle: (method) => {
+        trackEvent('live_action', { action: 'metronome', method })
         this.metronome.toggle()
         trackEvent('metronome_toggled', { on: this.metronome.running.value })
       },
@@ -377,7 +383,10 @@ export class App {
         metronomeBpmStore.save(this.metronome.bpm.value)
         trackEventSettled('tempo_changed', { bpm: this.metronome.bpm.value })
       },
-      onSessionToggle: () => this.toggleSessionRecord(),
+      onSessionToggle: (method) => {
+        trackEvent('live_action', { action: 'record', method })
+        this.toggleSessionRecord()
+      },
       onChordToggle: () => this.toggleChordOverlay(),
       onOctaveShift: (delta) => {
         if (delta < 0) this.keyboardInput.shiftOctaveDown()
@@ -1369,7 +1378,6 @@ export class App {
       return
     }
     this.loadSessionAsFile(midi)
-    this.resetPlaybackTelemetry()
     trackMidiLoaded({
       source: 'sample',
       sampleId,
@@ -1377,7 +1385,6 @@ export class App {
       noteCount: countNotes(midi),
       durationS: Math.round(midi.duration),
     })
-    this.autoplayAfterLoad()
   }
 
   // Play-mode loader for a previously-opened file. The bytes are re-parsed
@@ -1401,14 +1408,12 @@ export class App {
       return
     }
     this.loadSessionAsFile(midi)
-    this.resetPlaybackTelemetry()
     trackMidiLoaded({
       source: 'recent',
       trackCount: midi.tracks.length,
       noteCount: countNotes(midi),
       durationS: Math.round(midi.duration),
     })
-    this.autoplayAfterLoad()
   }
 
   // Opening a piece — card, drop, or file picker — is a "watch it" gesture, so
@@ -1548,7 +1553,7 @@ export class App {
       return
     }
 
-    if (action === 'open-in-file') {
+    if (action === 'play') {
       const midi = sessionToMidiFile(
         pending.events,
         pending.duration,

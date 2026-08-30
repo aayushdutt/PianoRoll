@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MidiFile } from '../../../core/midi/types'
 import type { AppServices } from '../../../core/services'
 import { createLearnState, type LearnState } from '../../core/LearnState'
-import { PlayAlongEngine } from './engine'
+import { cycleSpeedPreset, PlayAlongEngine } from './engine'
 
 // Fake clock that speaks to the same surface the engine uses. Tests tick
 // directly by calling `emit` with a time — no RAF, no AudioContext.
@@ -447,62 +447,69 @@ describe('PlayAlongEngine', () => {
     expect(engine.state.heldTicks).toBe(6)
   })
 
-  it('markLoopPoint cycles idle → mark A → set region → clear', () => {
-    // Mirrors the HUD's three-click flow: first click parks A, second click
-    // sets B and the region becomes active, third click clears everything.
+  it('toggleLoop seeds a region at the playhead, and toggles back off', () => {
+    // The whole point of the new flow: one click gives you a real region to
+    // trim, instead of asking you to catch two moments as the music runs.
     const { services, learnState } = makeServices()
     const engine = new PlayAlongEngine({ services, learnState })
-    engine.attach(makeMidi())
-    expect(engine.state.loopMark).toBeNull()
-    expect(engine.state.loopRegion).toBeNull()
+    engine.attach(makeMidi()) // 60 s @ 120 BPM → 4 bars = 8 s
 
-    // 1st click @ t=2 → A parked.
-    engine.markLoopPoint(2)
-    expect(engine.state.loopMark).toBeCloseTo(2)
-    expect(engine.state.loopRegion).toBeNull()
+    engine.toggleLoop(10)
+    expect(engine.state.loopRegion).toEqual({ start: 10, end: 18 })
 
-    // 2nd click @ t=10 → region [2,10], mark cleared.
-    engine.markLoopPoint(10)
-    expect(engine.state.loopRegion).toEqual({ start: 2, end: 10 })
-    expect(engine.state.loopMark).toBeNull()
-
-    // 3rd click → clear back to idle.
-    engine.markLoopPoint(15)
+    engine.toggleLoop(10)
     expect(engine.state.loopRegion).toBeNull()
-    expect(engine.state.loopMark).toBeNull()
   })
 
-  it('markLoopPoint orders A and B regardless of click sequence', () => {
-    // User clicks B *before* A (i.e. their second click is at an earlier
-    // playhead than the first). The region should still be valid [min,max].
+  it('slides the seeded region back when the playhead is near the end', () => {
     const { services, learnState } = makeServices()
     const engine = new PlayAlongEngine({ services, learnState })
     engine.attach(makeMidi())
-    engine.markLoopPoint(10)
-    engine.markLoopPoint(2)
-    expect(engine.state.loopRegion).toEqual({ start: 2, end: 10 })
+    // 2 s from the end of a 60 s piece — a forward-only span would be clipped
+    // to 2 s, so it shifts back to keep the full 4 bars.
+    engine.toggleLoop(58)
+    expect(engine.state.loopRegion).toEqual({ start: 52, end: 60 })
   })
 
-  it('markLoopPoint twice on the same spot is a clear (no zero-length region)', () => {
-    // A double-click at the same playhead would make a zero-length loop the
-    // wrap helper would refuse — guard at the engine instead so the UX
-    // doesn't get stuck in an unkillable mark state.
+  it('drags either edge, clamped to the piece and to a minimum span', () => {
     const { services, learnState } = makeServices()
     const engine = new PlayAlongEngine({ services, learnState })
     engine.attach(makeMidi())
-    engine.markLoopPoint(5)
-    engine.markLoopPoint(5.01) // within 50 ms tolerance → treated as same spot
+    engine.toggleLoop(10) // [10, 18]
+
+    engine.setLoopEdge('start', 4)
+    expect(engine.state.loopRegion).toEqual({ start: 4, end: 18 })
+
+    engine.setLoopEdge('end', 30)
+    expect(engine.state.loopRegion).toEqual({ start: 4, end: 30 })
+
+    // Past the opposite edge: parks at the minimum span rather than inverting
+    // into a region wrapIfAtEnd would refuse to loop.
+    engine.setLoopEdge('start', 45)
+    expect(engine.state.loopRegion!.start).toBeCloseTo(29.75)
+    expect(engine.state.loopRegion!.end).toBe(30)
+
+    // Beyond the piece bounds.
+    engine.setLoopEdge('end', 999)
+    expect(engine.state.loopRegion!.end).toBe(60)
+    engine.setLoopEdge('start', -5)
+    expect(engine.state.loopRegion!.start).toBe(0)
+  })
+
+  it('setLoopEdge is a no-op when no loop is active', () => {
+    const { services, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi())
+    expect(engine.setLoopEdge('start', 5)).toBeNull()
     expect(engine.state.loopRegion).toBeNull()
-    expect(engine.state.loopMark).toBeNull()
   })
 
-  it('clearLoop wipes both the region and the half-set mark', () => {
+  it('clearLoop wipes the region', () => {
     const { services, learnState } = makeServices()
     const engine = new PlayAlongEngine({ services, learnState })
     engine.attach(makeMidi())
-    engine.markLoopPoint(3) // half-set
+    engine.toggleLoop(3)
     engine.clearLoop()
-    expect(engine.state.loopMark).toBeNull()
     expect(engine.state.loopRegion).toBeNull()
   })
 
@@ -614,8 +621,8 @@ describe('PlayAlongEngine held-tick eligibility clearing', () => {
     engine.setWaitEnabled(true)
 
     // Short loop [2, 2.3] — wraps well before the eligibility window expires.
-    engine.markLoopPoint(2)
-    engine.markLoopPoint(2.3)
+    engine.toggleLoop(2)
+    engine.setLoopEdge('end', 2.3)
 
     clock.emit(2.01)
     engine.onNoteOn({ pitch: 60, velocity: 1, clockTime: 2.01, source: 'midi' })
@@ -701,5 +708,161 @@ describe('PlayAlongEngine error scoring rules', () => {
 
     engine.onNoteOn({ pitch: 99, velocity: 1, clockTime: 0, source: 'midi' })
     expect(engine.state.errors).toBe(0)
+  })
+})
+
+describe('PlayAlongEngine loop playhead snapping', () => {
+  it('pulls a playhead sitting before the loop up to the start', () => {
+    // Without this the first pass plays the lead-in: wrapIfAtEnd only fires at
+    // the END of the region, so a playhead before `start` is never corrected.
+    const { services, clock, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi())
+    clock.currentTime = 2
+    engine.toggleLoop(20)
+    expect(clock.currentTime).toBeCloseTo(20)
+  })
+
+  it('leaves a playhead already inside the loop alone', () => {
+    const { services, clock, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi())
+    engine.toggleLoop(20)
+    clock.currentTime = 24
+    engine.snapPlayheadIntoLoop()
+    expect(clock.currentTime).toBeCloseTo(24)
+  })
+
+  it('is a no-op with no loop active', () => {
+    const { services, clock, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi())
+    clock.currentTime = 5
+    engine.snapPlayheadIntoLoop()
+    expect(clock.currentTime).toBeCloseTo(5)
+  })
+})
+
+describe('PlayAlongEngine loop editing', () => {
+  it('does not wrap, score a pass, or celebrate while an edge is being dragged', () => {
+    // Parking the playhead on the end handle is how the user SEES what they are
+    // trimming to. Without suspending the wrap it bounced straight back to the
+    // loop start, counted a phantom clean pass and fired the celebration swell.
+    const { services, clock, learnState } = makeServices()
+    const onCleanPass = vi.fn()
+    const engine = new PlayAlongEngine({ services, learnState, onCleanPass })
+    engine.attach(makeMidi())
+    engine.toggleLoop(10) // [10, 18]
+
+    engine.beginLoopEdit()
+    clock.currentTime = 18
+    clock.emit(18)
+
+    expect(clock.currentTime).toBeCloseTo(18)
+    expect(engine.state.cleanPasses).toBe(0)
+    expect(onCleanPass).not.toHaveBeenCalled()
+  })
+
+  it('re-arms wrapping and pulls the playhead back in on release', () => {
+    const { services, clock, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi())
+    engine.toggleLoop(10)
+
+    engine.beginLoopEdit()
+    clock.currentTime = 18
+    engine.endLoopEdit()
+    expect(clock.currentTime).toBeCloseTo(10)
+
+    // Wrapping works again once the drag is over.
+    clock.currentTime = 18
+    clock.emit(18)
+    expect(engine.state.cleanPasses).toBe(1)
+  })
+})
+
+describe('PlayAlongEngine loop ending at the end of the piece', () => {
+  it('wraps instead of stopping when region.end === duration', () => {
+    // wrapIfAtEnd's 5 ms epsilon is far smaller than a ~16.7 ms tick, so a tick
+    // lands past `dur` before it ever lands inside the wrap window. With the
+    // end-of-piece stop checked first, the engine paused at the end instead of
+    // looping — and this is the COMMON case: toggleLoop slides its seeded span
+    // back to finish exactly at `dur` near the end of a piece.
+    const { services, clock, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi()) // 60 s
+    engine.toggleLoop(58) // slides back to [52, 60] — end === duration
+    expect(engine.state.loopRegion).toEqual({ start: 52, end: 60 })
+
+    engine.play()
+    clock.emit(60.01) // a tick that overshoots both `dur` and the wrap window
+
+    expect(clock.currentTime).toBeCloseTo(52)
+    expect(engine.state.cleanPasses).toBe(1)
+    expect(engine.state.userWantsToPlay).toBe(true)
+  })
+
+  it('still stops at the end of the piece when no loop is active', () => {
+    const { services, clock, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi())
+    engine.play()
+    clock.emit(60.01)
+    expect(engine.state.userWantsToPlay).toBe(false)
+    expect(clock.currentTime).toBeCloseTo(60)
+  })
+})
+
+describe('cycleSpeedPreset', () => {
+  it('steps forward and backward through the presets', () => {
+    expect(cycleSpeedPreset(80, 1)).toBe(100)
+    expect(cycleSpeedPreset(80, -1)).toBe(60)
+  })
+
+  it('wraps at both ends, so the chip and [ / ] cannot disagree', () => {
+    // The shortcuts used to clamp while the chip wrapped: at 120 pressing ]
+    // did nothing, but clicking the chip went back to 40.
+    expect(cycleSpeedPreset(120, 1)).toBe(40)
+    expect(cycleSpeedPreset(40, -1)).toBe(120)
+  })
+
+  it('falls back to the first preset for a value that is not a member', () => {
+    // A speed set from elsewhere must not strand the control.
+    expect(cycleSpeedPreset(73, 1)).toBe(60)
+  })
+})
+
+describe('PlayAlongEngine loop seed width', () => {
+  it('never seeds a region too thin to read as two handles', () => {
+    // The handles sit just outside the region, so the gap between them IS the
+    // loop's width on screen. A fixed 8 s on a 10-minute file is under 2% of the
+    // bar — the pair would collapse into one blob.
+    const { services, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    const long = makeMidi()
+    long.duration = 600
+    engine.attach(long)
+
+    engine.toggleLoop(0)
+    const region = engine.state.loopRegion!
+    expect(region.end - region.start).toBeCloseTo(48) // 8% of 600
+  })
+
+  it('uses the flat default when it already clears the minimum', () => {
+    const { services, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    engine.attach(makeMidi()) // 60 s → 8% is 4.8 s, so the 8 s default wins
+    engine.toggleLoop(10)
+    expect(engine.state.loopRegion).toEqual({ start: 10, end: 18 })
+  })
+
+  it('never seeds longer than the piece', () => {
+    const { services, learnState } = makeServices()
+    const engine = new PlayAlongEngine({ services, learnState })
+    const short = makeMidi()
+    short.duration = 5
+    engine.attach(short)
+    engine.toggleLoop(2)
+    expect(engine.state.loopRegion).toEqual({ start: 0, end: 5 })
   })
 })

@@ -1637,62 +1637,85 @@ body {
 .pa-hud__scrubber-wrap {
   position: relative;
   flex: 1 1 120px;
-  display: flex;
-  align-items: center;
+  /* 18px slider + a 12px rail beneath it for the loop handles. The slider is
+     absolutely placed rather than flex-centred so the track sits at a known
+     y (9px) and the handles can live strictly BELOW the input's hit area —
+     the input paints above the overlay, so anything overlapping it would have
+     its pointerdown swallowed and turn into a seek. The transport row is 32px
+     tall (the play button), so this costs no layout. */
+  height: 30px;
   min-width: 80px;
 }
 
-/* Loop band overlay. The slider's track is 4px tall, centered in an 18px
-   input; we draw an absolutely-positioned strip exactly on top. Two visual
-   states feed off the same ::before:
-     --loop : fill between A and B, plus a sharp 2px tick at B (A's tick is
-              drawn by ::after, shared with the half-set state).
-     --mark : no fill, just the A tick (waiting for B).
-   The slider's thumb sits in its own stacking context (z-index: 1 below) so
-   it stays interactive above the overlay. */
-.pa-hud__scrubber-wrap::before {
+/* Loop handles. A knob on a rail BELOW the slider, joined to the track by a
+   thin stem. The knob is the only interactive part and it sits entirely clear
+   of the input's 18px hit area — overlapping it would hand every press to the
+   slider (which paints above the overlay) and seek instead of dragging. */
+.pa-hud__loop-handle {
+  position: absolute;
+  top: 19px;
+  width: 14px;
+  height: 10px;
+  padding: 0;
+  background: var(--accent);
+  border: none;
+  cursor: ew-resize;
+  touch-action: none;
+}
+/* Stem up to the track, so the knob reads as attached to the loop edge rather
+   than floating. Decorative only. */
+/* Stem marks the exact edge time, and sits on whichever side of the knob the
+   region is — so the pair reads as a bracket around the loop. */
+.pa-hud__loop-handle::before {
   content: "";
   position: absolute;
-  inset: 0;
+  bottom: 100%;
+  width: 2px;
+  height: 12px;
+  background: var(--accent);
   pointer-events: none;
-  background: transparent;
-  border-radius: 999px;
 }
-.pa-hud__scrubber-wrap--loop::before {
-  background: /* B-edge tick — 1px hair, low-contrast. */
-    linear-gradient(
-      to right,
-      transparent calc(var(--loop-b-pct, 0%) - 0.5px),
-      color-mix(in srgb, #f3c36c 55%, transparent) calc(var(--loop-b-pct, 0%) - 0.5px),
-      color-mix(in srgb, #f3c36c 55%, transparent) calc(var(--loop-b-pct, 0%) + 0.5px),
-      transparent calc(var(--loop-b-pct, 0%) + 0.5px)
-    ),
-    /* Band between A and B — whisper-tint over the slider track only. */
-    linear-gradient(
-      to bottom,
-      transparent calc(50% - 2px),
-      color-mix(in srgb, #f3c36c 12%, transparent) calc(50% - 2px),
-      color-mix(in srgb, #f3c36c 12%, transparent) calc(50% + 2px),
-      transparent calc(50% + 2px)
-    ) var(--loop-a-pct, 0%) / calc(var(--loop-b-pct, 0%) - var(--loop-a-pct, 0%)) 100% no-repeat;
-}
-/* A-mark tick. Same hairline treatment for both --loop (left edge) and
-   --mark (half-set placeholder). 8px tall, no shadow — a hint, not a flag. */
-.pa-hud__scrubber-wrap--loop::after,
-.pa-hud__scrubber-wrap--mark::after {
+/* Enlarged grab area — a 14px knob is fine to look at, too small to hit. */
+.pa-hud__loop-handle::after {
   content: "";
   position: absolute;
-  top: 50%;
-  width: 1px;
-  height: 8px;
-  background: color-mix(in srgb, #f3c36c 55%, transparent);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
+  inset: -7px -8px;
+}
+/* Anchored OUTWARD, not centred. Centring both on their own edge made them
+   overlap whenever the loop was short relative to the piece — a 4-bar seed is
+   ~4% of a 3-minute file, so two 14px knobs landed ~8px apart and merged into
+   one blob. Sitting outside the region they always read as a start and an end,
+   however narrow the loop gets, and the lit span between them stays visible. */
+.pa-hud__loop-handle--start {
   left: var(--loop-a-pct, 0%);
+  margin-left: -14px;
+  border-radius: 3px 0 0 3px;
+}
+.pa-hud__loop-handle--start::before {
+  right: 0;
+}
+.pa-hud__loop-handle--end {
+  left: var(--loop-b-pct, 0%);
+  border-radius: 0 3px 3px 0;
+}
+.pa-hud__loop-handle--end::before {
+  left: 0;
+}
+.pa-hud__loop-handle:hover,
+.pa-hud__loop-handle:active {
+  background: color-mix(in srgb, var(--accent) 75%, #fff);
+}
+.pa-hud__loop-handle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .pa-hud__scrubber {
-  flex: 1 1 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
@@ -1722,6 +1745,51 @@ body {
     rgba(255, 255, 255, 0.1) 100%
   );
 }
+/* Outside the loop is dimmed on the track itself — one gradient, no overlay
+   elements, so nothing can fight the slider for paint order or swallow its
+   pointer events. Only applies while a loop is active. */
+.pa-hud__scrubber-wrap--loop .pa-hud__scrubber::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(
+      to right,
+      rgba(6, 6, 12, 0.68) 0,
+      rgba(6, 6, 12, 0.68) var(--loop-a-pct, 0%),
+      transparent var(--loop-a-pct, 0%),
+      transparent var(--loop-b-pct, 100%),
+      rgba(6, 6, 12, 0.68) var(--loop-b-pct, 100%),
+      rgba(6, 6, 12, 0.68) 100%
+    ),
+    linear-gradient(
+      to right,
+      var(--accent) 0%,
+      var(--accent) var(--pct, 0%),
+      rgba(255, 255, 255, 0.1) var(--pct, 0%),
+      rgba(255, 255, 255, 0.1) 100%
+    );
+}
+/* Firefox needs its own rule, NOT a shared selector list: a list containing an
+   unknown pseudo-element is discarded wholesale, which is how the dimming
+   silently never applied anywhere. */
+.pa-hud__scrubber-wrap--loop .pa-hud__scrubber::-moz-range-track {
+  background:
+    linear-gradient(
+      to right,
+      rgba(6, 6, 12, 0.68) 0,
+      rgba(6, 6, 12, 0.68) var(--loop-a-pct, 0%),
+      transparent var(--loop-a-pct, 0%),
+      transparent var(--loop-b-pct, 100%),
+      rgba(6, 6, 12, 0.68) var(--loop-b-pct, 100%),
+      rgba(6, 6, 12, 0.68) 100%
+    ),
+    linear-gradient(
+      to right,
+      var(--accent) 0%,
+      var(--accent) var(--pct, 0%),
+      rgba(255, 255, 255, 0.1) var(--pct, 0%),
+      rgba(255, 255, 255, 0.1) 100%
+    );
+}
+
 .pa-hud__scrubber::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
@@ -1850,66 +1918,56 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Loop pill + attached clear button. The pill cycles through three states
-   driven by the mark-style UX:
-     idle              → "Loop"
-     half-marked (A)   → "Mark B" (amber tint, gentle pulse)
-     active (A→B set)  → "Loop · Ns" (amber tint, ×-clear visible)
-   Clear button shows in either non-idle state so the user can bail without
-   placing a second mark. */
+/* Loop pill. Two states only:
+     idle   → "Loop"
+     active → "Clear loop · Ns" (amber tint)
+   Trimming happens on the bar via the bracket handles, so the pill never has
+   to describe a half-finished marking sequence. */
+/* Cycling speed chip. Fixed width sized for the widest label ("100%") so
+   cycling never resizes the chip and shifts the controls beside it. */
+.pa-hud__speed-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 28px;
+  flex-shrink: 0;
+  font: 600 11.5px / 1 var(--font);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.pa-hud__speed-chip:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--text);
+}
+.pa-hud__speed-chip:active {
+  transform: scale(0.95);
+}
+.pa-hud__speed-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* Slowed down is worth noticing at a glance — colour alone carries it. */
+.pa-hud__speed-chip.is-off {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 .pa-hud__loop {
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
-.pa-hud__loop--on .pa-hud__pill--loop,
-.pa-hud__loop--mark .pa-hud__pill--loop {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-.pa-hud__loop--mark .pa-hud__pill--loop {
-  /* Amber tint + slow pulse — half-set state is "you owe me a B". */
-  background: color-mix(in srgb, #f3c36c 18%, transparent);
-  border-color: color-mix(in srgb, #f3c36c 50%, transparent);
-  animation: pa-hud-loop-pulse 1.4s ease-in-out infinite;
-}
-@keyframes pa-hud-loop-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, #f3c36c 0%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 3px color-mix(in srgb, #f3c36c 18%, transparent);
-  }
-}
-.pa-hud__loop-clear {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 28px;
-  padding: 0;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  border-left: none;
-  border-top-right-radius: 999px;
-  border-bottom-right-radius: 999px;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    background 0.15s ease;
-}
-.pa-hud__loop--on .pa-hud__loop-clear,
-.pa-hud__loop--mark .pa-hud__loop-clear {
-  display: inline-flex;
-}
-.pa-hud__loop-clear:hover {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
-}
-
-/* Icon-only buttons (close / clear loop). */
+/* Icon-only buttons (close). */
 .pa-hud__icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1986,6 +2044,7 @@ body {
 .pa-hud__stat-unit {
   font: 500 11px / 1 var(--font);
   color: var(--text-muted);
+  margin-left: -2px;
 }
 
 /* Streak heat: cold = hidden by JSX, warm = amber tint, hot = brighter
@@ -2012,9 +2071,18 @@ body {
 .pa-hud__stats-breakdown {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding-left: 6px;
+  gap: 8px;
+  padding-left: 8px;
   border-left: 1px solid var(--border);
+}
+/* No pill chrome in here. Three bordered capsules for three single digits cost
+   ~120px and read as three controls; the counters are a readout hanging off the
+   accuracy figure, so they get the divider and nothing else. */
+.pa-hud__stats-breakdown .pa-hud__stat {
+  padding: 0;
+  gap: 3px;
+  background: none;
+  border: none;
 }
 
 .pa-hud__stat--perfect {

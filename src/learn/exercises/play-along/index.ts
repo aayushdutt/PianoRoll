@@ -8,14 +8,15 @@
 import { getContext } from 'tone'
 import type { BusNoteEvent } from '../../../core/input/InputBus'
 import { t } from '../../../i18n'
+import { uiAccentHex } from '../../../renderer/theme'
 import { watch } from '../../../store/watch'
 import type { Exercise, ExerciseDescriptor } from '../../core/Exercise'
 import type { ExerciseContext } from '../../core/ExerciseContext'
 import { createExerciseHarness } from '../../core/exerciseHarness'
-import { isKeyboardShortcutIgnored } from '../../core/keyboard'
+import { isKeyboardShortcutIgnored, isSpaceActivatedControl } from '../../core/keyboard'
 import type { ExerciseResult } from '../../core/Result'
 import { standardResult } from '../../core/resultHelpers'
-import { DEFAULT_SPEED_PRESETS, PlayAlongEngine } from './engine'
+import { cycleSpeedPreset, PlayAlongEngine } from './engine'
 import { createPlayAlongHud, type PlayAlongHudOptions } from './hud'
 
 // Aggressive Tone scheduler headroom while Play-Along is active — 5 ms,
@@ -65,8 +66,7 @@ class PlayAlongExercise implements Exercise {
     this.hud = createPlayAlongHud()
     this.hudOpts = {
       engine: this.engine,
-      onMarkLoop: () => this.markLoop(),
-      onClearLoop: () => this.clearLoop(),
+      onToggleLoop: () => this.toggleLoop(),
     }
     this.harness = createExerciseHarness({
       hud: this.hud,
@@ -106,7 +106,7 @@ class PlayAlongExercise implements Exercise {
             this.ctx.overlay.drawLoopBand({
               startTime: region.start,
               endTime: region.end,
-              color: 0xf3c36c,
+              color: uiAccentHex(this.ctx.services.renderer.currentTheme),
             })
           }
         },
@@ -179,9 +179,16 @@ class PlayAlongExercise implements Exercise {
 
   private onKeyDown = (e: KeyboardEvent): void => {
     if (e.shiftKey || isKeyboardShortcutIgnored(e)) return
-    if (e.code === 'KeyL') {
+    // Space is the transport key in every mode; the sustain pedal moved to
+    // Shift so it no longer competes. A focused button/checkbox keeps its own
+    // Space, otherwise Tab-ing to a HUD control would make it unusable.
+    if (e.code === 'Space') {
+      if (isSpaceActivatedControl(e.target)) return
       e.preventDefault()
-      this.markLoop()
+      this.engine.togglePlay()
+    } else if (e.code === 'KeyL') {
+      e.preventDefault()
+      this.toggleLoop()
     } else if (e.code === 'KeyR') {
       // The play → go back → repeat loop, without reaching for the scrubber
       // (which the collapsed HUD doesn't show at all).
@@ -196,21 +203,16 @@ class PlayAlongExercise implements Exercise {
     }
   }
 
-  // Mark-style loop: idle → mark A → mark B (loops) → clear. The HUD button
-  // and the `L` shortcut both route here so the two stay in sync.
-  private markLoop(): void {
+  // Loop on/off. Switching it on seeds a region at the playhead which the
+  // bracket handles then trim. The HUD button and the `L` shortcut both route
+  // here so the two stay in sync.
+  private toggleLoop(): void {
     if (!this.ctx.learnState.state.loadedMidi) return
-    this.engine.markLoopPoint(this.ctx.services.clock.currentTime)
-  }
-
-  private clearLoop(): void {
-    this.engine.clearLoop()
+    this.engine.toggleLoop(this.ctx.services.clock.currentTime)
   }
 
   private stepSpeed(delta: number): void {
-    const idx = (DEFAULT_SPEED_PRESETS as readonly number[]).indexOf(this.engine.state.speedPct)
-    const next = idx >= 0 ? DEFAULT_SPEED_PRESETS[idx + delta] : undefined
-    if (next !== undefined) this.engine.setSpeedPreset(next)
+    this.engine.setSpeedPreset(cycleSpeedPreset(this.engine.state.speedPct, delta))
   }
 
   private onCleanPass(): void {

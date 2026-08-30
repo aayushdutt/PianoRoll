@@ -9,7 +9,7 @@ import type { BusNoteEvent } from '../../../core/input/InputBus'
 import { t } from '../../../i18n'
 import type { Exercise, ExerciseDescriptor } from '../../core/Exercise'
 import type { ExerciseContext } from '../../core/ExerciseContext'
-import { isKeyboardShortcutIgnored } from '../../core/keyboard'
+import { isKeyboardShortcutIgnored, isSpaceActivatedControl } from '../../core/keyboard'
 import type { ExerciseResult } from '../../core/Result'
 import { computeXp } from '../../core/scoring'
 import { SightReadingEngine } from './engine'
@@ -129,7 +129,10 @@ class SightReadingExercise implements Exercise {
     // Escape → pause/resume. [ / ] → tempo −5 / +5 while paused.
     this.onEscKey = (e: KeyboardEvent) => {
       if (isKeyboardShortcutIgnored(e)) return
-      if (e.code === 'Escape') {
+      // Space matches every other mode's transport key; Escape stays as the
+      // pre-existing binding.
+      if (e.code === 'Space' && isSpaceActivatedControl(e.target)) return
+      if (e.code === 'Escape' || e.code === 'Space') {
         e.preventDefault()
         if (this.engine.paused) this.engine.resume()
         else this.engine.pause()
