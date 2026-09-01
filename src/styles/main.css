@@ -1504,7 +1504,11 @@ body {
 /* Play-Along HUD. Uses FloatingHud for the outer pill, drag/pin/idle.
    Overrides width + padding; wraps content in a two-row grid. */
 .float-hud.pa-hud {
-  width: min(720px, calc(100vw - 24px));
+  /* Sizes to content so the score can grow without squeezing the scrubber,
+     which is pinned below. Switches to a definite width under 900px, where the
+     viewport caps the HUD and the bar has to flex instead. */
+  width: max-content;
+  max-width: min(880px, calc(100vw - 24px));
   height: auto;
   padding: 10px 14px 12px 0;
   align-items: flex-start;
@@ -1514,13 +1518,16 @@ body {
    `minmax(0, 1fr)` prevents the scrubber from refusing to shrink. */
 .pa-hud__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* Both tracks size to content; the HUD grows to fit them. A `1fr` transport
+     track instead handed every pixel the score gained straight to the
+     scrubber. */
+  grid-template-columns: auto auto;
   grid-template-rows: auto auto;
   grid-template-areas:
     "transport meta"
     "options   options";
   align-items: center;
-  column-gap: 12px;
+  column-gap: 8px;
   row-gap: 8px;
   flex: 1;
   min-width: 0;
@@ -1538,15 +1545,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
+  /* Shrinkable, never growing: the wrap inside can only give ground if this
+     does too. */
+  flex: 0 1 auto;
   min-width: 0;
-}
-
-.pa-hud__meta {
-  grid-area: meta;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .pa-hud__options {
@@ -1636,14 +1638,15 @@ body {
    flex slot the input used to occupy. */
 .pa-hud__scrubber-wrap {
   position: relative;
-  flex: 1 1 120px;
-  /* 18px slider + a 12px rail beneath it for the loop handles. The slider is
-     absolutely placed rather than flex-centred so the track sits at a known
-     y (9px) and the handles can live strictly BELOW the input's hit area —
-     the input paints above the overlay, so anything overlapping it would have
-     its pointerdown swallowed and turn into a seek. The transport row is 32px
-     tall (the play button), so this costs no layout. */
-  height: 30px;
+  /* Pinned: a flex-basis alone collapses here, because the absolutely
+     positioned input leaves this box with no in-flow content for the grid's
+     max-content pass. Released below 900px, where the HUD cannot grow. */
+  flex: 0 0 var(--pa-scrub-w, 260px);
+  /* Slider only; --loop adds a 12px rail below for the handles. The input is
+     absolutely placed so the handles can sit strictly BELOW its hit area — it
+     paints above the overlay, so anything overlapping it swallows the
+     pointerdown and turns a drag into a seek. */
+  height: 18px;
   min-width: 80px;
 }
 
@@ -1748,6 +1751,10 @@ body {
 /* Outside the loop is dimmed on the track itself — one gradient, no overlay
    elements, so nothing can fight the slider for paint order or swallow its
    pointer events. Only applies while a loop is active. */
+.pa-hud__scrubber-wrap--loop {
+  height: 30px;
+}
+
 .pa-hud__scrubber-wrap--loop .pa-hud__scrubber::-webkit-slider-runnable-track {
   background:
     linear-gradient(
@@ -1916,6 +1923,58 @@ body {
   color: var(--text-dim);
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
+  /* Reserved for "99.9s". The loop duration updates on every pointermove while
+     a handle is dragged, so an auto-width box would shove the whole options row
+     throughout the gesture. Past 99.9s it may widen — acceptable, that is a
+     loop nobody is trimming by hand. Set smaller than the pill label: it is a
+     readout hanging off the action, not part of it. */
+  font-size: 9.5px;
+  min-width: 4.6ch;
+  text-align: right;
+}
+
+/* The loop pill carries the most content of any pill (glyph + label + a live
+   readout + an attached x), so it runs tighter than its siblings. */
+.pa-hud__pill--loop {
+  gap: 5px;
+  padding: 6px 9px;
+}
+
+/* Attached x on an active loop pill: the pill restarts, this clears. */
+.pa-hud__loop-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  margin-left: -1px;
+  /* Matches the pill it is welded to, now that the pill is no longer accented.
+     Turns accent only on hover — clearing a loop is destructive and has no
+     undo, so the warning belongs at the moment of reaching for it. */
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 999px 999px 0;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.pa-hud__loop-clear:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.pa-hud__loop-clear:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* Square off the pill's right edge so the two read as one control. */
+.pa-hud__loop--on .pa-hud__pill--loop {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 /* Loop pill. Two states only:
@@ -2005,6 +2064,8 @@ body {
 .pa-hud__stats {
   display: inline-flex;
   align-items: center;
+  grid-area: meta;
+  margin-left: 2px;
   gap: 8px;
   font: 600 12px / 1 var(--font);
   color: var(--text);
@@ -2036,9 +2097,22 @@ body {
   justify-content: center;
 }
 
+/* Zero streak: present, but clearly not a streak yet. */
+.pa-hud__stat--streak.is-cold {
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+.pa-hud__stat--streak.is-cold .pa-hud__stat-glyph {
+  filter: grayscale(1);
+}
+
 .pa-hud__stat-num {
   font: 600 12px / 1 var(--font);
+  /* Two digits reserved so a streak resetting 12 -> 0 does not resize the
+     chip. */
   font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+  text-align: right;
 }
 
 .pa-hud__stat-unit {
@@ -2071,18 +2145,24 @@ body {
 .pa-hud__stats-breakdown {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding-left: 8px;
-  border-left: 1px solid var(--border);
+  gap: 0;
+  font-variant-numeric: tabular-nums;
+  /* One chip with three sections: the counters are a single reading, not three
+     controls. */
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
 }
-/* No pill chrome in here. Three bordered capsules for three single digits cost
-   ~120px and read as three controls; the counters are a readout hanging off the
-   accuracy figure, so they get the divider and nothing else. */
 .pa-hud__stats-breakdown .pa-hud__stat {
-  padding: 0;
+  padding: 4px 8px;
   gap: 3px;
   background: none;
   border: none;
+  border-radius: 0;
+}
+.pa-hud__stats-breakdown .pa-hud__stat + .pa-hud__stat {
+  border-left: 1px solid var(--border);
 }
 
 .pa-hud__stat--perfect {
@@ -2157,9 +2237,42 @@ body {
   .pa-hud__time--muted {
     display: none;
   }
-  /* ...and let the scrubber give back the rest instead of forcing the overflow. */
+}
+
+@media (max-width: 900px) {
+  /* The viewport caps the HUD here, so a pinned bar would overflow the panel
+     and paint through the score. Both levels have to be released — and the
+     width must become DEFINITE at the same time, since a content-sized
+     container gives a flexible child nothing to fill. */
+  .float-hud.pa-hud {
+    width: min(calc(100vw - 24px), 880px);
+  }
+  .pa-hud__scrub {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
   .pa-hud__scrubber-wrap {
-    min-width: 56px;
+    flex: 1 1 56px;
+    /* Low enough for phone widths, where the duration and breakdown are
+       already hidden. */
+    min-width: 44px;
+    /* Never wider than the pinned size, so the bar matches across the
+       breakpoint. */
+    max-width: var(--pa-scrub-w, 260px);
+  }
+}
+
+@media (max-width: 440px) {
+  /* Past here they genuinely do not fit on one line, so the score gets its own
+     row rather than overlapping the transport. */
+  .pa-hud__body {
+    grid-template-areas:
+      "transport"
+      "meta"
+      "options";
+  }
+  .pa-hud__stats {
+    margin-left: 0;
   }
 }
 

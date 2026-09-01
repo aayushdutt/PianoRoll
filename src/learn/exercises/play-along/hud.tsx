@@ -7,8 +7,14 @@ import { createMountHandle } from '../../ui/mountComponent'
 import { cycleSpeedPreset, type PlayAlongEngine } from './engine'
 
 // Streak ≥ this is "hot" — saturated chip background. Below is "warm"
-// (visible but quieter). Below 1 the chip is hidden entirely.
+// (visible but quieter). At 0 the chip stays but goes cold.
 const STREAK_HOT_THRESHOLD = 5
+
+// Bounded so a long session cannot widen the score without limit. Nobody reads
+// a streak of 143 as anything but "a lot".
+export function cap(n: number): string {
+  return n > 99 ? '99+' : String(n)
+}
 
 // Hits / (hits + errors), as a whole percent. 100 when nothing attempted yet.
 export function playAlongAccuracy(engine: PlayAlongEngine): number {
@@ -30,6 +36,8 @@ const PAUSE_GLYPH =
   '<svg class="pa-hud__play-icon pa-hud__play-icon--pause" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="4" y="3" width="3" height="10" rx="0.5"/><rect x="9" y="3" width="3" height="10" rx="0.5"/></svg>'
 const LOOP_GLYPH =
   '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a5 5 0 0 1 8-4M13 8a5 5 0 0 1-8 4"/><path d="M11 2v3h-3M5 14v-3h3"/></svg>'
+const CLOSE_X_GLYPH =
+  '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6"/></svg>'
 const RESTART_GLYPH =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2v3h-3"/></svg>'
 const WAIT_GLYPH =
@@ -47,58 +55,66 @@ function LiveStats(props: { engine: PlayAlongEngine }) {
   const streakHot = () => engine.state.streak >= STREAK_HOT_THRESHOLD
   const streakWarm = () => engine.state.streak >= 1 && engine.state.streak < STREAK_HOT_THRESHOLD
   return (
-    <div class="pa-hud__stats" role="status" aria-label={t('learn.pa.score')}>
-      <Show when={engine.state.streak > 0}>
-        <span
-          class="pa-hud__stat pa-hud__stat--streak"
-          classList={{
-            'pa-hud__stat--streak-warm': streakWarm(),
-            'pa-hud__stat--streak-hot': streakHot(),
-          }}
-          data-tip={t('learn.pa.streak.tip')}
-        >
-          <span class="pa-hud__stat-glyph" aria-hidden="true">
-            🔥
-          </span>
-          <span class="pa-hud__stat-num">{engine.state.streak}</span>
+    <div class="pa-hud__stats" id="pa-stats" role="status" aria-label={t('learn.pa.score')}>
+      {/* Always rendered, dimmed at zero: hiding it made the chip pop in and out
+          on every mistake, and a reserved blank slot just left a hole. */}
+      <span
+        class="pa-hud__stat pa-hud__stat--streak"
+        classList={{
+          'is-cold': engine.state.streak === 0,
+          'pa-hud__stat--streak-warm': streakWarm(),
+          'pa-hud__stat--streak-hot': streakHot(),
+        }}
+        data-tip={t('learn.pa.streak.tip')}
+      >
+        <span class="pa-hud__stat-glyph" aria-hidden="true">
+          🔥
         </span>
-      </Show>
+        <span class="pa-hud__stat-num">{cap(engine.state.streak)}</span>
+      </span>
       <span class="pa-hud__stat pa-hud__stat--accuracy" data-tip={t('learn.pa.accuracy.tip')}>
         <span class="pa-hud__stat-num">{accuracyPct()}</span>
         <span class="pa-hud__stat-unit">%</span>
       </span>
-      {/* Hidden until something lands, the same rule the streak chip follows.
-          At the start of a session three zeros are pure noise, and the mobile
-          breakpoint already drops this block entirely. */}
-      <Show when={engine.state.perfect + engine.state.good + engine.state.errors > 0}>
-        <span class="pa-hud__stats-breakdown" aria-hidden="true">
-          <span
-            class="pa-hud__stat pa-hud__stat--perfect"
-            classList={{ 'is-zero': engine.state.perfect === 0 }}
-            data-tip={t('learn.pa.perfect.tip')}
-          >
-            <span class="pa-hud__stat-glyph">✓</span>
-            <span class="pa-hud__stat-num">{engine.state.perfect}</span>
-          </span>
-          <span
-            class="pa-hud__stat pa-hud__stat--good"
-            classList={{ 'is-zero': engine.state.good === 0 }}
-            data-tip={t('learn.pa.good.tip')}
-          >
-            <span class="pa-hud__stat-glyph">◌</span>
-            <span class="pa-hud__stat-num">{engine.state.good}</span>
-          </span>
-          <span
-            class="pa-hud__stat pa-hud__stat--error"
-            classList={{ 'is-zero': engine.state.errors === 0 }}
-            data-tip={t('learn.pa.error.tip')}
-          >
-            <span class="pa-hud__stat-glyph">×</span>
-            <span class="pa-hud__stat-num">{engine.state.errors}</span>
-          </span>
-        </span>
-      </Show>
+      <LiveBreakdown engine={engine} />
     </div>
+  )
+}
+
+// One chip, three sections — a single reading of how a pass broke down.
+function LiveBreakdown(props: { engine: PlayAlongEngine }) {
+  const { engine } = props
+  // Hidden until something lands, the same rule the streak chip follows. At the
+  // start of a session three zeros are pure noise.
+  return (
+    <Show when={engine.state.perfect + engine.state.good + engine.state.errors > 0}>
+      <span class="pa-hud__stats-breakdown" aria-hidden="true">
+        <span
+          class="pa-hud__stat pa-hud__stat--perfect"
+          classList={{ 'is-zero': engine.state.perfect === 0 }}
+          data-tip={t('learn.pa.perfect.tip')}
+        >
+          <span class="pa-hud__stat-glyph">✓</span>
+          <span class="pa-hud__stat-num">{cap(engine.state.perfect)}</span>
+        </span>
+        <span
+          class="pa-hud__stat pa-hud__stat--good"
+          classList={{ 'is-zero': engine.state.good === 0 }}
+          data-tip={t('learn.pa.good.tip')}
+        >
+          <span class="pa-hud__stat-glyph">◌</span>
+          <span class="pa-hud__stat-num">{cap(engine.state.good)}</span>
+        </span>
+        <span
+          class="pa-hud__stat pa-hud__stat--error"
+          classList={{ 'is-zero': engine.state.errors === 0 }}
+          data-tip={t('learn.pa.error.tip')}
+        >
+          <span class="pa-hud__stat-glyph">×</span>
+          <span class="pa-hud__stat-num">{cap(engine.state.errors)}</span>
+        </span>
+      </span>
+    </Show>
   )
 }
 
@@ -300,18 +316,21 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
                 <button
                   type="button"
                   class="pa-hud__loop-handle pa-hud__loop-handle--start"
+                  id="pa-loop-start"
                   aria-label={t('learn.pa.loopStartAria')}
                   onPointerDown={(e) => startEdgeDrag('start', e)}
                 />
                 <button
                   type="button"
                   class="pa-hud__loop-handle pa-hud__loop-handle--end"
+                  id="pa-loop-end"
                   aria-label={t('learn.pa.loopEndAria')}
                   onPointerDown={(e) => startEdgeDrag('end', e)}
                 />
               </Show>
               <input
                 class="pa-hud__scrubber"
+                id="pa-scrubber"
                 ref={scrubberEl}
                 type="range"
                 min="0"
@@ -344,9 +363,7 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
           </div>
         </div>
 
-        <div class="pa-hud__meta">
-          <LiveStats engine={engine} />
-        </div>
+        <LiveStats engine={engine} />
 
         <div class="pa-hud__options">
           {/* Same idea as the play-mode HUD chip: one control that cycles the
@@ -407,35 +424,47 @@ function PlayAlongHudView(props: PlayAlongHudOptions) {
             class="pa-hud__loop"
             classList={{ 'pa-hud__loop--on': engine.state.loopRegion !== null }}
           >
-            {/* Two states, not three: the loop is either off or on. Turning it
-                on seeds a region you then trim with the bracket handles, so the
-                button never has to describe a half-finished marking sequence. */}
+            {/* Off: creates a loop. On: restarts it; the attached x clears.
+                Restarting happens every pass, clearing once. `L` also toggles. */}
             <button
               class="pa-hud__pill pa-hud__pill--loop"
+              id="pa-loop"
               type="button"
               data-tip={
-                engine.state.loopRegion ? t('learn.pa.loopClearTip') : t('learn.pa.loopOnTip')
+                engine.state.loopRegion ? t('learn.pa.loopRestartTip') : t('learn.pa.loopOnTip')
               }
               aria-label={
-                engine.state.loopRegion ? t('learn.pa.loopClearAria') : t('learn.pa.loopOnAria')
+                engine.state.loopRegion ? t('learn.pa.loopRestartAria') : t('learn.pa.loopOnAria')
               }
-              aria-pressed={engine.state.loopRegion !== null}
-              onClick={() => props.onToggleLoop()}
+              /* No aria-pressed: a momentary action, not a toggle. It also drove
+                 the accent styling that belongs to Wait, a real toggle. */
+              onClick={() => (engine.state.loopRegion ? engine.restart() : props.onToggleLoop())}
             >
               <span innerHTML={LOOP_GLYPH} />
               <span>
                 <Show when={engine.state.loopRegion} fallback={t('learn.pa.loopLabel')}>
-                  {t('learn.pa.loopClearLabel')}
+                  {t('learn.pa.loopRestartLabel')}
                 </Show>
               </span>
               <Show when={engine.state.loopRegion}>
                 {(region) => (
+                  // Fixed slot: this updates on every pointermove during a drag.
                   <span class="pa-hud__pill-sub">
-                    · {(region().end - region().start).toFixed(1)}s
+                    {(region().end - region().start).toFixed(1)}s
                   </span>
                 )}
               </Show>
             </button>
+            <Show when={engine.state.loopRegion}>
+              <button
+                class="pa-hud__loop-clear"
+                type="button"
+                data-tip={t('learn.pa.loopClearTip')}
+                aria-label={t('learn.pa.loopClearAria')}
+                onClick={() => engine.clearLoop()}
+                innerHTML={CLOSE_X_GLYPH}
+              />
+            </Show>
           </div>
 
           <button
