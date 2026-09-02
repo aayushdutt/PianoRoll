@@ -41,6 +41,7 @@ const fr: Messages = {
   'topStrip.openMidi': 'Ouvrir un fichier MIDI',
   'topStrip.tracks': 'Pistes',
   'topStrip.midi': 'Périphérique MIDI',
+  'topStrip.pedal': 'Pédale de sustain',
   'topStrip.export': 'Exporter en MP4',
   'topStrip.export.label': 'Exporter',
   'topStrip.mode.play.label': 'Jouer',

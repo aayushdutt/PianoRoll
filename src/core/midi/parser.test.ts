@@ -343,6 +343,25 @@ describe('parseMidiFile — sustain pedal', () => {
     const buf = await makeBuf([{ midi: 60, time: 0, duration: 0.5 }])
     const parsed = await parseMidiFile(buf, 'plain')
     expect(parsed.tracks[0]!.notes[0]!.releaseAt).toBeUndefined()
+    expect(parsed.pedal).toBeUndefined()
+  })
+
+  it('keeps the holds on the file, merged across channels, for the indicator', async () => {
+    const midi = new Midi()
+    const a = midi.addTrack()
+    a.channel = 0
+    a.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })
+    a.addCC({ number: 64, value: 1, time: 0 })
+    a.addCC({ number: 64, value: 0, time: 2 })
+    const b = midi.addTrack()
+    b.channel = 1
+    b.addNote({ midi: 48, time: 0, duration: 0.5, velocity: 0.8 })
+    b.addCC({ number: 64, value: 1, time: 1 })
+    b.addCC({ number: 64, value: 0, time: 3 })
+    const parsed = await parseMidiFile(midi.toArray().slice().buffer as ArrayBuffer, 'holds')
+    expect(parsed.pedal).toHaveLength(1)
+    expect(parsed.pedal![0]!.start).toBeCloseTo(0, 1)
+    expect(parsed.pedal![0]!.end).toBeCloseTo(3, 1)
   })
 
   it('clamps an unlifted pedal to the file duration', async () => {

@@ -46,11 +46,22 @@ export interface MeterEntry {
   denominator: number
 }
 
+// One sustain-pedal hold, seconds. Half-open: down at `start`, up at `end`.
+export interface PedalInterval {
+  start: number
+  end: number
+}
+
 export interface MidiFile {
   name: string
   // Seconds. The end of the last audible note — a pedalled tail counts, so
   // playback and export run until the sound actually stops.
   duration: number
+  // Sustain-pedal holds, merged across channels, ascending and disjoint. For
+  // display only (the pedal indicator): audio reads `MidiNote.releaseAt`,
+  // which the parser already resolved from these. Absent when the file has
+  // no CC64.
+  pedal?: readonly PedalInterval[]
   // Nominal/display tempo and meter: the first event of each map. Also the
   // seconds↔ticks anchor for `transport.bpm`. Do NOT walk the map at those
   // call sites — note times are already resolved seconds.

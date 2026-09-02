@@ -71,6 +71,7 @@ import type { ExportSettings } from './ui/ExportModal'
 import { InstrumentMenu } from './ui/InstrumentMenu'
 import { KeyboardResizer } from './ui/KeyboardResizer'
 import type { SessionAction } from './ui/PostSessionModal'
+import { PEDAL_HIDDEN, type PedalIndicatorState, pedalIndicatorState } from './ui/pedalIndicator'
 import { showError, showSuccess } from './ui/Toast'
 import { TrackPanel } from './ui/TrackPanel'
 import { installViewportClassSync } from './ui/utils'
@@ -170,6 +171,9 @@ export class App {
   private firstPlayLogged = false
   private firstLiveNoteLogged = false
   private firstPedalLogged = false
+  // Last state pushed to the top-strip pedal chip; `syncPedalIndicator`
+  // recomputes on every clock tick and only touches the UI on a change.
+  private pedalShown: PedalIndicatorState = PEDAL_HIDDEN
   private playbackMilestones = new Set<number>()
   // Loop station one-shots, scoped to the page session. We want to know
   // whether users ever reach each step in the loop funnel, not count every
@@ -540,6 +544,7 @@ export class App {
         // milestones (and the playback_30s activation) for a piece nobody
         // played back.
         if (this.store.state.status === 'exporting') return
+        this.syncPedalIndicator(t)
         // Engagement milestones are mode-agnostic (watched ≥30s counts as
         // a real user regardless of where the clock was ticking).
         for (const m of [30, 60, 120]) {
@@ -583,6 +588,14 @@ export class App {
         () => this.store.state.volume,
         (v) => this.synth.setVolume(v),
       ),
+      // Pedal chip: a mode switch or a new piece changes which holds apply;
+      // the player's own pedal fires straight from the bus. Time-driven
+      // changes ride the clock tick above.
+      watch(
+        () => [this.store.state.mode, this.store.state.loadedMidi] as const,
+        () => this.syncPedalIndicator(),
+      ),
+      this.performanceBus.subscribePedal(() => this.syncPedalIndicator()),
       watch(
         () => this.store.state.speed,
         (s) => {
@@ -657,6 +670,7 @@ export class App {
       this.midiInput.status.subscribe((status) => {
         this.controls.updateMidiStatus(status, this.midiInput.deviceName.value)
         this.dropzone.updateMidiStatus(status, this.midiInput.deviceName.value)
+        this.syncPedalIndicator()
         if (status === 'connected') {
           // Vendor enum instead of raw device name — cardinality-friendly and
           // avoids leaking user-customised device labels.
@@ -687,7 +701,11 @@ export class App {
       resetInteractionState: () => this.resetInteractionState(),
       openFilePicker: () => this.openFilePicker(),
       primeInteractiveAudio: () => this.primeInteractiveAudio(),
-      setLearnFileName: (name) => this.controls.updateLearnFileName(name),
+      setLearnFileName: (name) => {
+        this.controls.updateLearnFileName(name)
+        // Learn's piece lives on LearnState, outside the store watch below.
+        this.syncPedalIndicator()
+      },
     }
 
     // Start in home. <HomeMode/>'s onMount handles the side effects.
@@ -847,6 +865,32 @@ export class App {
 
   private async autoConnectMidi(): Promise<void> {
     await this.midiInput.requestAccess({ silent: true })
+  }
+
+  // Recomputes the top-strip pedal chip from whatever can hold the pedal right
+  // now — the current mode's piece at `time`, and the player's own pedal —
+  // and pushes it only when it changed. Cheap enough for every clock tick:
+  // one binary search over the piece's holds.
+  private syncPedalIndicator(time = this.clock.currentTime): void {
+    const mode = this.store.state.mode
+    const piece =
+      mode === 'play'
+        ? this.store.state.loadedMidi
+        : mode === 'learn'
+          ? (this.learnControllerHandle.peek()?.learnState.state.loadedMidi ?? null)
+          : null
+    const next = pedalIndicatorState({
+      pieceHolds: piece?.pedal,
+      time,
+      liveDown: this.performanceBus.pedalDown,
+      midiConnected: this.midiInput.status.value === 'connected',
+      // The bus fires before `firstPedalLogged` is set on the very first
+      // press; read the live state too so that press shows the chip.
+      liveEverUsed: this.firstPedalLogged || this.performanceBus.pedalDown,
+    })
+    if (next.visible === this.pedalShown.visible && next.down === this.pedalShown.down) return
+    this.pedalShown = next
+    this.controls.updatePedal(next)
   }
 
   // Transpose re-derives `loadedMidi` from `sourceMidi` and pushes the result

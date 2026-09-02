@@ -22,6 +22,7 @@ export interface TopStripProps {
   midiDeviceName: () => string
   midiPillLabel: () => string
   midiMenuLabel: () => string
+  pedal: () => { visible: boolean; down: boolean }
   dim: () => boolean
   onHome: () => void
   onMode: (m: Exclude<AppMode, 'home'>) => void
@@ -249,6 +250,21 @@ export function TopStripView(props: TopStripProps) {
           <span />
           <span />
         </span>
+        {/* Sustain-pedal light: the piece's pedal in Play/Learn, the player's
+            own anywhere. A status glyph next to the title, not a control —
+            no border, no hover, state carried by `data-down` so the
+            aria-live status region doesn't announce every press. Hidden
+            when nothing can hold the pedal. */}
+        <span
+          class="ts-pedal"
+          classList={{ hidden: !props.pedal().visible }}
+          id="ts-pedal"
+          role="img"
+          aria-label={t('topStrip.pedal')}
+          data-tip={t('topStrip.pedal')}
+          data-down={props.pedal().down ? '' : undefined}
+          innerHTML={icons.pedal(13)}
+        />
         <span id="ts-chord-slot" class="ts-chord-slot" />
       </div>
 

@@ -1,4 +1,10 @@
-import { applySustain, buildPedalIntervals, type PedalEvent, type PedalInterval } from './sustain'
+import {
+  applySustain,
+  buildPedalIntervals,
+  mergePedalIntervals,
+  type PedalEvent,
+  type PedalInterval,
+} from './sustain'
 import {
   type MeterEntry,
   MIDI_MAX,
@@ -106,11 +112,13 @@ export async function parseMidiFileWithStats(
   // the notated end inside buildPedalIntervals, so only an explicit pedal-up
   // past the last note-off can extend it.
   let duration = midi.duration
+  let pedal: PedalInterval[] | null = null
   if (hasSustainPedal) {
     const pedalByChannel = new Map<number, PedalInterval[]>()
     for (const [channel, events] of pedalEventsByChannel) {
       pedalByChannel.set(channel, buildPedalIntervals(events, midi.duration))
     }
+    pedal = mergePedalIntervals(pedalByChannel.values())
     const sustained = applySustain(tracks, pedalByChannel)
     for (let i = 0; i < tracks.length; i++) {
       tracks[i]!.notes = sustained[i]!
@@ -156,6 +164,8 @@ export async function parseMidiFileWithStats(
       tempos,
       timeSignatures,
       tracks,
+      // exactOptionalPropertyTypes: omit rather than assign undefined.
+      ...(pedal && pedal.length > 0 ? { pedal } : {}),
     },
     stats: { outOfRangeNotes, hasSustainPedal, tempoEvents: midi.header.tempos.length },
   }

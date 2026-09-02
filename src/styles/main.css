@@ -2843,6 +2843,62 @@ body {
   white-space: nowrap;
 }
 
+/* Sustain-pedal light beside the title. Reads as a status lamp, like the
+   mode dot: dim outline while the pedal is up, accent-filled foot with a
+   soft glow while it is down. Press is snappy, release eases out like a
+   damper lifting, and each press rings once (the dot-pulse motif). */
+.ts-pedal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: default;
+  transition: color 0.26s var(--ease-out);
+}
+.ts-pedal svg {
+  display: block;
+  transition:
+    transform 0.14s var(--ease-spring),
+    filter 0.26s var(--ease-out);
+}
+.ts-pedal .ts-pedal-foot {
+  fill: currentColor;
+  fill-opacity: 0;
+  transition: fill-opacity 0.26s var(--ease-out);
+}
+.ts-pedal[data-down] {
+  color: var(--accent);
+  transition-duration: 0.06s;
+  animation: pedal-press 0.5s var(--ease-out) 1;
+}
+.ts-pedal[data-down] svg {
+  transform: translateY(1px);
+  filter: drop-shadow(0 0 5px var(--accent-glow));
+  transition-duration: 0.06s;
+}
+.ts-pedal[data-down] .ts-pedal-foot {
+  fill-opacity: 1;
+  transition-duration: 0.06s;
+}
+@keyframes pedal-press {
+  from {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  to {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ts-pedal[data-down] {
+    animation: none;
+  }
+}
+
 /* Tiny equaliser bars inside the status when playing */
 .ts-bars {
   display: inline-flex;

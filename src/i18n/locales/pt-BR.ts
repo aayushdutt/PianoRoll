@@ -38,6 +38,7 @@ const ptBR: Messages = {
   'topStrip.openMidi': 'Abrir arquivo MIDI',
   'topStrip.tracks': 'Faixas',
   'topStrip.midi': 'Dispositivo MIDI',
+  'topStrip.pedal': 'Pedal de sustain',
   'topStrip.export': 'Exportar MP4',
   'topStrip.export.label': 'Exportar',
   'topStrip.mode.play.label': 'Tocar',

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { applySustain, buildPedalIntervals, type PedalInterval } from './sustain'
+import {
+  applySustain,
+  buildPedalIntervals,
+  mergePedalIntervals,
+  type PedalInterval,
+  pedalDownAt,
+} from './sustain'
 import type { MidiNote } from './types'
 
 const note = (pitch: number, time: number, duration: number): MidiNote => ({
@@ -166,5 +172,64 @@ describe('applySustain', () => {
     const input = [note(60, 0, 0.5)]
     const out = applySustain([{ channel: 0, notes: input }], new Map())
     expect(out[0]?.[0]).toBe(input[0])
+  })
+})
+
+describe('mergePedalIntervals', () => {
+  it('unions overlapping and touching holds across channels into one list', () => {
+    const merged = mergePedalIntervals([
+      [
+        { start: 0, end: 2 },
+        { start: 5, end: 6 },
+      ],
+      [
+        { start: 1, end: 3 },
+        { start: 3, end: 4 },
+        { start: 8, end: 9 },
+      ],
+    ])
+    expect(merged).toEqual([
+      { start: 0, end: 4 },
+      { start: 5, end: 6 },
+      { start: 8, end: 9 },
+    ])
+  })
+
+  it('drops empty holds and does not mutate its inputs', () => {
+    const a: PedalInterval[] = [
+      { start: 2, end: 2 },
+      { start: 0, end: 1 },
+    ]
+    expect(mergePedalIntervals([a])).toEqual([{ start: 0, end: 1 }])
+    expect(a).toEqual([
+      { start: 2, end: 2 },
+      { start: 0, end: 1 },
+    ])
+  })
+
+  it('returns an empty list for no input', () => {
+    expect(mergePedalIntervals([])).toEqual([])
+  })
+})
+
+describe('pedalDownAt', () => {
+  const holds: PedalInterval[] = [
+    { start: 1, end: 2 },
+    { start: 4, end: 6 },
+  ]
+
+  it('is down inside a hold, start inclusive, end exclusive', () => {
+    expect(pedalDownAt(holds, 1)).toBe(true)
+    expect(pedalDownAt(holds, 1.5)).toBe(true)
+    expect(pedalDownAt(holds, 2)).toBe(false)
+    expect(pedalDownAt(holds, 5.99)).toBe(true)
+    expect(pedalDownAt(holds, 6)).toBe(false)
+  })
+
+  it('is up between and outside holds, and on an empty list', () => {
+    expect(pedalDownAt(holds, 0)).toBe(false)
+    expect(pedalDownAt(holds, 3)).toBe(false)
+    expect(pedalDownAt(holds, 10)).toBe(false)
+    expect(pedalDownAt([], 1)).toBe(false)
   })
 })

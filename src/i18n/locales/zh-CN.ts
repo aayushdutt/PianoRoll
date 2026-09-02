@@ -35,6 +35,7 @@ const zhCN: Messages = {
   'topStrip.openMidi': '打开 MIDI 文件',
   'topStrip.tracks': '音轨',
   'topStrip.midi': 'MIDI 设备',
+  'topStrip.pedal': '延音踏板',
   'topStrip.export': '导出 MP4',
   'topStrip.export.label': '导出',
   'topStrip.mode.play.label': '播放',

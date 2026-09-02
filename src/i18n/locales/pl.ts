@@ -43,6 +43,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'topStrip.openMidi': 'Otwórz plik MIDI',
   'topStrip.tracks': 'Ścieżki',
   'topStrip.midi': 'Urządzenie MIDI',
+  'topStrip.pedal': 'Pedał sustain',
   'topStrip.export': 'Eksportuj MP4',
   'topStrip.export.label': 'Eksport',
   'topStrip.mode.play.label': 'Graj',

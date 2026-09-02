@@ -1,4 +1,6 @@
-import type { MidiNote } from './types'
+import type { MidiNote, PedalInterval } from './types'
+
+export type { PedalInterval } from './types'
 
 // Resolves CC64 (sustain pedal) into note data at parse time: a note whose
 // notated end falls under a held pedal gets a `releaseAt` past that end.
@@ -21,11 +23,6 @@ const PEDAL_DOWN = 0.5
 // A stuck pedal in a bad file would otherwise hold every note to EOF and blow
 // the voice count.
 const MAX_SUSTAIN_EXTENSION = 15
-
-export interface PedalInterval {
-  start: number // seconds, pedal down
-  end: number // seconds, pedal up (clamped to the file end if never lifted)
-}
 
 export interface PedalEvent {
   time: number
@@ -138,4 +135,38 @@ export function applySustain(
       return { ...note, releaseAt: release }
     }),
   )
+}
+
+// Union of per-channel holds into one ascending, disjoint list — the file's
+// pedal as a whole, for display. Touching intervals are joined so the
+// indicator doesn't flicker on a pedal re-press at the exact same tick.
+export function mergePedalIntervals(lists: Iterable<readonly PedalInterval[]>): PedalInterval[] {
+  const all: PedalInterval[] = []
+  for (const list of lists) for (const iv of list) if (iv.end > iv.start) all.push(iv)
+  all.sort((a, b) => a.start - b.start)
+  const out: PedalInterval[] = []
+  for (const iv of all) {
+    const last = out[out.length - 1]
+    if (last && iv.start <= last.end) {
+      if (iv.end > last.end) last.end = iv.end
+    } else {
+      out.push({ start: iv.start, end: iv.end })
+    }
+  }
+  return out
+}
+
+// Pedal down at `t`? Binary search over the merged list — this runs on every
+// clock tick while a piece plays.
+export function pedalDownAt(intervals: readonly PedalInterval[], t: number): boolean {
+  let lo = 0
+  let hi = intervals.length - 1
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1
+    const iv = intervals[mid]!
+    if (t < iv.start) hi = mid - 1
+    else if (t >= iv.end) lo = mid + 1
+    else return true
+  }
+  return false
 }

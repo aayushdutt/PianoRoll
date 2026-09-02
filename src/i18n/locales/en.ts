@@ -55,6 +55,7 @@ export const en = {
   'topStrip.openMidi': 'Open MIDI file',
   'topStrip.tracks': 'Tracks',
   'topStrip.midi': 'MIDI device',
+  'topStrip.pedal': 'Sustain pedal',
   'topStrip.export': 'Export MP4',
   'topStrip.export.label': 'Export',
   // Mode-pill visible labels (the longer descriptors live in `topStrip.mode*`).
