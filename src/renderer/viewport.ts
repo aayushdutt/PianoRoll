@@ -95,8 +95,6 @@ export class Viewport {
     const keyboardTop = canvasHeight - keyboardHeight
     if (y < keyboardTop || y > canvasHeight) return null
 
-    // Same ratio the renderer bakes the black keys with, so the touch target
-    // always matches the pixels.
     const blackZoneBottom = keyboardTop + keyboardHeight * BLACK_KEY_HEIGHT_RATIO
     if (y <= blackZoneBottom) {
       for (const [pitch, pos] of this.keyPositions) {

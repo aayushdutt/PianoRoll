@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { type MidiTrack, TRACK_COLOR_SLOTS } from '../core/midi/types'
 import { accentCSS, getTrackColor, liveNoteColor, THEMES, type Theme, type ThemeId } from './theme'
 
-// Compile-time exhaustiveness: adding a member to the `ThemeId` union forces an
-// entry here, and a typo'd key is a type error. The runtime assertion below
-// then checks THEMES actually ships exactly one theme per id.
+// Compile-time exhaustiveness over the `ThemeId` union.
 const EXPECTED_THEME_IDS: Record<ThemeId, true> = {
   dark: true,
   midnight: true,
@@ -69,15 +67,11 @@ describe('liveNoteColor', () => {
 })
 
 describe('theme roster', () => {
-  // Ids are persisted (`midee.theme`), so drift between the union and the
-  // shipped themes silently resets somebody's preference to the default.
   it('ships exactly one theme per ThemeId', () => {
     const ids = THEMES.map((t) => t.id)
     expect([...ids].sort()).toEqual(Object.keys(EXPECTED_THEME_IDS).sort())
   })
 
-  // The parser assigns `colorIndex` modulo TRACK_COLOR_SLOTS, so a theme with
-  // a shorter palette would leave slots unreachable / double-mapped.
   it.each(THEMES)('$name has exactly TRACK_COLOR_SLOTS track colours', (theme) => {
     expect(theme.trackColors).toHaveLength(TRACK_COLOR_SLOTS)
   })

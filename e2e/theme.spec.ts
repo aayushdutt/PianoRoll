@@ -1,48 +1,18 @@
 import { expect, type Page, test } from '@playwright/test'
 
-// Workstream C of docs/RENDERER_THEME_CLEANUP_2026-09-02.md — theme selection +
-// persistence in a real browser.
+// Theme selection + persistence in a real browser: customize popover click →
+// App.applyTheme writes `--accent*` onto <html> → `midee.theme` id survives reload.
 //
-// WHY E2E: the theme round-trip crosses three layers that no unit test spans at
-// once — the Solid customize popover (click), `App.applyTheme` (writes
-// `--accent` / `--accent-soft` / `--accent-glow` onto <html>), and
-// localStorage persistence (`midee.theme` = stable theme id, with a one-time
-// migration from the legacy `midee.themeIndex` integer). Only a browser proves
-// the CSS custom properties actually land on the document element and survive a
-// reload.
-//
-// FLOW / SELECTORS (verified against src/ui/ControlsView.tsx + src/ui/CustomizeMenu.tsx):
-//   - Trigger:  `#ts-customize` — the Appearance pill rendered into the top
-//               strip's `#ts-customize-slot`. The top strip is `strip--active`
-//               in every mode (including home), so no MIDI file is needed.
-//   - HOME-CARD OVERLAP (real, deterministic): `#dropzone` is z-index 100 and
-//               `.ts-popover` is z-index 60, so on the home screen the home card
-//               (620px, centred) sits ON TOP of the left half of the customize
-//               popover. The 5-across theme grid puts Dark/Midnight/Neon under
-//               the card — clicking Neon on the home screen is genuinely blocked
-//               ("<div class=\"home-card\"> intercepts pointer events"). Sunset /
-//               Ocean happen to clear it. So before any tile CLICK we leave the
-//               home screen via the `#home-live` tile (same real-user path
-//               live-input.spec uses), which hides the dropzone. Boot-state
-//               assertions still read `--accent` on the home screen — no
-//               interaction needed there.
-//   - Popover:  `.ts-customize-menu`, gains `.ts-popover--open` when open. On
-//               viewports <=640px it opens as a bottom sheet (`.popover--sheet`);
-//               the Desktop Chrome project is 1280px wide, so we get the anchored
-//               popover. Either way the tiles are the same nodes.
-//   - Tiles:    `button.customize-theme-tile`, `aria-label="<Name> theme"`
-//               (untranslated — theme display names are not localized), active
-//               class `customize-theme-tile--on`.
-//
-// DETERMINISM: no wall-clock assertions. Everything that happens after boot or
-// after a click is read through `expect.poll` / auto-waiting locators.
+// Home-screen gotcha: `#dropzone` (z-index 100) sits above `.ts-popover`
+// (z-index 60), so the home card covers the Dark/Midnight/Neon tiles. Tests
+// leave the home screen via `#home-live` before clicking a tile. Drop
+// `leaveHomeScreen` once the stacking is fixed.
 
 const THEME_KEY = 'midee.theme'
 const LEGACY_KEY = 'midee.themeIndex'
 
-// Mirrors `Theme.accent` in src/renderer/theme.ts (Pixi hex -> `#rrggbb`).
-// THEMES order is [dark, midnight, neon, sunset, ocean] — the legacy index
-// migration below depends on `neon` being index 2.
+// Mirrors `Theme.accent` in src/renderer/theme.ts. THEMES order is
+// [dark, midnight, neon, sunset, ocean].
 const ACCENT = {
   dark: '#6366f1',
   midnight: '#a78bfa',
@@ -72,10 +42,7 @@ function themeTile(page: Page, name: string) {
 
 async function gotoApp(page: Page): Promise<void> {
   await page.goto('/')
-  // Secure-context guard — same sanity check the playback/export specs use to
-  // prove we're on the served preview origin, not about:blank.
   expect(await page.evaluate(() => window.isSecureContext)).toBe(true)
-  // The Appearance pill is mounted by App.init once the top strip exists.
   await page.locator('#ts-customize').waitFor({ state: 'visible', timeout: 30_000 })
 }
 
@@ -97,8 +64,7 @@ async function openCustomize(page: Page): Promise<void> {
   if (await menu.evaluate((el) => el.classList.contains('ts-popover--open')).catch(() => false))
     return
   const trigger = page.locator('#ts-customize')
-  // Hover first — the top strip dims on idle, mirroring playback.spec's guard
-  // against Playwright's actionability check racing a fade.
+  // Hover first — the top strip dims on idle.
   await trigger.hover()
   await trigger.click()
   await expect(menu).toHaveClass(/ts-popover--open/, { timeout: 15_000 })
@@ -121,7 +87,6 @@ test.describe('Theme selection + persistence', () => {
 
     await selectTheme(page, 'Neon')
 
-    // applyTheme() writes all three accent custom properties onto <html>.
     await expect
       .poll(() => accentVar(page, '--accent'), {
         timeout: 15_000,
@@ -131,10 +96,8 @@ test.describe('Theme selection + persistence', () => {
     expect(await accentVar(page, '--accent-soft')).toBe(`${ACCENT.neon}2e`)
     expect(await accentVar(page, '--accent-glow')).toBe(`${ACCENT.neon}66`)
 
-    // The tile reflects the active selection (App pushes it back into the menu).
     await expect(themeTile(page, 'Neon')).toHaveClass(/customize-theme-tile--on/)
 
-    // Persisted by STABLE ID, not by index — the whole point of the key change.
     await expect
       .poll(() => storedThemeId(page), {
         timeout: 15_000,
@@ -155,7 +118,6 @@ test.describe('Theme selection + persistence', () => {
     await page.reload()
     await page.locator('#ts-customize').waitFor({ state: 'visible', timeout: 30_000 })
 
-    // Boot-time load path: stored id -> theme -> applyTheme.
     await expect
       .poll(() => accentVar(page, '--accent'), {
         timeout: 15_000,
@@ -169,9 +131,7 @@ test.describe('Theme selection + persistence', () => {
   })
 
   test('legacy midee.themeIndex is migrated to a theme id on first load', async ({ page }) => {
-    // Simulate a returning user from before the key change: only the legacy
-    // integer index exists. Seeded via addInitScript so it lands BEFORE the app
-    // bundle reads localStorage.
+    // Returning user with only the legacy integer index; seeded before the bundle runs.
     await page.addInitScript(
       ([themeKey, legacyKey, index]) => {
         localStorage.removeItem(themeKey as string)
@@ -182,7 +142,6 @@ test.describe('Theme selection + persistence', () => {
 
     await gotoApp(page)
 
-    // Index 2 in THEMES === neon.
     await expect
       .poll(() => accentVar(page, '--accent'), {
         timeout: 15_000,
@@ -190,7 +149,6 @@ test.describe('Theme selection + persistence', () => {
       })
       .toBe(ACCENT.neon)
 
-    // The migration writes the id forward so the legacy key is never read again.
     await expect
       .poll(() => storedThemeId(page), {
         timeout: 15_000,

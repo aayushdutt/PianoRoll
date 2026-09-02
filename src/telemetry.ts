@@ -315,10 +315,11 @@ type EventMap = {
   tempo_changed: { bpm: number }
   metronome_toggled: { on: boolean }
 
-  // Customization. instrument_changed now carries `method` so cycle-button and
-  // menu-pick paths are distinguishable (cycling was previously untracked).
-  theme_changed: { theme: string }
-  particle_changed: { style: string }
+  // Customization. `method` distinguishes the topbar cycle button from a menu
+  // pick. `theme` is the display name (kept for existing filters); `theme_id`
+  // is the stable persisted id.
+  theme_changed: { theme: string; theme_id: string; method: 'cycle' | 'menu' }
+  particle_changed: { style: string; method: 'cycle' | 'menu' }
   instrument_changed: { from: string | undefined; to: string; method: 'cycle' | 'menu' }
   // Live commands, split by how they were invoked. The Shift+letter shortcuts
   // and the HUD buttons call the same handlers, so nothing previously recorded

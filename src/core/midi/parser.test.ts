@@ -221,7 +221,6 @@ describe('parseMidiFile — track metadata', () => {
   })
 
   it('wraps colorIndex back to 0 after TRACK_COLOR_SLOTS tracks', async () => {
-    // One more track than there are palette slots — the extra must wrap to 0.
     const count = TRACK_COLOR_SLOTS + 1
     const midi = new Midi()
     for (let i = 0; i < count; i++) {
@@ -238,7 +237,6 @@ describe('parseMidiFile — track metadata', () => {
   })
 
   it('does not carry a literal `color` — tracks only reference a palette slot', async () => {
-    // Themes own the palette; a baked-in colour would go stale on theme change.
     const buf = await makeBuf([{ midi: 60, time: 1, duration: 0.5 }])
     const result = await parseMidiFile(buf, 'test')
     expect(result.tracks[0]).not.toHaveProperty('color')

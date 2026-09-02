@@ -194,7 +194,6 @@ describe('idPersisted', () => {
     const s = idPersisted<Id>(key, 'sunset', ids, legacy)
     expect(s.load()).toBe('neon')
     expect(localStorage.getItem(key)).toBe('neon')
-    // Legacy key is left alone — inert once the new key exists.
     expect(localStorage.getItem(legacyKey)).toBe('2')
   })
 

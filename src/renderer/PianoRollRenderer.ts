@@ -345,11 +345,8 @@ export class PianoRollRenderer {
     this.presentFrame()
   }
 
-  // Clamp + commit a new keyboard height into the renderer, viewport and the
-  // `--keyboard-h` CSS var. Deliberately does NOT rebuild or present, so a
-  // caller that is about to resize (and therefore rebuild anyway) can apply
-  // the height first and bake the keyboard exactly once. Returns whether the
-  // height actually changed.
+  // Clamp + commit a keyboard height without rebuilding or presenting, so a
+  // caller that resizes anyway bakes the keyboard once. Returns whether it changed.
   private applyKeyboardHeight(px: number): boolean {
     const clamped = Math.max(KEYBOARD_HEIGHT_MIN, Math.min(KEYBOARD_HEIGHT_MAX, Math.round(px)))
     if (clamped === this.keyboardHeight) return false
@@ -414,9 +411,8 @@ export class PianoRollRenderer {
       (this.loopNoteStore?.hasRenderableNotes ?? false)
     // Anything that changes frame-to-frame without an external event: a
     // running clock (notes scroll), live/loop note trails (rise and decay),
-    // in-flight particles, or external layers. A layer counts as animating
-    // unless it opts out via `isAnimating()` — today's Learn overlays run
-    // per-frame countdowns/celebrations, so Learn mode never idle-stops.
+    // in-flight particles, or external layers (animating unless they opt out
+    // via `isAnimating()`).
     const animating =
       clock.playing || hasLive || this.particles.hasActive || layersAnimating(this.externalLayers)
     if (animating) {
@@ -809,10 +805,8 @@ export class PianoRollRenderer {
     // Ignore viewport events during export — the exporter owns canvas size
     // until it restores it in its own finally block.
     if (this.exportMode) return
-    // Re-clamp keyboard height so a portrait-sized keyboard doesn't dominate
-    // after rotation into landscape. Applied *before* resize() so the single
-    // rebuildStaticLayers() inside resize() bakes the keyboard once at the
-    // final height, rather than baking twice (old size, then new).
+    // Re-clamp keyboard height (rotation) before resize() so the keyboard
+    // bakes once at the final height.
     const { min, max } = viewportKeyboardBounds()
     this.applyKeyboardHeight(Math.min(max, Math.max(min, this.keyboardHeight)))
     this.resize(window.innerWidth, window.innerHeight)

@@ -17,10 +17,8 @@ export interface MidiTrack {
   colorIndex: number // index into theme.trackColors for theme-aware note/particle rendering
 }
 
-// Size of every theme's `trackColors` palette. `colorIndex` is assigned modulo
-// this so the value is meaningful in any theme; `getTrackColor` wraps again as
-// a safety net. Keep in sync with `Theme.trackColors.length` (theme.test.ts
-// asserts it for every built-in theme).
+// Size of every theme's `trackColors` palette; `colorIndex` is assigned modulo
+// this. Keep in sync with `Theme.trackColors.length` (asserted in theme.test.ts).
 export const TRACK_COLOR_SLOTS = 8
 
 export interface MidiFile {

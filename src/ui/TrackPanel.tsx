@@ -40,8 +40,7 @@ function TrackPanelView(props: PanelProps) {
         <For each={props.tracks()}>
           {(tr) => {
             // Resolve from the active theme so the swatch matches what
-            // NoteRenderer actually paints — the track itself only carries a
-            // palette slot (`colorIndex`), never a literal colour.
+            // NoteRenderer actually paints.
             const color = (): string => hexToCSS(getTrackColor(tr, props.theme()))
             return (
               <label class="track-item">

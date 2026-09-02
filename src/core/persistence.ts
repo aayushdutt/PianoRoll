@@ -45,14 +45,10 @@ function safeSetItem(key: string, value: string): void {
   }
 }
 
-// String id drawn from a fixed roster (theme / instrument / particle style).
-// Ids are stable and order-independent, unlike the integer indices we used to
-// store — reordering a roster no longer silently changes a user's preference.
-//
-// `legacy` opts into a one-shot migration: when the new key is absent but the
-// old integer-index key holds a valid index into `legacy.ids`, that id is
-// returned *and* written under the new key. The legacy key is left in place —
-// it's inert once the new key exists, and keeps a rollback harmless.
+// String id from a fixed roster (theme / instrument / particle style). Ids are
+// order-independent, so reordering a roster can't change a saved preference.
+// `legacy` migrates an old integer-index key once: when the new key is absent
+// and the index is valid, the id is returned and written under the new key.
 export function idPersisted<T extends string>(
   key: string,
   fallback: T,
@@ -69,8 +65,7 @@ export function idPersisted<T extends string>(
   return {
     load(): T {
       const raw = safeGetItem(key)
-      // Present but unrecognised (hand-edited storage, removed roster entry)
-      // falls back rather than reaching for the legacy key.
+      // Present but unrecognised → fallback, without consulting the legacy key.
       if (raw !== null) return parse(raw) ?? fallback
       const migrated = legacy === undefined ? null : migrateLegacyIndex(legacy, parse)
       if (migrated === null) return fallback

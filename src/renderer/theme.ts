@@ -1,7 +1,6 @@
 import type { MidiTrack } from '../core/midi/types'
 
-// Stable identifiers — persisted in localStorage (`midee.theme`), so never
-// rename or reorder-dependent. Display names live in `name`.
+// Persisted in localStorage (`midee.theme`) — never rename.
 export type ThemeId = 'dark' | 'midnight' | 'neon' | 'sunset' | 'ocean'
 
 export interface Theme {
@@ -26,29 +25,23 @@ export interface Theme {
   beatLineAlpha: number
   barLineAlpha: number
 
-  // UI accent as a Pixi hex number — the single source of truth. CSS custom
-  // properties derive their string form via `accentCSS()`.
+  // UI accent as a Pixi hex; CSS gets its string form via `accentCSS()`.
   accent: number
 
   // Per-track note/particle colors — indexed by MidiTrack.colorIndex
   trackColors: number[]
 }
 
-// 0xRRGGBB → '#rrggbb'. Lives here (not ui/utils) so the renderer never
-// imports UI code; ui/utils re-exports it for existing callers.
+// 0xRRGGBB → '#rrggbb'. Lives here so the renderer never imports UI code.
 export function hexToCSS(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`
 }
 
-// String form of the theme accent for CSS custom properties / inline styles.
 export function accentCSS(theme: Theme): string {
   return hexToCSS(theme.accent)
 }
 
-// Colour used for the user's own live-input notes, particles, and keyboard
-// highlights. Ties live play to the first track palette slot so it matches
-// imported single-track MIDI; falls back to the now-line colour for an
-// (impossible today) empty palette.
+// Colour for the user's own live notes, particles, and key highlights.
 export function liveNoteColor(theme: Theme): number {
   return theme.trackColors[0] ?? theme.nowLine
 }

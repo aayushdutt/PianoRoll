@@ -110,8 +110,6 @@ export class KeyboardRenderer {
   build(viewport: Viewport, yOffset: number): void {
     const { keyboardHeight, canvasWidth, pitchMin, pitchMax } = viewport.config
     const positions = viewport.getAllKeyPositions()
-    // Held for the practice-hint layer, which redraws on its own ticker and
-    // needs the live key layout + keyboard height without a `build()` call.
     this.viewport = viewport
 
     // Skip the destroy+re-bake when every input to the bake is unchanged. All
@@ -346,7 +344,6 @@ export class KeyboardRenderer {
     const pending = this.practicePending
     const accepted = this.practiceAccepted
     if ((!pending || pending.size === 0) && (!accepted || accepted.size === 0)) return
-    // No build() yet — the hint geometry has nothing to align to.
     const viewport = this.viewport
     if (!viewport) return
     const yOffset = this.whiteSprite?.y ?? 0
@@ -357,8 +354,6 @@ export class KeyboardRenderer {
     // the chord the remaining keys keep a strong baseline glow.
     const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this.practicePulsePhase))
 
-    // Read live from the Viewport that built the current bake, so hint
-    // geometry always matches the baked sprites.
     const positions = viewport.getAllKeyPositions()
 
     this.whitePracticeHintLayer.y = yOffset
@@ -401,8 +396,6 @@ export class KeyboardRenderer {
     tint: number,
     opts: { bodyAlpha: number; stripAlpha: number; haloScale: number },
   ): void {
-    // Same rect the static bake uses, so the halo hugs the drawn key body
-    // instead of overhanging the 1px seam between white keys.
     const { x, y, w, h, radius } = keyRect(pitch, pos, keyboardHeight)
 
     const halos: readonly [number, number][] = [
@@ -431,9 +424,7 @@ export class KeyboardRenderer {
     return `${p}|${a}`
   }
 
-  // The Viewport that produced the current bake. Held (not snapshotted) so
-  // practice hints read the same key layout and keyboard height the baked
-  // sprites were drawn from. Set by `build()`.
+  // Viewport of the current bake; practice hints read key layout from it.
   private viewport: Viewport | null = null
 
   // Cheap change-detection: concatenate sorted pitch:color pairs. The map is

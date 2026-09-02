@@ -12,7 +12,6 @@ describe('keyRect', () => {
   const KB_HEIGHT = 120
 
   it('insets a white key by 1px horizontally and 2px/4px vertically', () => {
-    // C4 = 60 is a white key.
     expect(isBlackKey(60)).toBe(false)
     expect(keyRect(60, { x: 100, width: 20 }, KB_HEIGHT)).toEqual({
       x: 101,
@@ -24,7 +23,6 @@ describe('keyRect', () => {
   })
 
   it('gives a black key the full position width and 62% of the keyboard height', () => {
-    // C#4 = 61 is a black key.
     expect(isBlackKey(61)).toBe(true)
     expect(keyRect(61, { x: 111.6, width: 11.6 }, KB_HEIGHT)).toEqual({
       x: 111.6,

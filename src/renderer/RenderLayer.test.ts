@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { layersAnimating, type RenderLayer } from './RenderLayer'
 
-// Minimal stub — mount/unmount are never called by `layersAnimating`, which is
-// the whole point of extracting it as a pure function (no Pixi needed).
 const layer = (id: string, isAnimating?: () => boolean): RenderLayer => ({
   id,
   zIndex: 5,

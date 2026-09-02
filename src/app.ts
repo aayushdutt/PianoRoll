@@ -161,7 +161,6 @@ export class App {
   private chordLastSig = ''
   private chordOverlayOn = false
 
-  // Persisted as stable ids; the App works in list indices, so resolve once here.
   private themeIndex = indexOfId(THEMES, themeStore.load())
   private instrumentIndex = indexOfId(INSTRUMENTS, instrumentStore.load())
   private particleIndex = indexOfId(PARTICLE_STYLES, particleStore.load())
@@ -488,8 +487,8 @@ export class App {
       THEMES,
       PARTICLE_STYLES,
       {
-        onSelectTheme: (idx) => this.setThemeByIndex(idx),
-        onSelectParticle: (idx) => this.setParticleByIndex(idx),
+        onSelectTheme: (idx) => this.setThemeByIndex(idx, 'menu'),
+        onSelectParticle: (idx) => this.setParticleByIndex(idx, 'menu'),
         onToggleChord: () => this.toggleChordOverlay(),
         // Locale change is rare, and almost every part of the UI was built
         // with the previous locale baked in via template literals. Reload
@@ -916,15 +915,16 @@ export class App {
   }
 
   private cycleTheme(): void {
-    this.setThemeByIndex((this.themeIndex + 1) % THEMES.length)
+    this.setThemeByIndex((this.themeIndex + 1) % THEMES.length, 'cycle')
   }
 
-  private setThemeByIndex(idx: number): void {
+  private setThemeByIndex(idx: number, method: 'cycle' | 'menu'): void {
     if (idx < 0 || idx >= THEMES.length || idx === this.themeIndex) return
     this.themeIndex = idx
-    this.applyTheme(THEMES[idx]!)
-    themeStore.save(THEMES[idx]!.id)
-    trackEvent('theme_changed', { theme: THEMES[idx]!.name })
+    const theme = THEMES[idx]!
+    this.applyTheme(theme)
+    themeStore.save(theme.id)
+    trackEvent('theme_changed', { theme: theme.name, theme_id: theme.id, method })
   }
 
   private cycleInstrument(): void {
@@ -957,15 +957,15 @@ export class App {
   }
 
   private cycleParticleStyle(): void {
-    this.setParticleByIndex((this.particleIndex + 1) % PARTICLE_STYLES.length)
+    this.setParticleByIndex((this.particleIndex + 1) % PARTICLE_STYLES.length, 'cycle')
   }
 
-  private setParticleByIndex(idx: number): void {
+  private setParticleByIndex(idx: number, method: 'cycle' | 'menu'): void {
     if (idx < 0 || idx >= PARTICLE_STYLES.length || idx === this.particleIndex) return
     this.particleIndex = idx
     this.applyParticleStyle()
     particleStore.save(PARTICLE_STYLES[idx]!.id)
-    trackEvent('particle_changed', { style: PARTICLE_STYLES[idx]!.id })
+    trackEvent('particle_changed', { style: PARTICLE_STYLES[idx]!.id, method })
   }
 
   private applyParticleStyle(): void {
@@ -1787,12 +1787,9 @@ export class App {
 }
 
 // User-preference persistence. Each entry exposes load()/save() backed by
-// localStorage. Defined here (not in persistence.ts) because the rosters they
-// validate against — theme list, instrument list, particle styles — are
-// runtime values owned by other modules.
-//
-// Preferences are stored as stable *ids*, with a one-shot migration from the
-// pre-2026-09 integer-index keys (`midee.*Index`). See `idPersisted`.
+// localStorage. Defined here (not in persistence.ts) because they validate
+// against rosters owned by other modules. Stored as stable ids, with a one-shot
+// migration from the old `midee.*Index` integer keys (see `idPersisted`).
 const themeStore = idPersisted<ThemeId>(
   'midee.theme',
   'sunset',
@@ -1819,9 +1816,7 @@ const metronomeBpmStore = numberPersisted('midee.metronomeBpm', 120, 40, 240)
 // an explicit "false" turns it off.
 const chordOverlayStore = booleanPersisted('midee.chordOverlay', true)
 
-// Persisted ids → the list index the App keeps as runtime state. The stores
-// only ever hand back ids that exist in their roster, so -1 is unreachable;
-// the clamp keeps that guarantee local instead of trusting it at call sites.
+// Persisted id → list index. Stores only return roster ids, so -1 is unreachable.
 function indexOfId<T extends { id: string }>(list: readonly T[], id: string): number {
   return Math.max(
     0,

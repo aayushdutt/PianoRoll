@@ -7,8 +7,7 @@ export function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// Canonical implementation lives in renderer/theme.ts (renderer must not
-// import UI code); re-exported here so existing UI callers keep working.
+// Canonical copy lives in renderer/theme.ts (renderer must not import UI code).
 export { hexToCSS } from '../renderer/theme'
 
 // Narrow viewport = bottom-sheet popover mode. Kept in sync with the CSS

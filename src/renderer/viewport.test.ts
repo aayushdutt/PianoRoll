@@ -135,9 +135,8 @@ describe('Viewport.pitchAtPoint', () => {
     const vp = makeViewport({ pitchMin: 60, pitchMax: 71 })
     const cSharp = vp.getAllKeyPositions().get(61)!
     const xMid = cSharp.x + cSharp.width / 2
-    // keyboardTop = 500, keyboardHeight = 100 → boundary at 500 + 100 * ratio.
+    // keyboardTop = 500, keyboardHeight = 100. Boundary is inclusive.
     const boundary = 500 + 100 * BLACK_KEY_HEIGHT_RATIO
-    // Inclusive on the boundary itself, white one pixel below it.
     expect(vp.pitchAtPoint(xMid, boundary)).toBe(61)
     expect(vp.pitchAtPoint(xMid, boundary + 1)).not.toBe(61)
   })
