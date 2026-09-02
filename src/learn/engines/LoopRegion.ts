@@ -6,6 +6,18 @@
 // The runtime state machine lives in whatever exercise composes these — the
 // math lives here.
 
+import {
+  barSpanBefore,
+  barStartAtOrBefore,
+  isTempoMapSource,
+  type TempoMapSource,
+} from '../../core/midi/tempoMap'
+
+// Bar math takes either a plain BPM (live/metronome contexts with no file) or
+// the loaded file's tempo + meter map, which is what makes loops line up in a
+// piece with tempo or meter changes. Prefer passing the `MidiFile`.
+export type BarTempo = number | TempoMapSource
+
 // A half-open [start, end) time range. `start < end` is an invariant; the
 // helpers below refuse to produce zero-or-negative ranges and callers treat
 // a `null` from `makeRegion` as "loop off".
@@ -22,12 +34,15 @@ export function barsToSeconds(bars: number, bpm: number, beatsPerBar = 4): numbe
   return bars * beatsPerBar * (60 / bpm)
 }
 
-// Snap `t` down to the nearest bar boundary when the metronome is running.
-// Returns `t` unchanged when `enabled` is false. Useful for both ends of a
-// drag-selected range.
-export function barSnap(t: number, bpm: number, enabled: boolean, beatsPerBar = 4): number {
-  if (!enabled || bpm <= 0) return t
-  const secPerBar = beatsPerBar * (60 / bpm)
+// Snap `t` down to the nearest bar boundary. Returns `t` unchanged when
+// `enabled` is false. Useful for both ends of a drag-selected range. With a
+// tempo map, bar counting restarts at every meter change (see tempoMap.ts);
+// `beatsPerBar` is ignored in that case because the meter supplies it.
+export function barSnap(t: number, tempo: BarTempo, enabled: boolean, beatsPerBar = 4): number {
+  if (!enabled) return t
+  if (isTempoMapSource(tempo)) return barStartAtOrBefore(tempo, t)
+  if (tempo <= 0) return t
+  const secPerBar = beatsPerBar * (60 / tempo)
   if (secPerBar <= 0) return t
   return Math.max(0, Math.floor(t / secPerBar) * secPerBar)
 }
@@ -44,7 +59,7 @@ export function barSnap(t: number, bpm: number, enabled: boolean, beatsPerBar = 
 export function makeRegionFromBars(
   playhead: number,
   bars: number | null,
-  bpm: number,
+  tempo: BarTempo,
   pieceDuration: number,
 ): LoopRegion | null {
   if (pieceDuration <= 0) return null
@@ -53,9 +68,13 @@ export function makeRegionFromBars(
     return { start: 0, end: pieceDuration }
   }
   if (bars <= 0) return null
-  const span = barsToSeconds(bars, bpm)
-  if (span <= 0) return null
   const end = Math.min(pieceDuration, Math.max(0, playhead))
+  // The map path measures the actual bars preceding the playhead, so a tempo
+  // or meter change inside the window doesn't stretch or shrink the loop.
+  const span = isTempoMapSource(tempo)
+    ? barSpanBefore(tempo, end, bars)
+    : barsToSeconds(bars, tempo)
+  if (span <= 0) return null
   const start = Math.max(0, end - span)
   if (end - start <= 0) return null
   return { start, end }

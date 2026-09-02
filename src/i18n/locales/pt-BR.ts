@@ -96,6 +96,7 @@ const ptBR: Messages = {
   'hud.mute': 'Silenciar',
   'hud.unmute': 'Ativar som',
   'hud.speed': 'Velocidade · clique para alternar, shift+clique volta',
+  'hud.transpose': 'Transpor · semitons · clique no valor para redefinir',
   'hud.zoom': 'Zoom (altura das notas)',
   'hud.tip.kbdRefHide': 'Ocultar',
   'hud.tip.kbdRefShow': 'Mostrar referência do teclado',
@@ -112,6 +113,9 @@ const ptBR: Messages = {
   'hud.aria.seek': 'Posição',
   'hud.aria.volume': 'Volume',
   'hud.aria.speed': 'Velocidade',
+  'hud.aria.transposeDown': 'Transpor um semitom para baixo',
+  'hud.aria.transposeUp': 'Transpor um semitom para cima',
+  'hud.aria.transposeReset': 'Redefinir a transposição para zero',
   'hud.aria.zoom': 'Zoom',
   'hud.aria.metronomeToggle': 'Alternar metrônomo',
   'hud.aria.bpmDec': 'Diminuir BPM',
@@ -452,6 +456,10 @@ const ptBR: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nada gravado - toque algumas notas com o Gravar ativo.',
+  'toast.midi.pitchFolded.one':
+    '{count} nota fora do alcance de 88 teclas foi trazida para o alcance',
+  'toast.midi.pitchFolded.other':
+    '{count} notas fora do alcance de 88 teclas foram trazidas para o alcance',
 
   'onboarding.localeDetected': 'Mostrando em {language} · troque em Aparência',
 }

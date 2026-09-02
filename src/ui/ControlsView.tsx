@@ -2,7 +2,7 @@ import { createEffect, onCleanup, onMount } from 'solid-js'
 import { t } from '../i18n'
 import type { LiveLooperState } from '../midi/LiveLooper'
 import type { MidiDeviceStatus } from '../midi/MidiInputManager'
-import type { AppMode } from '../store/state'
+import { type AppMode, TRANSPOSE_LIMIT } from '../store/state'
 import { FloatingHud } from './FloatingHud'
 import { icons } from './icons'
 
@@ -77,6 +77,8 @@ export interface HudProps {
   volume: () => number
   speed: () => number
   speedLabel: () => string
+  transpose: () => number
+  onTranspose: (semitones: number) => void
   zoom: () => number
   wakeRef: (fn: () => void) => void
   togglePinRef: (fn: () => void) => void
@@ -473,6 +475,46 @@ export function HudView(props: HudProps) {
           </button>
         </div>
 
+        <div class="hud-divider hud-group--transport" />
+
+        {/* Discrete stepper, no slider: 25 integer positions over a 60px track
+            is unusable, and semitones are things you count, not drag to. The
+            value doubles as the reset button (click → 0), mirroring how the
+            speed chip carries its own action. One data-tip on the group — a
+            nested data-tip would render two bubbles at once. */}
+        <div class="ctrl-group hud-transpose hud-group--transport" data-tip={t('hud.transpose')}>
+          <button
+            type="button"
+            class="hud-transpose-step"
+            id="hud-transpose-dec"
+            aria-label={t('hud.aria.transposeDown')}
+            disabled={props.transpose() <= -TRANSPOSE_LIMIT}
+            onClick={() => props.onTranspose(props.transpose() - 1)}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            class="hud-transpose-val"
+            id="hud-transpose-val"
+            data-off={props.transpose() === 0 ? undefined : ''}
+            aria-label={t('hud.aria.transposeReset')}
+            onClick={() => props.onTranspose(0)}
+          >
+            {formatTranspose(props.transpose())}
+          </button>
+          <button
+            type="button"
+            class="hud-transpose-step"
+            id="hud-transpose-inc"
+            aria-label={t('hud.aria.transposeUp')}
+            disabled={props.transpose() >= TRANSPOSE_LIMIT}
+            onClick={() => props.onTranspose(props.transpose() + 1)}
+          >
+            +
+          </button>
+        </div>
+
         <div class="hud-divider" />
 
         {/* Percentage of the default, not raw pixels-per-second: 200 means
@@ -797,6 +839,13 @@ export function stepSpeedPreset(current: number, delta: number): number {
 // feel. Pull to it whenever the drag lands close enough.
 export function snapTo(value: number, target: number, tolerance: number): number {
   return Math.abs(value - target) <= tolerance ? target : value
+}
+
+// "0" / "+2" / "−3". U+2212 MINUS SIGN, not a hyphen — it matches the metronome
+// stepper's glyph and lines up in the tabular-numerals font.
+export function formatTranspose(semitones: number): string {
+  if (semitones === 0) return '0'
+  return semitones > 0 ? `+${semitones}` : `−${-semitones}`
 }
 
 export function formatSpeed(s: number): string {

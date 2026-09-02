@@ -117,6 +117,7 @@ export const en = {
   'hud.mute': 'Mute',
   'hud.unmute': 'Unmute',
   'hud.speed': 'Playback speed · click to cycle, shift-click back',
+  'hud.transpose': 'Transpose · semitones · click the value to reset',
   'hud.zoom': 'Zoom (note height)',
   'hud.tip.kbdRefHide': 'Hide',
   'hud.tip.kbdRefShow': 'Show keyboard reference',
@@ -135,6 +136,9 @@ export const en = {
   'hud.aria.seek': 'Seek',
   'hud.aria.volume': 'Volume',
   'hud.aria.speed': 'Speed',
+  'hud.aria.transposeDown': 'Transpose down one semitone',
+  'hud.aria.transposeUp': 'Transpose up one semitone',
+  'hud.aria.transposeReset': 'Reset transpose to zero',
   'hud.aria.zoom': 'Zoom',
   'hud.aria.metronomeToggle': 'Toggle metronome',
   'hud.aria.bpmDec': 'Decrease BPM',
@@ -487,6 +491,10 @@ export const en = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nothing recorded - play a few notes while Record is on.',
+  // Fold notice — the file had pitches outside the 88-key range, so they were
+  // moved by whole octaves. Plural via tn().
+  'toast.midi.pitchFolded.one': '{count} note outside the 88-key range was shifted into range',
+  'toast.midi.pitchFolded.other': '{count} notes outside the 88-key range were shifted into range',
 
   // ── Onboarding ─────────────────────────────────────────────
   // Shown once on first visit if a non-English locale was auto-detected,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MasterClock } from '../../core/clock/MasterClock'
-import type { MidiFile } from '../../core/midi/types'
+import { type MidiFile, nominalTempoMap } from '../../core/midi/types'
 import { PracticeEngine } from './PracticeEngine'
 
 function makeClock() {
@@ -33,6 +33,7 @@ function midiWithNotes(notes: Array<{ pitch: number; time: number }>): MidiFile 
     duration: 10,
     bpm: 120,
     timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
     tracks: [
       {
         id: 'rh',
@@ -257,6 +258,7 @@ describe('PracticeEngine step building and peekNextStep', () => {
       duration: 10,
       bpm: 120,
       timeSignature: [4, 4],
+      ...nominalTempoMap(120, [4, 4]),
       tracks: [
         {
           id: 'dr',
@@ -306,6 +308,7 @@ function midiWithTwoTracks(): MidiFile {
     duration: 10,
     bpm: 120,
     timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
     tracks: [
       {
         id: 'rh',

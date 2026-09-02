@@ -102,6 +102,9 @@ export class NoteRenderer {
       const [lo, hi] = visibleNoteRange(track.notes, visStart, visEnd)
       for (let ni = lo; ni < hi; ni++) {
         const note = track.notes[ni]!
+        // No key under this pitch (narrowed viewport, or unfolded data) —
+        // skip rather than paint a zero-width bar at x = 0.
+        if (!viewport.hasKey(note.pitch)) continue
 
         const x = viewport.pitchToX(note.pitch)
         const w = Math.max(viewport.pitchWidth(note.pitch) - 1, 2)

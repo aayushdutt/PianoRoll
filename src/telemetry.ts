@@ -313,6 +313,10 @@ type EventMap = {
   volume_changed: { volume: number }
   zoom_changed: { zoom: number }
   tempo_changed: { bpm: number }
+  // Playback transpose in semitones (-12..12). Settled like the other
+  // *_changed controls: the HUD stepper is click-repeatable, so a walk from
+  // 0 to +5 should report one event carrying +5, not five events.
+  transpose_changed: { semitones: number }
   metronome_toggled: { on: boolean }
 
   // Customization. `method` distinguishes the topbar cycle button from a menu
@@ -332,6 +336,17 @@ type EventMap = {
     method: 'shortcut' | 'button'
   }
   track_toggled: { enabled: boolean }
+
+  // One per parsed user file: what the source actually contains versus what
+  // midee currently models. Answers "how common are out-of-range pitches,
+  // pedalled files, and tempo maps in real uploads?" — the counters that
+  // prioritise the MIDI-fidelity work (docs/MIDI_FIDELITY_PLAN_2026-08-30.md).
+  midi_parse_quality: {
+    target: 'play' | 'learn'
+    out_of_range_notes: number
+    has_sustain_pedal: boolean
+    tempo_events: number
+  }
 
   // Previously-silent failure paths now surfaced as first-class events.
   synth_load_failed: { source: string }

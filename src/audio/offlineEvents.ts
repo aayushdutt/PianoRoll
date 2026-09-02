@@ -2,13 +2,13 @@
 // filtering can be unit-tested without instantiating an OfflineAudioContext
 // (which jsdom lacks) or pulling Tone (which won't resolve under vitest).
 
-import type { MidiFile } from '../core/midi/types'
+import { audibleDuration, type MidiFile } from '../core/midi/types'
 import { midiToNoteName } from './midiNoteName'
 
 export interface OfflineNoteEvent {
   time: number
   note: string
-  duration: number
+  duration: number // audible length (pedal-extended), not the notated one
   velocity: number
 }
 
@@ -26,7 +26,8 @@ export function buildOfflineEvents(
       events.push({
         time: note.time,
         note: midiToNoteName(note.pitch),
-        duration: note.duration,
+        // Offline render has no speed control, so no 1/speed scaling here.
+        duration: audibleDuration(note),
         velocity: note.velocity,
       })
     }

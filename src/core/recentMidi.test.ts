@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MidiFile } from './midi/types'
+import { type MidiFile, nominalTempoMap } from './midi/types'
 
 // `recentMidi` caches its IDB handle at module level, so every test re-imports
 // the module after installing (or removing) a fake `indexedDB`.
@@ -65,6 +65,7 @@ function midiFixture(name: string, duration = 60): MidiFile {
     duration,
     bpm: 120,
     timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
     tracks: [
       {
         id: 'track-0',

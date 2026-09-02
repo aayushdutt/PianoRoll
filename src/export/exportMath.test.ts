@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { MidiFile, MidiNote, MidiTrack } from '../core/midi/types'
+import { type MidiFile, type MidiNote, type MidiTrack, nominalTempoMap } from '../core/midi/types'
 import {
   fitPitchRange,
   overallProgress,
@@ -38,6 +38,7 @@ function midiWith(...trackPitches: number[][]): MidiFile {
     duration: 10,
     bpm: 120,
     timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
     tracks: trackPitches.map(track),
   }
 }

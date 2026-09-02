@@ -99,6 +99,7 @@ const fr: Messages = {
   'hud.mute': 'Couper le son',
   'hud.unmute': 'Rétablir le son',
   'hud.speed': 'Vitesse · clic pour changer, maj+clic pour revenir',
+  'hud.transpose': 'Transposition · demi-tons · cliquez sur la valeur pour réinitialiser',
   'hud.zoom': 'Zoom (hauteur des notes)',
   'hud.tip.kbdRefHide': 'Masquer',
   'hud.tip.kbdRefShow': 'Afficher la référence du clavier',
@@ -115,6 +116,9 @@ const fr: Messages = {
   'hud.aria.seek': 'Position',
   'hud.aria.volume': 'Volume',
   'hud.aria.speed': 'Vitesse',
+  'hud.aria.transposeDown': 'Transposer d’un demi-ton vers le bas',
+  'hud.aria.transposeUp': 'Transposer d’un demi-ton vers le haut',
+  'hud.aria.transposeReset': 'Réinitialiser la transposition à zéro',
   'hud.aria.zoom': 'Zoom',
   'hud.aria.metronomeToggle': 'Activer/désactiver le métronome',
   'hud.aria.bpmDec': 'Diminuer le BPM',
@@ -460,6 +464,10 @@ const fr: Messages = {
     "Rien d'enregistré - jouez quelques notes pendant que Record est activé.",
 
   'onboarding.localeDetected': 'Affichage en {language} · changez dans Apparence',
+  'toast.midi.pitchFolded.one':
+    '{count} note hors de la plage des 88 touches a été ramenée dans la plage',
+  'toast.midi.pitchFolded.other':
+    '{count} notes hors de la plage des 88 touches ont été ramenées dans la plage',
 }
 
 export default fr

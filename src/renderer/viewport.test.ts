@@ -194,6 +194,20 @@ describe('Viewport.buildKeyLayout with narrowed pitch range (fit-to-piece)', () 
     expect(vp.pitchToX(49)).toBeCloseTo(47.333, 2)
   })
 
+  // Draw sites gate on hasKey because pitchToX/pitchWidth fall back to 0 for
+  // an unmapped pitch — a degenerate bar at x = 0 instead of nothing.
+  it('hasKey reports which pitches the current layout can draw', () => {
+    const vp = makeViewport({ canvasWidth: 1000 })
+    expect(vp.hasKey(21)).toBe(true)
+    expect(vp.hasKey(108)).toBe(true)
+    expect(vp.hasKey(20)).toBe(false)
+    expect(vp.hasKey(109)).toBe(false)
+
+    vp.update({ pitchMin: 48, pitchMax: 72 })
+    expect(vp.hasKey(60)).toBe(true)
+    expect(vp.hasKey(47)).toBe(false)
+  })
+
   it('narrowing the range via update() rebuilds the layout wider', () => {
     const vp = makeViewport({ canvasWidth: 1000 })
     const fullWhiteW = vp.pitchWidth(60) // full piano: many white keys → narrow

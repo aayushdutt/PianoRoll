@@ -4297,12 +4297,93 @@ body {
   color: var(--accent);
 }
 
+/* Transpose stepper — a discrete −/value/+ trio. Sized and coloured off the
+   metronome stepper (.hud-metro-step / .hud-metro-bpm) so the two read as the
+   same kind of control, and the value chip takes .speed-chip's off-default
+   accent so a non-zero transpose is noticeable at a glance. */
+/* Tighter than the 6px .ctrl-group default (and than the narrow-viewport
+   override further down, hence the extra specificity): −/value/+ is one
+   control, not three neighbours. */
+.hud-bar .ctrl-group.hud-transpose {
+  gap: 2px;
+}
+
+.hud-transpose-step {
+  width: 18px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  transition:
+    color 0.12s,
+    background 0.12s,
+    transform 0.1s var(--ease-spring);
+}
+.hud-transpose-step:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+.hud-transpose-step:active:not(:disabled) {
+  transform: scale(0.9);
+}
+.hud-transpose-step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.hud-transpose-step:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.hud-transpose-val {
+  /* Fixed at the widest label ("−12") so stepping never resizes the HUD. */
+  width: 3.5ch;
+  padding: 3px 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.hud-transpose-val:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--text);
+}
+.hud-transpose-val:active {
+  transform: scale(0.95);
+}
+.hud-transpose-val:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.hud-transpose-val[data-off] {
+  color: var(--accent);
+}
+
 /* Disable controls during export */
 #hud.hud--exporting .btn-play,
 #hud.hud--exporting .btn-skip,
 #hud.hud--exporting .scrubber,
 #hud.hud--exporting .mini-slider,
 #hud.hud--exporting .speed-chip,
+#hud.hud--exporting .hud-transpose-step,
+#hud.hud--exporting .hud-transpose-val,
 #hud.hud--exporting .ctrl-icon--btn {
   opacity: 0.25;
   pointer-events: none;

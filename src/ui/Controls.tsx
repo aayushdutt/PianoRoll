@@ -48,6 +48,9 @@ export interface ControlsOptions {
   services: AppServices
   onSeek?: (t: number) => void
   onZoom?: (pps: number) => void
+  // App owns the re-derive: the store swaps `loadedMidi`, then the synth has
+  // to be reloaded and rescheduled. Controls only reports the intent.
+  onTranspose?: (semitones: number) => void
   onThemeCycle?: () => void
   onMidiConnect?: () => void
   onOpenTracks?: () => void
@@ -154,6 +157,7 @@ export class Controls {
     const [octave, setOctave] = createSignal(4)
     const [volume, setVolumeSig] = createSignal(store.state.volume ?? 0.8)
     const [speed, setSpeedSig] = createSignal(store.state.speed ?? 1)
+    const [transpose, setTransposeSig] = createSignal(store.state.transpose ?? 0)
     const [zoom, setZoomSig] = createSignal(ZOOM_DEFAULT)
 
     const [uiStore, setUi] = createStore<UiStoreShape>({
@@ -325,6 +329,8 @@ export class Controls {
             volume={volume}
             speed={speed}
             speedLabel={() => formatSpeed(speed())}
+            transpose={transpose}
+            onTranspose={(v) => opts.onTranspose?.(v)}
             zoom={zoom}
             wakeRef={(fn) => {
               this.hudWake = fn
@@ -410,6 +416,12 @@ export class Controls {
           setHasFile(midi !== null)
           this.refreshUi()
         },
+      ),
+      // The store clamps and resets-on-load, so the chip mirrors the store
+      // rather than holding its own truth.
+      watch(
+        () => store.state.transpose,
+        (n) => setTransposeSig(n),
       ),
       watch(
         () => store.state.duration,

@@ -1,11 +1,15 @@
 import type { Messages } from './en'
 
 // Polish has four plural categories (one/few/many/other) where en ships only
-// one/other. The two pluralised keys (`tracks.notes`, `postSession.stats`)
-// therefore carry extra `.few` and `.many` forms. They're declared via this
-// intersection so TypeScript still enforces full key parity for everything
-// else — only these four specific extra keys are permitted, not arbitrary ones.
-type PolishPluralKey = `tracks.notes.${'few' | 'many'}` | `postSession.stats.${'few' | 'many'}`
+// one/other. The pluralised keys (`tracks.notes`, `postSession.stats`,
+// `toast.midi.pitchFolded`) therefore carry extra `.few` and `.many` forms.
+// They're declared via this intersection so TypeScript still enforces full key
+// parity for everything else — only these specific extra keys are permitted,
+// not arbitrary ones.
+type PolishPluralKey =
+  | `tracks.notes.${'few' | 'many'}`
+  | `postSession.stats.${'few' | 'many'}`
+  | `toast.midi.pitchFolded.${'few' | 'many'}`
 
 const pl: Messages & Record<PolishPluralKey, string> = {
   'home.kicker': 'midee · wizualizator MIDI',
@@ -98,6 +102,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'hud.mute': 'Wycisz',
   'hud.unmute': 'Włącz dźwięk',
   'hud.speed': 'Prędkość · kliknij, aby zmienić, shift+klik cofa',
+  'hud.transpose': 'Transpozycja · półtony · kliknij wartość, aby zresetować',
   'hud.zoom': 'Powiększenie (wysokość nut)',
   'hud.tip.kbdRefHide': 'Ukryj',
   'hud.tip.kbdRefShow': 'Pokaż układ klawiszy',
@@ -113,6 +118,9 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'hud.aria.seek': 'Przewiń',
   'hud.aria.volume': 'Głośność',
   'hud.aria.speed': 'Prędkość',
+  'hud.aria.transposeDown': 'Transponuj o pół tonu w dół',
+  'hud.aria.transposeUp': 'Transponuj o pół tonu w górę',
+  'hud.aria.transposeReset': 'Zresetuj transpozycję do zera',
   'hud.aria.zoom': 'Powiększenie',
   'hud.aria.metronomeToggle': 'Przełącz metronom',
   'hud.aria.bpmDec': 'Zmniejsz BPM',
@@ -443,6 +451,14 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'toast.session.saved': 'midee-session.mid · {seconds} s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nic nie nagrano - zagraj kilka nut przy włączonym nagrywaniu.',
+  'toast.midi.pitchFolded.one':
+    '{count} nuta spoza zakresu 88 klawiszy została przeniesiona do zakresu',
+  'toast.midi.pitchFolded.few':
+    '{count} nuty spoza zakresu 88 klawiszy zostały przeniesione do zakresu',
+  'toast.midi.pitchFolded.many':
+    '{count} nut spoza zakresu 88 klawiszy zostało przeniesionych do zakresu',
+  'toast.midi.pitchFolded.other':
+    '{count} nuty spoza zakresu 88 klawiszy zostały przeniesione do zakresu',
 
   'onboarding.localeDetected': 'Język interfejsu: {language} · zmień w sekcji Wygląd',
 }

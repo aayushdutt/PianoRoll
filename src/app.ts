@@ -3,7 +3,8 @@ import { INSTRUMENTS, type InstrumentId, SynthEngine } from './audio/SynthEngine
 import { MasterClock } from './core/clock/MasterClock'
 import { type BusNoteEvent, InputBus } from './core/input/InputBus'
 import { lazyHandle } from './core/lazyHandle'
-import { parseMidiFile } from './core/midi/parser'
+import { parseMidiFileWithStats } from './core/midi/parser'
+import { secondsPerBarAt } from './core/midi/tempoMap'
 import type { MidiFile } from './core/midi/types'
 import { detectChord } from './core/music/ChordDetector'
 import {
@@ -28,7 +29,7 @@ import {
 // heavy VideoExporter chunk (see Promise.all removal below).
 import type { ExportStage, VideoExporter } from './export/VideoExporter'
 import { audioBufferToWav } from './export/wav'
-import { setLocale, t } from './i18n'
+import { setLocale, t, tn } from './i18n'
 import { CaptureFanout } from './midi/CaptureFanout'
 import { ComputerKeyboardInput } from './midi/ComputerKeyboardInput'
 import { LiveLooper, type LiveLooperState } from './midi/LiveLooper'
@@ -247,11 +248,17 @@ export class App {
           })
         },
       },
-      // Bar-snap when the metronome is running — rounds loop length to the
-      // nearest whole bar at current BPM (4/4). Off → freeform length.
+      // Bar-snap when the metronome is running — the metronome is the on/off
+      // switch, but the bar LENGTH comes from the loaded file's tempo map and
+      // meter (the notes are what the loop has to line up with). Only with no
+      // file loaded does the metronome's own BPM define the bar, at 4/4.
       (raw) => {
         if (!this.metronome.running.value) return raw
-        const secPerBar = (60 / this.metronome.bpm.value) * 4
+        const midi = this.store.state.loadedMidi
+        const secPerBar = midi
+          ? secondsPerBarAt(midi, this.clock.currentTime)
+          : (60 / this.metronome.bpm.value) * 4
+        if (secPerBar <= 0) return raw
         const bars = Math.max(1, Math.round(raw / secPerBar))
         return bars * secPerBar
       },
@@ -341,6 +348,7 @@ export class App {
         this.liveNotes.reset()
       },
       onZoom: (pps) => this.renderer.setZoom(pps),
+      onTranspose: (semitones) => this.applyTranspose(semitones),
       onThemeCycle: () => this.cycleTheme(),
       onMidiConnect: () => void this.connectMidi(),
       onOpenTracks: () => this.trackPanel.toggle(),
@@ -439,6 +447,7 @@ export class App {
         trackEvent('track_toggled', { enabled })
       },
       () => this.openFilePicker(),
+      (id) => !this.synth.getDisabledTrackIds().has(id),
     )
     this.trackPanel.setTrigger(this.controls.tracksButton)
 
@@ -846,6 +855,50 @@ export class App {
 
   // Play-mode MIDI loader. Learn has its own loader on LearnController that
   // never touches AppState — see the mode dispatch at the DropZone callback.
+  // Pushes a parsed file into Play state and returns the DERIVED MidiFile -
+  // the one the synth, renderer and export must all use. The store keeps the
+  // parsed original as `sourceMidi`. Folding is silent-but-audible otherwise,
+  // so tell the user once when notes had to move.
+  private completePlayLoad(source: MidiFile): MidiFile {
+    const foldedCount = this.store.completePlayLoad(source)
+    if (foldedCount > 0) this.showError(tn('toast.midi.pitchFolded', foldedCount))
+    // completePlayLoad always sets loadedMidi.
+    return this.store.state.loadedMidi ?? source
+  }
+
+  // Transpose re-derives `loadedMidi` from `sourceMidi` and pushes the result
+  // down the same three paths a load uses — renderer, synth, scheduler. The
+  // renderer half is free: `store.setTranspose` writes a NEW loadedMidi object,
+  // which re-fires <PlayMode/>'s effect (renderer.loadMidi + trackPanel.render)
+  // synchronously before this method continues.
+  //
+  // Two things that load resets and a transpose must not: the fold toast (a
+  // transpose legitimately pushes notes off the 88 keys — telling the user
+  // every click would be noise) and the muted tracks (`synth.load` clears them,
+  // `renderer.loadMidi` re-shows every track), so the mute set is restored
+  // right after.
+  private applyTranspose(semitones: number): void {
+    if (this.store.state.mode !== 'play' || this.store.state.sourceMidi === null) return
+    const before = this.store.state.transpose
+    const next = this.store.setTranspose(semitones)
+    if (next === before) return
+    trackEventSettled('transpose_changed', { semitones: next })
+
+    const midi = this.store.state.loadedMidi
+    if (!midi) return
+    const muted = [...this.synth.getDisabledTrackIds()]
+    this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
+    for (const id of muted) {
+      this.synth.setTrackEnabled(id, false)
+      this.renderer.setTrackVisible(id, false)
+    }
+    // Rebuilds the Tone.Part from the new pitches. If the transport is running
+    // it restarts at the same instant, so a transpose mid-playback is seamless;
+    // if it isn't, this just drops the stale schedule.
+    this.synth.seek(this.clock.currentTime)
+    this.liveNotes.reset()
+  }
+
   private async loadMidi(file: File, source: 'drag' | 'picker' = 'picker'): Promise<void> {
     const previousMode = this.store.state.mode
     const previousMidi = this.store.state.loadedMidi
@@ -855,17 +908,24 @@ export class App {
     this.showLoading()
 
     try {
-      const midi = await parseMidiFile(file)
+      const { midi: parsed, stats } = await parseMidiFileWithStats(file)
+      trackEvent('midi_parse_quality', {
+        target: 'play',
+        out_of_range_notes: stats.outOfRangeNotes,
+        has_sustain_pedal: stats.hasSustainPedal,
+        tempo_events: stats.tempoEvents,
+      })
+      // completePlayLoad derives (88-key fold) then flips mode to 'play';
+      // <PlayMode/>'s effect drives renderer.loadMidi, trackPanel.render,
+      // document.title, and dropzone.hide off the new loadedMidi. The synth
+      // must hear the DERIVED file, so it loads after this, not before.
+      const midi = this.completePlayLoad(parsed)
       this.synth.load(midi).catch((err) => {
         console.error('SynthEngine.load failed:', err)
         // Visuals load but there's no sound — a silent session-killer that
         // produced zero telemetry before.
         trackEvent('synth_load_failed', { source })
       })
-      // completePlayLoad flips mode to 'play'; <PlayMode/>'s effect then
-      // drives renderer.loadMidi, trackPanel.render, document.title, and
-      // dropzone.hide off the new loadedMidi.
-      this.store.completePlayLoad(midi)
       this.resetPlaybackTelemetry()
       // Recorded only on the success path, so a file the parser choked on
       // never comes back as a recent card. Fire-and-forget by design —
@@ -1013,7 +1073,12 @@ export class App {
     // loaded MidiFile to .mid bytes. Especially useful after "Open in file
     // mode" from a live session, where the raw .mid was never downloaded.
     if (settings.output === 'midi') {
-      const bytes = await midiFileToBytes(midi)
+      // The only "download MIDI" path for a loaded file, and the one place
+      // that must NOT follow the derive step: transpose (and the 88-key fold)
+      // are playback settings, so the .mid the user gets back carries the
+      // pitches their file actually contained. Audio/video below deliberately
+      // export `midi` — the derived file is what you hear and see.
+      const bytes = await midiFileToBytes(this.store.state.sourceMidi ?? midi)
       triggerMidiDownload(bytes, `${sanitiseFilename(midi.name)}.mid`)
       exportModal.close()
       this.showSuccess(`↓ ${sanitiseFilename(midi.name)}.mid`)
@@ -1572,12 +1637,12 @@ export class App {
   // completePlayLoad, <PlayMode/>'s effect owns the surface side effects
   // (renderer.loadMidi, trackPanel.render, dropzone.hide,
   // keyboardInput.enable, document.title) — don't repeat them here.
-  private loadSessionAsFile(midi: import('./core/midi/types').MidiFile): void {
+  private loadSessionAsFile(source: MidiFile): void {
     this.resetInteractionState()
     this.store.beginPlayLoad()
     this.renderer.clearMidi()
+    const midi = this.completePlayLoad(source)
     this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
-    this.store.completePlayLoad(midi)
     this.resetPlaybackTelemetry()
     // You just performed this and pressed Play — the strongest version of the
     // "you asked for it, so it plays" rule the other loaders follow.

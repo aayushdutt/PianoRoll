@@ -91,6 +91,7 @@ const zhCN: Messages = {
   'hud.mute': '静音',
   'hud.unmute': '取消静音',
   'hud.speed': '播放速度 · 点击切换，Shift+点击返回',
+  'hud.transpose': '移调 · 半音 · 点击数值可重置',
   'hud.zoom': '缩放（音符高度）',
   'hud.tip.kbdRefHide': '隐藏',
   'hud.tip.kbdRefShow': '显示键位参考',
@@ -106,6 +107,9 @@ const zhCN: Messages = {
   'hud.aria.seek': '定位',
   'hud.aria.volume': '音量',
   'hud.aria.speed': '速度',
+  'hud.aria.transposeDown': '向下移调一个半音',
+  'hud.aria.transposeUp': '向上移调一个半音',
+  'hud.aria.transposeReset': '将移调重置为零',
   'hud.aria.zoom': '缩放',
   'hud.aria.metronomeToggle': '切换节拍器',
   'hud.aria.bpmDec': '降低 BPM',
@@ -424,6 +428,8 @@ const zhCN: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': '还没有录到内容 · 请在录制开启时弹几个音符。',
+  'toast.midi.pitchFolded.one': '{count} 个音符超出 88 键范围，已按八度移入范围内',
+  'toast.midi.pitchFolded.other': '{count} 个音符超出 88 键范围，已按八度移入范围内',
 
   'onboarding.localeDetected': '当前显示为 {language} · 可在“外观”中切换',
 }
