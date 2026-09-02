@@ -277,6 +277,23 @@ describe('PracticeEngine step building and peekNextStep', () => {
     expect(onWaitStart).not.toHaveBeenCalled()
   })
 
+  it('skips notes off the 88-key piano — nothing to press, so never a wait step', () => {
+    // A0 is 21, C8 is 108. 10 and 120 are audible but have no key.
+    const midi = midiWithNotes([
+      { pitch: 10, time: 1 },
+      { pitch: 120, time: 1 },
+      { pitch: 60, time: 2 },
+      { pitch: 115, time: 2 },
+    ])
+    const { clock, engine, onWaitStart } = makeEngine(midi)
+    clock.emit(1.01)
+    expect(engine.isWaiting).toBe(false)
+    clock.emit(2.0)
+    expect(engine.isWaiting).toBe(true)
+    expect([...(engine.peekNextStep()?.pitches ?? [])]).toEqual([60])
+    expect(onWaitStart).toHaveBeenCalledTimes(1)
+  })
+
   it('peekNextStep returns the upcoming step before it is cleared', () => {
     const { engine } = makeEngine()
     const step = engine.peekNextStep()

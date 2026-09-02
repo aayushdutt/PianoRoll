@@ -17,16 +17,6 @@ export interface ViewportConfig {
   pitchMax?: number
 }
 
-// Once per session, not per frame — this fires from inside the draw loop.
-let warnedUnmappedPitch = false
-function warnUnmappedPitch(pitch: number): void {
-  if (warnedUnmappedPitch) return
-  warnedUnmappedPitch = true
-  console.warn(
-    `[viewport] pitch ${pitch} has no key on the full 88-key layout — it should have been folded by deriveMidi().`,
-  )
-}
-
 export class Viewport {
   private cfg: ViewportConfig
   private keyPositions: Map<number, { x: number; width: number }> = new Map()
@@ -82,19 +72,11 @@ export class Viewport {
 
   // Draw sites must gate on this: pitchToX/pitchWidth fall back to 0 for an
   // unmapped pitch, which paints a degenerate bar at x = 0 instead of nothing.
-  // A miss is legitimate under a narrowed pitchMin/pitchMax ("Fit to piece"),
-  // so it only warns (once, dev-only) when the layout spans the full piano —
-  // there it means out-of-range data slipped past deriveMidi.
+  // A miss is normal — a note off the 88 keys (in the file, or pushed there by
+  // a transpose) or outside a narrowed pitchMin/pitchMax ("Fit to piece"). It
+  // is still audible; it just has nowhere to be drawn.
   hasKey(pitch: number): boolean {
-    if (this.keyPositions.has(pitch)) return true
-    if (import.meta.env.DEV && this.isFullRange()) warnUnmappedPitch(pitch)
-    return false
-  }
-
-  private isFullRange(): boolean {
-    return (
-      (this.cfg.pitchMin ?? MIDI_MIN) <= MIDI_MIN && (this.cfg.pitchMax ?? MIDI_MAX) >= MIDI_MAX
-    )
+    return this.keyPositions.has(pitch)
   }
 
   pitchToX(pitch: number): number {

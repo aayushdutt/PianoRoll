@@ -491,10 +491,6 @@ export const en = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nothing recorded - play a few notes while Record is on.',
-  // Fold notice — the file had pitches outside the 88-key range, so they were
-  // moved by whole octaves. Plural via tn().
-  'toast.midi.pitchFolded.one': '{count} note outside the 88-key range was shifted into range',
-  'toast.midi.pitchFolded.other': '{count} notes outside the 88-key range were shifted into range',
 
   // ── Onboarding ─────────────────────────────────────────────
   // Shown once on first visit if a non-English locale was auto-detected,

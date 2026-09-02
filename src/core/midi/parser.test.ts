@@ -356,6 +356,31 @@ describe('parseMidiFile — sustain pedal', () => {
     expect(note.releaseAt).toBeCloseTo(parsed.duration, 1)
   })
 
+  it('extends the file duration to a pedal-up past the last note-off', async () => {
+    // Playback stops and the export trims at `duration`; a final chord held
+    // on the pedal must not be cut off at its notated end.
+    const midi = new Midi()
+    const t = midi.addTrack()
+    t.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })
+    t.addNote({ midi: 64, time: 1, duration: 0.5, velocity: 0.8 })
+    t.addCC({ number: 64, value: 1, time: 0.9 })
+    t.addCC({ number: 64, value: 0, time: 4 })
+    const parsed = await parseMidiFile(midi.toArray().slice().buffer as ArrayBuffer, 'tail')
+    expect(parsed.tracks[0]!.notes[1]!.releaseAt).toBeCloseTo(4, 1)
+    expect(parsed.duration).toBeCloseTo(4, 1)
+  })
+
+  it('keeps the notated duration when the pedal lifts before the last note-off', async () => {
+    const midi = new Midi()
+    const t = midi.addTrack()
+    t.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })
+    t.addNote({ midi: 64, time: 3, duration: 1, velocity: 0.8 })
+    t.addCC({ number: 64, value: 1, time: 0 })
+    t.addCC({ number: 64, value: 0, time: 2 })
+    const parsed = await parseMidiFile(midi.toArray().slice().buffer as ArrayBuffer, 'lift')
+    expect(parsed.duration).toBeCloseTo(4, 1)
+  })
+
   it('cuts a sustained note when the same pitch is re-struck', async () => {
     const midi = new Midi()
     const t = midi.addTrack()
@@ -372,7 +397,7 @@ describe('parseMidiFile — sustain pedal', () => {
 
 // ── parseMidiFileWithStats — parse-quality counters ───────────────────────
 // These feed the `midi_parse_quality` telemetry event: they describe the
-// SOURCE file, so they're measured before any derive/fold step runs.
+// SOURCE file, so they're measured before the transpose derive runs.
 
 describe('parseMidiFileWithStats', () => {
   it('counts notes outside the 88-key range', async () => {

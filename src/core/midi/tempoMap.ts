@@ -12,6 +12,9 @@
 //   quarter notes per minute. secondsPerBeat = (4/denominator) * (60/bpm).
 // - `transport.bpm` call sites must keep using the scalar `MidiFile.bpm`.
 //   Nothing here is for them.
+// - The walker is a plain beat-by-beat loop from each meter anchor. It is
+//   not meant to run per frame: BeatGrid caches its output per file, and the
+//   loop helpers run on user actions.
 
 import type { MeterEntry, TempoEntry } from './types'
 
@@ -22,49 +25,43 @@ export interface TempoMapSource {
 }
 
 const NOMINAL_BPM = 120
-const NOMINAL_NUMERATOR = 4
-const NOMINAL_DENOMINATOR = 4
+const NOMINAL_METER: MeterEntry = { time: 0, numerator: 4, denominator: 4 }
 
 // Absurd tempi (a corrupt file can encode 60000 bpm) would otherwise spin the
-// beat walker for millions of iterations inside a draw call.
+// beat walker for millions of iterations.
 const MIN_BEAT_SECONDS = 0.02
+
+// Index of the last entry at or before `time`; 0 when `time` precedes the
+// first entry (it is extended back to the piece start). Binary search because
+// DAW exports with tempo ramps can carry thousands of entries.
+function indexAt(entries: readonly { time: number }[], time: number): number {
+  let lo = 0
+  let hi = entries.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1
+    if (entries[mid]!.time <= time) lo = mid
+    else hi = mid - 1
+  }
+  return lo
+}
 
 export function tempoAt(src: TempoMapSource, time: number): number {
   const tempos = src.tempos
   if (tempos.length === 0) return NOMINAL_BPM
-  // Files carry a handful of tempo events; a linear scan beats a binary search
-  // and keeps this allocation-free.
-  let bpm = tempos[0]!.bpm
-  for (let i = 1; i < tempos.length; i++) {
-    const t = tempos[i]!
-    if (t.time > time) break
-    bpm = t.bpm
-  }
+  const bpm = tempos[indexAt(tempos, time)]!.bpm
   return bpm > 0 ? bpm : NOMINAL_BPM
 }
 
-const NOMINAL_METER: MeterEntry = {
-  time: 0,
-  numerator: NOMINAL_NUMERATOR,
-  denominator: NOMINAL_DENOMINATOR,
-}
-
-// The meter in force at `time`, plus the timestamp bar counting restarts from
-// (the meter's own `time`, floored at 0 for a map that starts late).
+// The meter in force at `time`. Bar counting restarts from the meter's own
+// `time` (floored at 0 for a map that starts late).
 export function meterAt(src: TempoMapSource, time: number): MeterEntry {
   const meters = src.timeSignatures
   if (meters.length === 0) return NOMINAL_METER
-  let meter = meters[0]!
-  for (let i = 1; i < meters.length; i++) {
-    const m = meters[i]!
-    if (m.time > time) break
-    meter = m
-  }
-  return meter
+  return meters[indexAt(meters, time)]!
 }
 
 function beatSeconds(bpm: number, denominator: number): number {
-  const den = denominator > 0 ? denominator : NOMINAL_DENOMINATOR
+  const den = denominator > 0 ? denominator : NOMINAL_METER.denominator
   return Math.max(MIN_BEAT_SECONDS, (4 / den) * (60 / bpm))
 }
 
@@ -74,24 +71,22 @@ export function secondsPerBeatAt(src: TempoMapSource, time: number): number {
 }
 
 // Length of the bar starting at `time`, assuming constant tempo across it.
-// Exact for the common case (tempo changes land on bar lines); the walkers
-// below integrate beat-by-beat when they don't.
+// Exact for the common case (tempo changes land on bar lines); the walker
+// integrates beat-by-beat when they don't.
 export function secondsPerBarAt(src: TempoMapSource, time: number): number {
   const meter = meterAt(src, time)
-  const numerator = meter.numerator > 0 ? meter.numerator : NOMINAL_NUMERATOR
+  const numerator = meter.numerator > 0 ? meter.numerator : NOMINAL_METER.numerator
   return numerator * beatSeconds(tempoAt(src, time), meter.denominator)
 }
 
 // Return `false` to stop the walk early.
 export type BeatVisitor = (time: number, isBar: boolean) => boolean | void
 
-// Safety net: a pathological map can't hang a frame.
+// Safety net: a pathological map can't hang the caller.
 const MAX_STEPS = 1_000_000
 
 // Walk beat lines in [from, to], emitting only inside the window but counting
-// bars from each meter anchor so phase is correct however far in the walker
-// starts. Constant-tempo stretches before the window are skipped analytically,
-// which is what makes this cheap enough for a per-frame draw call.
+// bars from each meter anchor so phase is correct regardless of the window.
 export function forEachBeatLine(
   src: TempoMapSource,
   from: number,
@@ -109,39 +104,19 @@ export function forEachBeatLine(
     const segStart = mi === 0 ? 0 : Math.max(0, meter.time)
     const next = meters[mi + 1]
     const segEnd = next ? Math.max(segStart, next.time) : Number.POSITIVE_INFINITY
+    // A segment entirely before the window carries no phase into the next
+    // one (bars reset at the meter change), so it can be skipped whole.
     if (segEnd <= from) continue
     if (segStart > to) break
 
-    const numerator = meter.numerator > 0 ? meter.numerator : NOMINAL_NUMERATOR
+    const numerator = meter.numerator > 0 ? meter.numerator : NOMINAL_METER.numerator
     let t = segStart
-    let beat = 0
-
-    while (t <= to && t < segEnd) {
+    for (let beat = 0; t <= to && t < segEnd; beat++) {
       if (++steps > MAX_STEPS) return
-      const dur = beatSeconds(tempoAt(src, t), meter.denominator)
-      if (t >= from) {
-        if (visit(t, beat % numerator === 0) === false) return
-        t += dur
-        beat++
-        continue
-      }
-      // Still before the window: jump whole beats up to the next boundary that
-      // could change `dur` (a tempo change, the window start, or the meter end).
-      const limit = Math.min(from, segEnd, nextTempoTimeAfter(src, t))
-      const skip = Math.max(1, Math.floor((limit - t) / dur))
-      t += skip * dur
-      beat += skip
+      if (t >= from && visit(t, beat % numerator === 0) === false) return
+      t += beatSeconds(tempoAt(src, t), meter.denominator)
     }
   }
-}
-
-function nextTempoTimeAfter(src: TempoMapSource, time: number): number {
-  const tempos = src.tempos
-  for (let i = 0; i < tempos.length; i++) {
-    const t = tempos[i]!
-    if (t.time > time) return t.time
-  }
-  return Number.POSITIVE_INFINITY
 }
 
 export interface BeatLine {
@@ -149,8 +124,6 @@ export interface BeatLine {
   isBar: boolean
 }
 
-// Array-returning convenience over `forEachBeatLine` — for tests and cold
-// paths. The renderer uses the visitor form to stay allocation-free.
 export function beatLinesBetween(src: TempoMapSource, from: number, to: number): BeatLine[] {
   const out: BeatLine[] = []
   forEachBeatLine(src, from, to, (time, isBar) => {
@@ -175,9 +148,7 @@ export function barStartAtOrBefore(src: TempoMapSource, time: number): number {
   const cutoff = time + 0.0005
   let last = 0
   forEachBeatLine(src, 0, cutoff, (t, isBar) => {
-    if (!isBar) return
-    if (t > cutoff) return false
-    last = t
+    if (isBar) last = t
   })
   return Math.min(last, time)
 }
@@ -186,19 +157,9 @@ export function barStartAtOrBefore(src: TempoMapSource, time: number): number {
 // the real map rather than a constant. Clamps at 0 (the piece start).
 export function barSpanBefore(src: TempoMapSource, endTime: number, bars: number): number {
   if (bars <= 0 || endTime <= 0) return 0
-  const cutoff = endTime + 0.0005
-  // Ring buffer of the last `bars + 1` bar lines: the one `bars` back is the
-  // span's start. Bounded memory regardless of piece length.
-  const ring: number[] = new Array(bars + 1).fill(0)
-  let count = 0
-  forEachBeatLine(src, 0, cutoff, (t, isBar) => {
-    if (!isBar) return
-    if (t > cutoff) return false
-    ring[count % ring.length] = t
-    count++
-  })
-  if (count === 0) return endTime
-  const start = count > bars ? ring[(count - 1 - bars) % ring.length]! : 0
+  const lines = barBoundariesBetween(src, 0, endTime + 0.0005)
+  if (lines.length === 0) return endTime
+  const start = lines.length > bars ? lines[lines.length - 1 - bars]! : 0
   return Math.max(0, endTime - start)
 }
 

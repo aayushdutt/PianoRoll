@@ -35,7 +35,7 @@ export class EmptyMidiError extends Error {
 // (the only place the raw @tonejs/midi object exists) and reported by the
 // caller — the parser itself stays side-effect-free.
 export interface MidiParseStats {
-  outOfRangeNotes: number // notes outside A0–C8, i.e. what deriveMidi will fold
+  outOfRangeNotes: number // notes outside A0–C8: audible, but nothing to draw them on
   hasSustainPedal: boolean // any CC64 event, on any track
   tempoEvents: number // >1 means the file has a tempo map we currently flatten
 }
@@ -97,15 +97,27 @@ export async function parseMidiFileWithStats(
 
   if (tracks.length === 0) throw new EmptyMidiError()
 
-  // Pedal resolution runs on RAW pitches — it is pitch-independent, and
-  // deriveMidi (transpose + octave fold) preserves `releaseAt` downstream.
+  // Pedal resolution is pitch-independent, so it runs here on the parsed
+  // pitches; deriveMidi (transpose) preserves `releaseAt` downstream.
+  //
+  // `duration` must cover the pedalled tail: playback stops and the export
+  // trims at `duration`, so a final chord held on the pedal past its notated
+  // end would otherwise be cut off mid-ring. An unlifted pedal is clamped to
+  // the notated end inside buildPedalIntervals, so only an explicit pedal-up
+  // past the last note-off can extend it.
+  let duration = midi.duration
   if (hasSustainPedal) {
     const pedalByChannel = new Map<number, PedalInterval[]>()
     for (const [channel, events] of pedalEventsByChannel) {
       pedalByChannel.set(channel, buildPedalIntervals(events, midi.duration))
     }
     const sustained = applySustain(tracks, pedalByChannel)
-    for (let i = 0; i < tracks.length; i++) tracks[i]!.notes = sustained[i]!
+    for (let i = 0; i < tracks.length; i++) {
+      tracks[i]!.notes = sustained[i]!
+      for (const n of sustained[i]!) {
+        if (n.releaseAt !== undefined && n.releaseAt > duration) duration = n.releaseAt
+      }
+    }
   }
 
   // Tempo/meter maps. `TempoEvent.time` is optional and `TimeSignatureEvent`
@@ -138,7 +150,7 @@ export async function parseMidiFileWithStats(
   return {
     midi: {
       name: rawName.replace(/\.mid[i]?$/i, ''),
-      duration: midi.duration,
+      duration,
       bpm,
       timeSignature: [num, den] as [number, number],
       tempos,

@@ -1,5 +1,5 @@
 import type { MasterClock } from '../../core/clock/MasterClock'
-import type { MidiFile } from '../../core/midi/types'
+import { MIDI_MAX, MIDI_MIN, type MidiFile } from '../../core/midi/types'
 import { createEventSignal } from '../../store/eventSignal'
 
 // Minimum gap between two consecutive note-onsets to consider them a *new*
@@ -338,6 +338,9 @@ export class PracticeEngine {
       if (track.isDrum) continue
       if (this.visibleTrackIds && !this.visibleTrackIds.has(track.id)) continue
       for (const note of track.notes) {
+        // No key for it on an 88-key piano — the player can't press it, and
+        // the roll doesn't draw it, so waiting on it would stall forever.
+        if (note.pitch < MIDI_MIN || note.pitch > MIDI_MAX) continue
         onsets.push({
           time: note.time,
           pitch: note.pitch,

@@ -428,8 +428,6 @@ const zhCN: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': '还没有录到内容 · 请在录制开启时弹几个音符。',
-  'toast.midi.pitchFolded.one': '{count} 个音符超出 88 键范围，已按八度移入范围内',
-  'toast.midi.pitchFolded.other': '{count} 个音符超出 88 键范围，已按八度移入范围内',
 
   'onboarding.localeDetected': '当前显示为 {language} · 可在“外观”中切换',
 }

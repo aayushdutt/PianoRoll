@@ -1,4 +1,3 @@
-import { deriveMidi } from '../core/midi/derive'
 import { parseMidiFileWithStats } from '../core/midi/parser'
 import type { MidiFile } from '../core/midi/types'
 import { forgetRecent, readRecentMidi, rememberRecent } from '../core/recentMidi'
@@ -273,16 +272,13 @@ export class LearnController {
 
   // Learn's counterpart to `AppStore.completePlayLoad`: the single gate every
   // Learn loader (file, sample, recent, cross-mode hand-off) funnels through.
-  // The derive step runs here so the renderer, the synth and PracticeEngine
-  // all read the same pitches — an unfolded note is invisible on the roll
-  // (Viewport has no geometry above C8) but still expected by the scorer.
   //
-  // Fixed at transpose 0 by design: Play's `transpose` is a per-piece playback
+  // No transpose here by design: Play's `transpose` is a per-piece playback
   // setting on `AppStore`, and Learn keeps its MIDI on `LearnState` precisely
   // so the two modes never share transport state. Practising a piece a
   // semitone off what the app told you to play would also be a scoring trap.
-  private async consumeMidi(source: MidiFile): Promise<void> {
-    const { midi } = deriveMidi(source, { transpose: 0 })
+  // Notes off the 88 keys are audible but undrawn; PracticeEngine skips them.
+  private async consumeMidi(midi: MidiFile): Promise<void> {
     // A newly selected piece is a fresh practice session. Do not inherit the
     // previous exercise's playhead, hand focus, loop, or wait state.
     if (this.runner?.isActive) this.runner.close('abandoned')

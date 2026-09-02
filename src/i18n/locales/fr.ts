@@ -464,10 +464,6 @@ const fr: Messages = {
     "Rien d'enregistré - jouez quelques notes pendant que Record est activé.",
 
   'onboarding.localeDetected': 'Affichage en {language} · changez dans Apparence',
-  'toast.midi.pitchFolded.one':
-    '{count} note hors de la plage des 88 touches a été ramenée dans la plage',
-  'toast.midi.pitchFolded.other':
-    '{count} notes hors de la plage des 88 touches ont été ramenées dans la plage',
 }
 
 export default fr

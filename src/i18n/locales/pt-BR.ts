@@ -456,10 +456,6 @@ const ptBR: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nada gravado - toque algumas notas com o Gravar ativo.',
-  'toast.midi.pitchFolded.one':
-    '{count} nota fora do alcance de 88 teclas foi trazida para o alcance',
-  'toast.midi.pitchFolded.other':
-    '{count} notas fora do alcance de 88 teclas foram trazidas para o alcance',
 
   'onboarding.localeDetected': 'Mostrando em {language} · troque em Aparência',
 }

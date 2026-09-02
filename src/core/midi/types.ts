@@ -48,7 +48,9 @@ export interface MeterEntry {
 
 export interface MidiFile {
   name: string
-  duration: number // seconds
+  // Seconds. The end of the last audible note — a pedalled tail counts, so
+  // playback and export run until the sound actually stops.
+  duration: number
   // Nominal/display tempo and meter: the first event of each map. Also the
   // seconds↔ticks anchor for `transport.bpm`. Do NOT walk the map at those
   // call sites — note times are already resolved seconds.

@@ -256,17 +256,24 @@ describe('createAppStore transpose', () => {
     expect(store.state.loadedMidi).toBeNull()
   })
 
-  it('folds notes a transpose pushes past C8 back into the 88-key range', () => {
-    // deriveMidi order is transpose-then-fold: C8 (108) + 5 = 113, which has
-    // no key geometry, so it comes back an octave down at 101.
+  it('loads the parsed file as-is: loadedMidi is sourceMidi until a transpose', () => {
+    const store = createAppStore()
+    // Solid wraps store objects in proxies, so compare through the store:
+    // one underlying object → one proxy.
+    store.completePlayLoad(midiWithPitches(108, 21, 10))
+    expect(store.state.loadedMidi).toBe(store.state.sourceMidi)
+    expect(pitchesOf(store.state.loadedMidi)).toEqual([108, 21, 10])
+  })
+
+  it('lets a transpose push notes off the 88 keys without folding them', () => {
+    // Out-of-range notes stay audible and are simply not drawn; the store
+    // never rewrites pitches by octaves.
     const store = createAppStore()
     store.completePlayLoad(midiWithPitches(108, 21))
-    expect(pitchesOf(store.state.loadedMidi)).toEqual([108, 21])
     store.setTranspose(5)
-    expect(pitchesOf(store.state.loadedMidi)).toEqual([101, 26])
-    // …and symmetrically off the bottom: A0 (21) − 5 = 16 → 28.
+    expect(pitchesOf(store.state.loadedMidi)).toEqual([113, 26])
     store.setTranspose(-5)
-    expect(pitchesOf(store.state.loadedMidi)).toEqual([103, 28])
+    expect(pitchesOf(store.state.loadedMidi)).toEqual([103, 16])
   })
 
   it('preserves releaseAt (pedal-extended notes) through a transpose', () => {
