@@ -1,7 +1,7 @@
 import { Container, Graphics } from 'pixi.js'
 import { GlowFilter } from 'pixi-filters'
 import type { LiveNote, LiveNoteStore } from '../midi/LiveNoteStore'
-import type { Theme } from './theme'
+import { liveNoteColor, type Theme } from './theme'
 import type { Viewport } from './viewport'
 
 // Renders live MIDI note trails. Held notes grow upward from the strike line;
@@ -71,7 +71,7 @@ export class LiveNoteRenderer {
 
     // Live notes take the theme's primary track color so they visually tie
     // into the UI accent and any imported MIDI notes.
-    const color = this.theme.trackColors[0] ?? this.theme.nowLine
+    const color = liveNoteColor(this.theme)
     const { pixelsPerSecond } = viewport.config
     const nowY = viewport.nowLineY
 

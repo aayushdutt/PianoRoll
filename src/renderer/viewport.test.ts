@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isBlackKey, type MidiNote } from '../core/midi/types'
+import { BLACK_KEY_HEIGHT_RATIO } from './keyGeometry'
 import { Viewport, type ViewportConfig, visibleNoteRange } from './viewport'
 
 const note = (time: number, duration: number): MidiNote => ({
@@ -128,6 +129,17 @@ describe('Viewport.pitchAtPoint', () => {
     const pitch = vp.pitchAtPoint(xMid, 580)
     expect(pitch).not.toBeNull()
     expect(isBlackKey(pitch!)).toBe(false)
+  })
+
+  it('places the black/white zone boundary at BLACK_KEY_HEIGHT_RATIO of the keyboard', () => {
+    const vp = makeViewport({ pitchMin: 60, pitchMax: 71 })
+    const cSharp = vp.getAllKeyPositions().get(61)!
+    const xMid = cSharp.x + cSharp.width / 2
+    // keyboardTop = 500, keyboardHeight = 100 → boundary at 500 + 100 * ratio.
+    const boundary = 500 + 100 * BLACK_KEY_HEIGHT_RATIO
+    // Inclusive on the boundary itself, white one pixel below it.
+    expect(vp.pitchAtPoint(xMid, boundary)).toBe(61)
+    expect(vp.pitchAtPoint(xMid, boundary + 1)).not.toBe(61)
   })
 
   it('resolves a clearly-white region to its white key in both zones', () => {

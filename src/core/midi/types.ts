@@ -14,9 +14,14 @@ export interface MidiTrack {
   instrument: number // GM program number 0–127
   isDrum: boolean
   notes: MidiNote[]
-  color: number // PixiJS hex color — stable base color used for track list toggle
   colorIndex: number // index into theme.trackColors for theme-aware note/particle rendering
 }
+
+// Size of every theme's `trackColors` palette. `colorIndex` is assigned modulo
+// this so the value is meaningful in any theme; `getTrackColor` wraps again as
+// a safety net. Keep in sync with `Theme.trackColors.length` (theme.test.ts
+// asserts it for every built-in theme).
+export const TRACK_COLOR_SLOTS = 8
 
 export interface MidiFile {
   name: string

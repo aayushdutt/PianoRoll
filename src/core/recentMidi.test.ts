@@ -76,7 +76,6 @@ function midiFixture(name: string, duration = 60): MidiFile {
           { pitch: 60, time: 0, duration: 1, velocity: 0.8 },
           { pitch: 64, time: 1, duration: 1, velocity: 0.8 },
         ],
-        color: 0x6366f1,
         colorIndex: 0,
       },
     ],

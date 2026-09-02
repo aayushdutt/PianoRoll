@@ -7,9 +7,9 @@ export function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-export function hexToCSS(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`
-}
+// Canonical implementation lives in renderer/theme.ts (renderer must not
+// import UI code); re-exported here so existing UI callers keep working.
+export { hexToCSS } from '../renderer/theme'
 
 // Narrow viewport = bottom-sheet popover mode. Kept in sync with the CSS
 // breakpoint used by the `.popover--sheet` styling.

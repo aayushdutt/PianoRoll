@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { booleanPersisted, indexPersisted, jsonPersisted, numberPersisted } from './persistence'
+import { booleanPersisted, idPersisted, jsonPersisted, numberPersisted } from './persistence'
 
 // Vitest runs in Node — no real DOM. Shim just enough of Storage for these
 // tests; reverted in afterAll so this file doesn't leak globals into others.
@@ -90,7 +90,7 @@ describe('jsonPersisted', () => {
   })
 })
 
-// booleanPersisted / numberPersisted / indexPersisted each have distinct
+// booleanPersisted / numberPersisted / idPersisted each have distinct
 // parse logic. jsdom provides localStorage; clear between each test.
 
 describe('booleanPersisted', () => {
@@ -164,36 +164,61 @@ describe('numberPersisted', () => {
   })
 })
 
-describe('indexPersisted', () => {
-  const key = 'midee.test.idx'
+describe('idPersisted', () => {
+  const key = 'midee.test.id'
+  const legacyKey = 'midee.test.idIndex'
+  const ids = ['dark', 'midnight', 'neon', 'sunset'] as const
+  type Id = (typeof ids)[number]
+  const legacy = { key: legacyKey, ids }
+
   beforeEach(() => localStorage.clear())
 
-  it('round-trips a valid index', () => {
-    const s = indexPersisted(key, 0, 5)
-    s.save(3)
-    expect(s.load()).toBe(3)
+  it('round-trips a valid id', () => {
+    const s = idPersisted<Id>(key, 'sunset', ids)
+    s.save('neon')
+    expect(localStorage.getItem(key)).toBe('neon')
+    expect(s.load()).toBe('neon')
   })
 
-  it('accepts 0 and maxExclusive-1 as the valid boundaries', () => {
-    const s = indexPersisted(key, 0, 5)
-    s.save(0)
-    expect(s.load()).toBe(0)
-    s.save(4)
-    expect(s.load()).toBe(4)
+  it('returns the fallback when the key is missing', () => {
+    expect(idPersisted<Id>(key, 'sunset', ids).load()).toBe('sunset')
   })
 
-  it('returns the fallback for maxExclusive itself (out of range)', () => {
-    localStorage.setItem(key, '5')
-    expect(indexPersisted(key, 0, 5).load()).toBe(0)
+  it('returns the fallback for an id that is not in the roster', () => {
+    localStorage.setItem(key, 'chartreuse')
+    expect(idPersisted<Id>(key, 'sunset', ids).load()).toBe('sunset')
   })
 
-  it('returns the fallback for negative values', () => {
-    localStorage.setItem(key, '-1')
-    expect(indexPersisted(key, 2, 5).load()).toBe(2)
+  it('migrates a legacy integer index and writes it under the new key', () => {
+    localStorage.setItem(legacyKey, '2') // ids[2] === 'neon'
+    const s = idPersisted<Id>(key, 'sunset', ids, legacy)
+    expect(s.load()).toBe('neon')
+    expect(localStorage.getItem(key)).toBe('neon')
+    // Legacy key is left alone — inert once the new key exists.
+    expect(localStorage.getItem(legacyKey)).toBe('2')
   })
 
-  it('returns the fallback for non-integers', () => {
-    localStorage.setItem(key, '2.5')
-    expect(indexPersisted(key, 0, 5).load()).toBe(0)
+  it('ignores a legacy index that is out of range', () => {
+    localStorage.setItem(legacyKey, '9')
+    const s = idPersisted<Id>(key, 'sunset', ids, legacy)
+    expect(s.load()).toBe('sunset')
+    expect(localStorage.getItem(key)).toBeNull()
+  })
+
+  it('ignores a non-integer legacy value', () => {
+    localStorage.setItem(legacyKey, 'neon')
+    expect(idPersisted<Id>(key, 'sunset', ids, legacy).load()).toBe('sunset')
+  })
+
+  it('prefers the new key over the legacy index and never re-migrates', () => {
+    localStorage.setItem(key, 'midnight')
+    localStorage.setItem(legacyKey, '2')
+    expect(idPersisted<Id>(key, 'sunset', ids, legacy).load()).toBe('midnight')
+  })
+
+  it('does not consult the legacy key when the stored id is invalid', () => {
+    localStorage.setItem(key, 'bogus')
+    localStorage.setItem(legacyKey, '2')
+    expect(idPersisted<Id>(key, 'sunset', ids, legacy).load()).toBe('sunset')
   })
 })

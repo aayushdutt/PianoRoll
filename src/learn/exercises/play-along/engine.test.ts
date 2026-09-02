@@ -92,7 +92,6 @@ function makeMidi(): MidiFile {
         channel: 0,
         instrument: 0,
         isDrum: false,
-        color: 0xffffff,
         colorIndex: 0,
         notes: [
           // Two simple chord steps: 2 s (C4+E4+G4), then 4 s (F4+A4+C5).
@@ -121,7 +120,6 @@ function makeSplitHandMidi(): MidiFile {
         channel: 0,
         instrument: 0,
         isDrum: false,
-        color: 0xffffff,
         colorIndex: 0,
         notes: [{ pitch: 48, time: 2, duration: 0.5, velocity: 1 }],
       },
@@ -131,7 +129,6 @@ function makeSplitHandMidi(): MidiFile {
         channel: 1,
         instrument: 0,
         isDrum: false,
-        color: 0xffffff,
         colorIndex: 1,
         notes: [{ pitch: 72, time: 4, duration: 0.5, velocity: 1 }],
       },
@@ -376,7 +373,6 @@ describe('PlayAlongEngine', () => {
           channel: 0,
           instrument: 0,
           isDrum: false,
-          color: 0xffffff,
           colorIndex: 0,
           notes: [{ pitch: 60, time: 1, duration: 0.5, velocity: 1 }],
         },

@@ -46,4 +46,28 @@ export interface RenderLayer {
   // Called when static state changes (viewport resize, theme swap, keyboard
   // height, zoom). Redraw anything that depends on layout.
   rebuild?(ctx: RenderContext): void
+
+  // Whether this layer still has something to animate right now. The renderer
+  // idle-stops its ticker once nothing on screen is moving; a layer that
+  // returns `false` is declaring it will draw identical pixels until something
+  // calls back into it.
+  //
+  // Omitting the hook (or returning `true`) means "always animating", which
+  // keeps the render loop alive. That is the safe default: a layer whose
+  // imperative API (pulse, celebrate, …) doesn't call `renderer.wake()` MUST
+  // NOT return `false`, or the effect would never be drawn.
+  isAnimating?(): boolean
+}
+
+// Whether any registered layer still needs per-frame redraws. Extracted as a
+// pure function so the idle-stop decision is testable without a Pixi
+// Application: `PianoRollRenderer.onTick` folds it in with the clock / live
+// note / particle checks.
+export function layersAnimating(layers: readonly RenderLayer[]): boolean {
+  for (const layer of layers) {
+    // Omitting the hook means "always animating" — the conservative default
+    // that matches the behaviour before `isAnimating` existed.
+    if (!layer.isAnimating || layer.isAnimating()) return true
+  }
+  return false
 }

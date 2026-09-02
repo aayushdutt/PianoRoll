@@ -157,7 +157,6 @@ function track(id: string, notes: MidiNote[]): MidiTrack {
     instrument: 0,
     isDrum: false,
     notes,
-    color: 0xffffff,
     colorIndex: 0,
   }
 }

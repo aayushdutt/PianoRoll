@@ -1,6 +1,11 @@
 import type { MidiTrack } from '../core/midi/types'
 
+// Stable identifiers — persisted in localStorage (`midee.theme`), so never
+// rename or reorder-dependent. Display names live in `name`.
+export type ThemeId = 'dark' | 'midnight' | 'neon' | 'sunset' | 'ocean'
+
 export interface Theme {
+  id: ThemeId
   name: string
   background: number
 
@@ -21,18 +26,31 @@ export interface Theme {
   beatLineAlpha: number
   barLineAlpha: number
 
-  uiAccentCSS: string
+  // UI accent as a Pixi hex number — the single source of truth. CSS custom
+  // properties derive their string form via `accentCSS()`.
+  accent: number
 
   // Per-track note/particle colors — indexed by MidiTrack.colorIndex
   trackColors: number[]
 }
 
-// Pixi colours are numbers; `uiAccentCSS` is the string form the CSS custom
-// properties consume. Falls back to the Sunset accent if a theme ever carries
-// something that is not a plain #rrggbb.
-export function uiAccentHex(theme: Theme): number {
-  const parsed = Number.parseInt(theme.uiAccentCSS.replace('#', ''), 16)
-  return Number.isFinite(parsed) ? parsed : 0xf97316
+// 0xRRGGBB → '#rrggbb'. Lives here (not ui/utils) so the renderer never
+// imports UI code; ui/utils re-exports it for existing callers.
+export function hexToCSS(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`
+}
+
+// String form of the theme accent for CSS custom properties / inline styles.
+export function accentCSS(theme: Theme): string {
+  return hexToCSS(theme.accent)
+}
+
+// Colour used for the user's own live-input notes, particles, and keyboard
+// highlights. Ties live play to the first track palette slot so it matches
+// imported single-track MIDI; falls back to the now-line colour for an
+// (impossible today) empty palette.
+export function liveNoteColor(theme: Theme): number {
+  return theme.trackColors[0] ?? theme.nowLine
 }
 
 export function getTrackColor(track: MidiTrack, theme: Theme): number {
@@ -40,6 +58,7 @@ export function getTrackColor(track: MidiTrack, theme: Theme): number {
 }
 
 export const darkTheme: Theme = {
+  id: 'dark',
   name: 'Dark',
   background: 0x09090f,
   noteRadius: 4,
@@ -55,11 +74,12 @@ export const darkTheme: Theme = {
   nowLineGlow: 0xffffff,
   beatLineAlpha: 0.028,
   barLineAlpha: 0.07,
-  uiAccentCSS: '#6366f1',
+  accent: 0x6366f1,
   trackColors: [0x6366f1, 0x818cf8, 0x60a5fa, 0xa78bfa, 0xf472b6, 0x34d399, 0xfbbf24, 0xfb923c],
 }
 
 export const midnightTheme: Theme = {
+  id: 'midnight',
   name: 'Midnight',
   background: 0x050510,
   noteRadius: 4,
@@ -75,11 +95,12 @@ export const midnightTheme: Theme = {
   nowLineGlow: 0xaaaaff,
   beatLineAlpha: 0.025,
   barLineAlpha: 0.06,
-  uiAccentCSS: '#a78bfa',
+  accent: 0xa78bfa,
   trackColors: [0xa78bfa, 0xc084fc, 0x818cf8, 0xe879f9, 0x7dd3fc, 0xf9a8d4, 0x93c5fd, 0x6ee7b7],
 }
 
 export const neonTheme: Theme = {
+  id: 'neon',
   name: 'Neon',
   background: 0x030306,
   noteRadius: 4,
@@ -95,11 +116,12 @@ export const neonTheme: Theme = {
   nowLineGlow: 0x00ffaa,
   beatLineAlpha: 0.035,
   barLineAlpha: 0.09,
-  uiAccentCSS: '#00d4aa',
+  accent: 0x00d4aa,
   trackColors: [0x00ffaa, 0x00e5ff, 0x39ff14, 0xff6bff, 0xffe600, 0xff4040, 0x00bfff, 0xff9100],
 }
 
 export const sunsetTheme: Theme = {
+  id: 'sunset',
   name: 'Sunset',
   background: 0x0e0608,
   noteRadius: 4,
@@ -115,11 +137,12 @@ export const sunsetTheme: Theme = {
   nowLineGlow: 0xff8c5a,
   beatLineAlpha: 0.03,
   barLineAlpha: 0.075,
-  uiAccentCSS: '#f97316',
+  accent: 0xf97316,
   trackColors: [0xf97316, 0xfbbf24, 0xef4444, 0xec4899, 0xff8c5a, 0xfde68a, 0xff6b9d, 0xfca5a5],
 }
 
 export const oceanTheme: Theme = {
+  id: 'ocean',
   name: 'Ocean',
   background: 0x040d14,
   noteRadius: 4,
@@ -135,7 +158,7 @@ export const oceanTheme: Theme = {
   nowLineGlow: 0x38bdf8,
   beatLineAlpha: 0.028,
   barLineAlpha: 0.07,
-  uiAccentCSS: '#38bdf8',
+  accent: 0x38bdf8,
   trackColors: [0x38bdf8, 0x06b6d4, 0x6366f1, 0x34d399, 0xa78bfa, 0x4ade80, 0x22d3ee, 0x67e8f9],
 }
 

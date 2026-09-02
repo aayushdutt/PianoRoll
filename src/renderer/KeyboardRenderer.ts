@@ -1,7 +1,8 @@
-import type { Application } from 'pixi.js'
+import type { Application, Ticker } from 'pixi.js'
 import { Container, Graphics, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
 import { isBlackKey, MIDI_MAX, MIDI_MIN } from '../core/midi/types'
-import type { Theme } from './theme'
+import { keyRect } from './keyGeometry'
+import { liveNoteColor, type Theme } from './theme'
 import type { Viewport } from './viewport'
 
 // The static keyboard base is split into two RenderTextures — a white-keys
@@ -16,22 +17,6 @@ import type { Viewport } from './viewport'
 //   2. whiteActiveLayer  — per-frame: tinted overlay for pressed white keys
 //   3. blackSprite       — blacks + bevels + rails
 //   4. blackActiveLayer  — per-frame: tinted overlay for pressed black keys
-
-// Convert a CSS-style hex color (`#abcdef` / `#abc`) into a Pixi 0xRRGGBB
-// number. Returns null on parse failure so callers can fall back.
-function parseHexColor(s: string): number | null {
-  const m = s.trim().match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
-  if (!m) return null
-  let hex = m[1]!
-  if (hex.length === 3) {
-    hex = hex
-      .split('')
-      .map((c) => c + c)
-      .join('')
-  }
-  const n = parseInt(hex, 16)
-  return Number.isFinite(n) ? n : null
-}
 
 // One 96×96 greyscale noise tile is enough — it tiles imperceptibly
 // across 88 keys. Cached at module scope so theme rebuilds don't
@@ -81,10 +66,9 @@ export class KeyboardRenderer {
   private blackPracticeHintLayer: Graphics
   private practiceSignature = ''
   private practicePulsePhase = 0
-  private practiceTickerHandler: ((ticker: import('pixi.js').Ticker) => void) | null = null
+  private practiceTickerHandler: ((ticker: Ticker) => void) | null = null
   private practicePending: ReadonlySet<number> | null = null
   private practiceAccepted: ReadonlySet<number> | null = null
-  private practiceTheme: Theme | null = null
 
   // Snapshot of the last-drawn pitch→color map as a single signature string.
   // If nothing changed we skip the clear + redraw entirely (common during
@@ -126,9 +110,9 @@ export class KeyboardRenderer {
   build(viewport: Viewport, yOffset: number): void {
     const { keyboardHeight, canvasWidth, pitchMin, pitchMax } = viewport.config
     const positions = viewport.getAllKeyPositions()
-    // Snapshot for the practice-hint layer (which redraws on its own ticker
-    // and doesn't otherwise have a Viewport reference handy).
-    this.lastPositions = new Map(positions)
+    // Held for the practice-hint layer, which redraws on its own ticker and
+    // needs the live key layout + keyboard height without a `build()` call.
+    this.viewport = viewport
 
     // Skip the destroy+re-bake when every input to the bake is unchanged. All
     // the baked pixels depend on: canvas width, keyboard height, the pitch
@@ -138,18 +122,8 @@ export class KeyboardRenderer {
     const sig =
       `${canvasWidth}x${keyboardHeight}|${pitchMin ?? 21}-${pitchMax ?? 108}|` +
       `${this.theme.whiteKey}.${this.theme.blackKey}.${this.theme.keyBorder}|y=${yOffset}`
-    if (sig === this.lastBuildSignature && this.whiteSprite && this.blackSprite) {
-      // Positions may still need to be re-cached if the caller swapped the
-      // Viewport instance — but sig encodes every positional input, so
-      // referential equality is fine here too.
-      if (!this.lastPositions) this.lastPositions = new Map(positions)
-      return
-    }
+    if (sig === this.lastBuildSignature && this.whiteSprite && this.blackSprite) return
     this.lastBuildSignature = sig
-
-    // Snapshot for the practice-hint layer (which redraws on its own ticker
-    // and doesn't otherwise have a Viewport reference handy).
-    this.lastPositions = new Map(positions)
 
     // Destroy previous textures/sprites to avoid memory leaks. destroy()
     // also removes the sprite from its parent container.
@@ -169,16 +143,11 @@ export class KeyboardRenderer {
 
     // White keys: body + ivory warmth + lighting depth.
     const whiteLayer = new Graphics()
-    const wMargin = 1
-    const wRadius = 3
     for (let p = MIDI_MIN; p <= MIDI_MAX; p++) {
       if (isBlackKey(p)) continue
       const pos = positions.get(p)
       if (!pos) continue
-      const x = pos.x + wMargin
-      const y = 2
-      const w = pos.width - wMargin * 2
-      const h = keyboardHeight - 4
+      const { x, y, w, h, radius: wRadius } = keyRect(p, pos, keyboardHeight)
 
       // Body
       whiteLayer.roundRect(x, y, w, h, wRadius).fill({ color: this.theme.whiteKey })
@@ -227,16 +196,11 @@ export class KeyboardRenderer {
     // overlay below can show through inter-black-key gaps.
     const blackBake = new Container()
     const blackLayer = new Graphics()
-    const bRadius = 2
-    const blackHeight = keyboardHeight * 0.62
     for (let p = MIDI_MIN; p <= MIDI_MAX; p++) {
       if (!isBlackKey(p)) continue
       const pos = positions.get(p)
       if (!pos) continue
-      const x = pos.x
-      const y = 0
-      const w = pos.width
-      const h = blackHeight
+      const { x, y, w, h, radius: bRadius } = keyRect(p, pos, keyboardHeight)
 
       // Body
       blackLayer.roundRect(x, y, w, h, bRadius).fill({ color: this.theme.blackKey })
@@ -308,7 +272,7 @@ export class KeyboardRenderer {
 
     const { keyboardHeight } = viewport.config
     const positions = viewport.getAllKeyPositions()
-    const fallback = this.theme.trackColors[0] ?? this.theme.nowLine
+    const fallback = liveNoteColor(this.theme)
 
     // Halos drawn first (so the solid body sits on top).
     const halos: readonly [number, number][] = [
@@ -322,12 +286,7 @@ export class KeyboardRenderer {
       const tint = color || fallback
       const isBlack = isBlackKey(pitch)
       const layer = isBlack ? this.blackActiveLayer : this.whiteActiveLayer
-      const h = isBlack ? keyboardHeight * 0.62 : keyboardHeight - 4
-      const margin = isBlack ? 0 : 1
-      const x = pos.x + margin
-      const w = pos.width - margin * 2
-      const y = isBlack ? 0 : 2
-      const radius = isBlack ? 2 : 3
+      const { x, y, w, h, radius } = keyRect(pitch, pos, keyboardHeight)
 
       for (const [expand, alpha] of halos) {
         layer.roundRect(x - expand, y - expand, w + expand * 2, h + expand * 2, radius + expand)
@@ -345,7 +304,6 @@ export class KeyboardRenderer {
     // Colors baked into the active-key fill changed — force a redraw.
     this.activeLayerDirty = true
     // Practice hint colours follow the active theme accent.
-    this.practiceTheme = theme
     this.practiceSignature = ''
   }
 
@@ -356,11 +314,9 @@ export class KeyboardRenderer {
   setPracticeHints(
     pending: ReadonlySet<number> | null,
     accepted: ReadonlySet<number> | null,
-    theme: Theme,
   ): void {
     this.practicePending = pending
     this.practiceAccepted = accepted
-    this.practiceTheme = theme
     const sig = this.hintSignature(pending, accepted)
     if (sig !== this.practiceSignature) {
       this.practiceSignature = sig
@@ -390,33 +346,32 @@ export class KeyboardRenderer {
     const pending = this.practicePending
     const accepted = this.practiceAccepted
     if ((!pending || pending.size === 0) && (!accepted || accepted.size === 0)) return
-    const theme = this.practiceTheme ?? this.theme
+    // No build() yet — the hint geometry has nothing to align to.
+    const viewport = this.viewport
+    if (!viewport) return
     const yOffset = this.whiteSprite?.y ?? 0
-    const totalH = this.whiteSprite?.height ?? 0
-    if (totalH === 0) return
+    const kbHeight = viewport.config.keyboardHeight
+    if (kbHeight === 0) return
 
     // Pulse: 0..1 sine, normalised so even when the user has played part of
     // the chord the remaining keys keep a strong baseline glow.
     const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this.practicePulsePhase))
 
-    // Use the exact key positions captured during the latest static keyboard
-    // build so hint geometry matches the baked sprites.
-    const positions = this.lastPositions
-    if (!positions) return
+    // Read live from the Viewport that built the current bake, so hint
+    // geometry always matches the baked sprites.
+    const positions = viewport.getAllKeyPositions()
 
     this.whitePracticeHintLayer.y = yOffset
     this.blackPracticeHintLayer.y = yOffset
-    const accent = theme.uiAccentCSS
-    const tint = parseHexColor(accent) ?? theme.trackColors[0] ?? theme.nowLine
+    const tint = this.theme.accent
     const acceptedTint = 0x9ee7b8
-    const fullKbHeight = totalH
 
     if (accepted) {
       for (const pitch of accepted) {
         const pos = positions.get(pitch)
         if (!pos) continue
         const layer = isBlackKey(pitch) ? this.blackPracticeHintLayer : this.whitePracticeHintLayer
-        this.drawPracticeKey(layer, pitch, pos, fullKbHeight, acceptedTint, {
+        this.drawPracticeKey(layer, pitch, pos, kbHeight, acceptedTint, {
           bodyAlpha: isBlackKey(pitch) ? 0.36 : 0.25,
           stripAlpha: 0.58,
           haloScale: 0.55,
@@ -430,7 +385,7 @@ export class KeyboardRenderer {
       if (!pos) continue
       const isBlack = isBlackKey(pitch)
       const layer = isBlack ? this.blackPracticeHintLayer : this.whitePracticeHintLayer
-      this.drawPracticeKey(layer, pitch, pos, fullKbHeight, tint, {
+      this.drawPracticeKey(layer, pitch, pos, kbHeight, tint, {
         bodyAlpha: (isBlack ? 0.32 : 0.22) * pulse,
         stripAlpha: 0.55 * pulse,
         haloScale: pulse,
@@ -442,16 +397,13 @@ export class KeyboardRenderer {
     layer: Graphics,
     pitch: number,
     pos: { x: number; width: number },
-    fullKbHeight: number,
+    keyboardHeight: number,
     tint: number,
     opts: { bodyAlpha: number; stripAlpha: number; haloScale: number },
   ): void {
-    const x = pos.x
-    const w = pos.width
-    const isBlack = isBlackKey(pitch)
-    const h = isBlack ? fullKbHeight * 0.62 : fullKbHeight - 4
-    const y = isBlack ? 0 : 2
-    const radius = isBlack ? 2 : 3
+    // Same rect the static bake uses, so the halo hugs the drawn key body
+    // instead of overhanging the 1px seam between white keys.
+    const { x, y, w, h, radius } = keyRect(pitch, pos, keyboardHeight)
 
     const halos: readonly [number, number][] = [
       [12, 0.05 * opts.haloScale],
@@ -479,9 +431,10 @@ export class KeyboardRenderer {
     return `${p}|${a}`
   }
 
-  // Cached so practice-hints can render without reaching back into Viewport.
-  // Captured during `build()` from the same Viewport instance.
-  private lastPositions: Map<number, { x: number; width: number }> | null = null
+  // The Viewport that produced the current bake. Held (not snapshotted) so
+  // practice hints read the same key layout and keyboard height the baked
+  // sprites were drawn from. Set by `build()`.
+  private viewport: Viewport | null = null
 
   // Cheap change-detection: concatenate sorted pitch:color pairs. The map is
   // small (≤ ~10 active pitches at once) so this is essentially free and

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { PracticeEngine } from '../../learn/engines/PracticeEngine'
 import type { MasterClock } from '../clock/MasterClock'
 import { EmptyMidiError, parseMidiFile } from './parser'
+import { TRACK_COLOR_SLOTS } from './types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -219,19 +220,29 @@ describe('parseMidiFile — track metadata', () => {
     expect(result.tracks[0]?.name).toBe('Track 1')
   })
 
-  it('wraps color index back to 0 after 10 tracks', async () => {
-    // Build a MIDI with 11 tracks — the 11th (index 10) must wrap to colorIndex 0.
+  it('wraps colorIndex back to 0 after TRACK_COLOR_SLOTS tracks', async () => {
+    // One more track than there are palette slots — the extra must wrap to 0.
+    const count = TRACK_COLOR_SLOTS + 1
     const midi = new Midi()
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < count; i++) {
       const track = midi.addTrack()
-      track.addNote({ midi: 60 + i, time: i + 1, duration: 0.5, velocity: 0.8 })
+      track.addNote({ midi: 40 + i, time: i + 1, duration: 0.5, velocity: 0.8 })
     }
     const buf = midi.toArray().slice().buffer as ArrayBuffer
     const result = await parseMidiFile(buf, 'test')
-    expect(result.tracks).toHaveLength(11)
-    expect(result.tracks[10]?.colorIndex).toBe(0)
-    expect(result.tracks[0]?.colorIndex).toBe(0)
-    expect(result.tracks[9]?.colorIndex).toBe(9)
+    expect(result.tracks).toHaveLength(count)
+    expect(result.tracks.map((t) => t.colorIndex)).toEqual([
+      ...Array.from({ length: TRACK_COLOR_SLOTS }, (_, i) => i),
+      0,
+    ])
+  })
+
+  it('does not carry a literal `color` — tracks only reference a palette slot', async () => {
+    // Themes own the palette; a baked-in colour would go stale on theme change.
+    const buf = await makeBuf([{ midi: 60, time: 1, duration: 0.5 }])
+    const result = await parseMidiFile(buf, 'test')
+    expect(result.tracks[0]).not.toHaveProperty('color')
+    expect(Object.keys(result.tracks[0]!)).not.toContain('color')
   })
 })
 

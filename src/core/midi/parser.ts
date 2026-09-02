@@ -1,4 +1,4 @@
-import type { MidiFile, MidiNote, MidiTrack } from './types'
+import { type MidiFile, type MidiNote, type MidiTrack, TRACK_COLOR_SLOTS } from './types'
 
 // `@tonejs/midi` is ~25 KB gz and only used inside this module + MidiEncoding.
 // Both entry points (file picker, record export) are user-driven and already
@@ -20,20 +20,6 @@ export class EmptyMidiError extends Error {
     this.name = 'EmptyMidiError'
   }
 }
-
-// Distinct, vibrant track colors — ordered for visual variety
-const TRACK_COLORS = [
-  0x6366f1, // indigo
-  0xec4899, // pink
-  0x06b6d4, // cyan
-  0xf59e0b, // amber
-  0x10b981, // emerald
-  0x8b5cf6, // violet
-  0xf97316, // orange
-  0x3b82f6, // blue
-  0xe11d48, // rose
-  0x14b8a6, // teal
-]
 
 export async function parseMidiFile(source: File | ArrayBuffer, name?: string): Promise<MidiFile> {
   const buffer = source instanceof ArrayBuffer ? source : await source.arrayBuffer()
@@ -62,8 +48,7 @@ export async function parseMidiFile(source: File | ArrayBuffer, name?: string): 
         instrument: t.instrument.number,
         isDrum: t.instrument.percussion,
         notes,
-        color: TRACK_COLORS[i % TRACK_COLORS.length] as number,
-        colorIndex: i % TRACK_COLORS.length,
+        colorIndex: i % TRACK_COLOR_SLOTS,
       }
     })
 

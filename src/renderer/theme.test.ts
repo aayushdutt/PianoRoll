@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import type { MidiTrack } from '../core/midi/types'
-import { getTrackColor, THEMES, type Theme, uiAccentHex } from './theme'
+import { type MidiTrack, TRACK_COLOR_SLOTS } from '../core/midi/types'
+import { accentCSS, getTrackColor, liveNoteColor, THEMES, type Theme, type ThemeId } from './theme'
+
+// Compile-time exhaustiveness: adding a member to the `ThemeId` union forces an
+// entry here, and a typo'd key is a type error. The runtime assertion below
+// then checks THEMES actually ships exactly one theme per id.
+const EXPECTED_THEME_IDS: Record<ThemeId, true> = {
+  dark: true,
+  midnight: true,
+  neon: true,
+  sunset: true,
+  ocean: true,
+}
 
 const track = (colorIndex: number): MidiTrack => ({
   id: 't',
@@ -9,7 +20,6 @@ const track = (colorIndex: number): MidiTrack => ({
   instrument: 0,
   isDrum: false,
   notes: [],
-  color: 0,
   colorIndex,
 })
 
@@ -31,24 +41,44 @@ describe('getTrackColor', () => {
   })
 })
 
-describe('uiAccentHex', () => {
-  it('converts a #rrggbb accent to the number Pixi wants', () => {
-    expect(uiAccentHex({ uiAccentCSS: '#f97316' } as Theme)).toBe(0xf97316)
-    expect(uiAccentHex({ uiAccentCSS: '#6366f1' } as Theme)).toBe(0x6366f1)
+describe('accentCSS', () => {
+  it('renders the numeric accent as a #rrggbb string', () => {
+    expect(accentCSS({ accent: 0xf97316 } as Theme)).toBe('#f97316')
+    expect(accentCSS({ accent: 0x0000ff } as Theme)).toBe('#0000ff')
   })
 
-  it('converts every built-in theme', () => {
+  it('every built-in theme has a unique id and an in-range accent', () => {
+    const ids = new Set(THEMES.map((t) => t.id))
+    expect(ids.size).toBe(THEMES.length)
     for (const theme of THEMES) {
-      const hex = uiAccentHex(theme)
-      expect(Number.isFinite(hex)).toBe(true)
-      expect(hex).toBeGreaterThanOrEqual(0)
-      expect(hex).toBeLessThanOrEqual(0xffffff)
+      expect(theme.accent).toBeGreaterThanOrEqual(0)
+      expect(theme.accent).toBeLessThanOrEqual(0xffffff)
     }
   })
+})
 
-  it('falls back rather than returning NaN for an unparseable accent', () => {
-    // A NaN colour makes Pixi draw black, which would look like the loop band
-    // vanishing rather than an obviously wrong colour.
-    expect(uiAccentHex({ uiAccentCSS: 'rebeccapurple' } as Theme)).toBe(0xf97316)
+describe('liveNoteColor', () => {
+  it('uses the first track palette slot', () => {
+    const theme = THEMES[0]!
+    expect(liveNoteColor(theme)).toBe(theme.trackColors[0])
+  })
+
+  it('falls back to the now-line colour for an empty palette', () => {
+    expect(liveNoteColor({ trackColors: [], nowLine: 0xabcdef } as unknown as Theme)).toBe(0xabcdef)
+  })
+})
+
+describe('theme roster', () => {
+  // Ids are persisted (`midee.theme`), so drift between the union and the
+  // shipped themes silently resets somebody's preference to the default.
+  it('ships exactly one theme per ThemeId', () => {
+    const ids = THEMES.map((t) => t.id)
+    expect([...ids].sort()).toEqual(Object.keys(EXPECTED_THEME_IDS).sort())
+  })
+
+  // The parser assigns `colorIndex` modulo TRACK_COLOR_SLOTS, so a theme with
+  // a shorter palette would leave slots unreachable / double-mapped.
+  it.each(THEMES)('$name has exactly TRACK_COLOR_SLOTS track colours', (theme) => {
+    expect(theme.trackColors).toHaveLength(TRACK_COLOR_SLOTS)
   })
 })

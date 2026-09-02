@@ -9,7 +9,6 @@ function track(id: string, pitches: number[]): MidiTrack {
     channel: 0,
     instrument: 0,
     isDrum: false,
-    color: 0,
     colorIndex: 0,
     notes: pitches.map((pitch, i) => ({
       pitch,

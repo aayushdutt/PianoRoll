@@ -8,7 +8,6 @@
 import { getContext } from 'tone'
 import type { BusNoteEvent } from '../../../core/input/InputBus'
 import { t } from '../../../i18n'
-import { uiAccentHex } from '../../../renderer/theme'
 import { watch } from '../../../store/watch'
 import type { Exercise, ExerciseDescriptor } from '../../core/Exercise'
 import type { ExerciseContext } from '../../core/ExerciseContext'
@@ -106,7 +105,7 @@ class PlayAlongExercise implements Exercise {
             this.ctx.overlay.drawLoopBand({
               startTime: region.start,
               endTime: region.end,
-              color: uiAccentHex(this.ctx.services.renderer.currentTheme),
+              color: this.ctx.services.renderer.currentTheme.accent,
             })
           }
         },

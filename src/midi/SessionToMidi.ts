@@ -1,10 +1,6 @@
 import type { MidiFile, MidiNote, MidiTrack } from '../core/midi/types'
 import type { CapturedEvent } from './MidiEncoding'
 
-// Matches the default indigo from the parser's track palette so a session
-// loaded into file mode visually blends with imported MIDIs.
-const DEFAULT_COLOR = 0x6366f1
-
 // Converts a live session's captured events into the internal `MidiFile`
 // shape used by renderer + synth + export. Pairs on/off events into durations
 // and closes any dangling on at the session end so notes don't sustain past
@@ -54,7 +50,6 @@ export function sessionToMidiFile(
     instrument: 0,
     isDrum: false,
     notes,
-    color: DEFAULT_COLOR,
     colorIndex: 0,
   }
 

@@ -28,7 +28,6 @@ function track(pitches: number[]): MidiTrack {
     instrument: 0,
     isDrum: false,
     notes: pitches.map(note),
-    color: 0,
     colorIndex: 0,
   }
 }

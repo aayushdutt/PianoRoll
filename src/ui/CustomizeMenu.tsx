@@ -2,7 +2,7 @@ import { createSignal, For } from 'solid-js'
 import { render } from 'solid-js/web'
 import { LOCALES, type LocaleCode, locale, t } from '../i18n'
 import type { ParticleStyle, ParticleStyleInfo } from '../renderer/ParticleSystem'
-import type { Theme } from '../renderer/theme'
+import { accentCSS, type Theme } from '../renderer/theme'
 import { trackEvent } from '../telemetry'
 import { icons } from './icons'
 import { FEEDBACK_URL, isNarrowViewport } from './utils'
@@ -115,10 +115,7 @@ function MenuView(props: MenuProps) {
                   aria-label={`${theme.name} theme`}
                   onClick={() => props.onSelectTheme(i())}
                 >
-                  <span
-                    class="customize-theme-tile-dot"
-                    style={{ background: theme.uiAccentCSS }}
-                  />
+                  <span class="customize-theme-tile-dot" style={{ background: accentCSS(theme) }} />
                   <span class="customize-theme-tile-label">{theme.name}</span>
                 </button>
               )}
@@ -359,7 +356,7 @@ export class CustomizeMenu {
     if (!theme) return
     // Tint the palette glyph with the active theme accent — keeps the live
     // "current theme" signal the old colour swatch carried.
-    this.setAccent(theme.uiAccentCSS)
+    this.setAccent(accentCSS(theme))
     this.setLabel(theme.name)
   }
 

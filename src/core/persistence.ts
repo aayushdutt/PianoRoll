@@ -45,16 +45,52 @@ function safeSetItem(key: string, value: string): void {
   }
 }
 
-/** Integer index in [0, maxExclusive). Returns null if the value is out of range. */
-export function indexPersisted(
+// String id drawn from a fixed roster (theme / instrument / particle style).
+// Ids are stable and order-independent, unlike the integer indices we used to
+// store — reordering a roster no longer silently changes a user's preference.
+//
+// `legacy` opts into a one-shot migration: when the new key is absent but the
+// old integer-index key holds a valid index into `legacy.ids`, that id is
+// returned *and* written under the new key. The legacy key is left in place —
+// it's inert once the new key exists, and keeps a rollback harmless.
+export function idPersisted<T extends string>(
   key: string,
-  fallback: number,
-  maxExclusive: number,
-): Persisted<number> {
-  return persisted(key, fallback, (raw) => {
-    const n = Number(raw)
-    return Number.isInteger(n) && n >= 0 && n < maxExclusive ? n : null
-  })
+  fallback: T,
+  validIds: readonly T[],
+  legacy?: { key: string; ids: readonly T[] },
+): Persisted<T> {
+  const parse = (raw: string): T | null =>
+    (validIds as readonly string[]).includes(raw) ? (raw as T) : null
+
+  const save = (value: T): void => {
+    safeSetItem(key, value)
+  }
+
+  return {
+    load(): T {
+      const raw = safeGetItem(key)
+      // Present but unrecognised (hand-edited storage, removed roster entry)
+      // falls back rather than reaching for the legacy key.
+      if (raw !== null) return parse(raw) ?? fallback
+      const migrated = legacy === undefined ? null : migrateLegacyIndex(legacy, parse)
+      if (migrated === null) return fallback
+      save(migrated)
+      return migrated
+    },
+    save,
+  }
+}
+
+function migrateLegacyIndex<T extends string>(
+  legacy: { key: string; ids: readonly T[] },
+  parse: (raw: string) => T | null,
+): T | null {
+  const raw = safeGetItem(legacy.key)
+  if (raw === null) return null
+  const idx = Number(raw)
+  if (!Number.isInteger(idx) || idx < 0 || idx >= legacy.ids.length) return null
+  const id = legacy.ids[idx]
+  return id === undefined ? null : parse(id)
 }
 
 /** Finite number clamped to [min, max]. */

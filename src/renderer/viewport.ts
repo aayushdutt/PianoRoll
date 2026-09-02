@@ -1,4 +1,5 @@
 import { isBlackKey, MIDI_MAX, MIDI_MIN, type MidiNote } from '../core/midi/types'
+import { BLACK_KEY_HEIGHT_RATIO } from './keyGeometry'
 
 // The strike line sits directly on the keyboard edge so notes "land" where the
 // keys begin instead of floating relative to the HUD.
@@ -94,7 +95,9 @@ export class Viewport {
     const keyboardTop = canvasHeight - keyboardHeight
     if (y < keyboardTop || y > canvasHeight) return null
 
-    const blackZoneBottom = keyboardTop + keyboardHeight * 0.62
+    // Same ratio the renderer bakes the black keys with, so the touch target
+    // always matches the pixels.
+    const blackZoneBottom = keyboardTop + keyboardHeight * BLACK_KEY_HEIGHT_RATIO
     if (y <= blackZoneBottom) {
       for (const [pitch, pos] of this.keyPositions) {
         if (!isBlackKey(pitch)) continue

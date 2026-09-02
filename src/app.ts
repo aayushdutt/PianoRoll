@@ -1,5 +1,5 @@
 import { Metronome } from './audio/Metronome'
-import { INSTRUMENTS, SynthEngine } from './audio/SynthEngine'
+import { INSTRUMENTS, type InstrumentId, SynthEngine } from './audio/SynthEngine'
 import { MasterClock } from './core/clock/MasterClock'
 import { type BusNoteEvent, InputBus } from './core/input/InputBus'
 import { lazyHandle } from './core/lazyHandle'
@@ -10,7 +10,7 @@ import {
   createLivePerformanceBus,
   type LivePerformanceBus,
 } from './core/performance/LivePerformanceBus'
-import { booleanPersisted, indexPersisted, numberPersisted } from './core/persistence'
+import { booleanPersisted, idPersisted, numberPersisted } from './core/persistence'
 import { forgetRecent, readRecentMidi, rememberRecent } from './core/recentMidi'
 import { fetchSampleMidi, getSample } from './core/samples'
 import type { AppServices } from './core/services'
@@ -41,9 +41,9 @@ import { sessionToMidiFile } from './midi/SessionToMidi'
 import type { LearnController } from './modes/LearnController'
 import { setNextLiveOpts } from './modes/LiveMode'
 import { MODE_CAPTURES_LIVE, type ModeContext } from './modes/ModeController'
-import { PARTICLE_STYLES } from './renderer/ParticleSystem'
+import { PARTICLE_STYLES, type ParticleStyle } from './renderer/ParticleSystem'
 import { PianoRollRenderer } from './renderer/PianoRollRenderer'
-import { THEMES, type Theme } from './renderer/theme'
+import { accentCSS, THEMES, type Theme, type ThemeId } from './renderer/theme'
 import type { AppMode, AppStore } from './store/state'
 import { watch } from './store/watch'
 import {
@@ -161,9 +161,10 @@ export class App {
   private chordLastSig = ''
   private chordOverlayOn = false
 
-  private themeIndex = themeIndexStore.load()
-  private instrumentIndex = instrumentIndexStore.load()
-  private particleIndex = particleIndexStore.load()
+  // Persisted as stable ids; the App works in list indices, so resolve once here.
+  private themeIndex = indexOfId(THEMES, themeStore.load())
+  private instrumentIndex = indexOfId(INSTRUMENTS, instrumentStore.load())
+  private particleIndex = indexOfId(PARTICLE_STYLES, particleStore.load())
   private audioPrimed = false
   // Analytics one-shot flags. Reset when a new file is loaded so a user
   // who opens MIDI A then MIDI B gets `first_play` events for both.
@@ -922,7 +923,7 @@ export class App {
     if (idx < 0 || idx >= THEMES.length || idx === this.themeIndex) return
     this.themeIndex = idx
     this.applyTheme(THEMES[idx]!)
-    themeIndexStore.save(idx)
+    themeStore.save(THEMES[idx]!.id)
     trackEvent('theme_changed', { theme: THEMES[idx]!.name })
   }
 
@@ -930,7 +931,7 @@ export class App {
     const from = INSTRUMENTS[this.instrumentIndex]?.id
     this.instrumentIndex = (this.instrumentIndex + 1) % INSTRUMENTS.length
     this.applyInstrument()
-    instrumentIndexStore.save(this.instrumentIndex)
+    instrumentStore.save(INSTRUMENTS[this.instrumentIndex]!.id)
     trackEvent('instrument_changed', {
       from,
       to: INSTRUMENTS[this.instrumentIndex]!.id,
@@ -944,7 +945,7 @@ export class App {
     const from = INSTRUMENTS[this.instrumentIndex]?.id
     this.instrumentIndex = idx
     this.applyInstrument()
-    instrumentIndexStore.save(this.instrumentIndex)
+    instrumentStore.save(INSTRUMENTS[idx]!.id)
     trackEvent('instrument_changed', { from, to: id, method: 'menu' })
   }
 
@@ -963,7 +964,7 @@ export class App {
     if (idx < 0 || idx >= PARTICLE_STYLES.length || idx === this.particleIndex) return
     this.particleIndex = idx
     this.applyParticleStyle()
-    particleIndexStore.save(idx)
+    particleStore.save(PARTICLE_STYLES[idx]!.id)
     trackEvent('particle_changed', { style: PARTICLE_STYLES[idx]!.id })
   }
 
@@ -1725,7 +1726,7 @@ export class App {
     this.renderer.setTheme(theme)
     this.customizeMenu?.setTheme(this.themeIndex)
     this.trackPanel?.setTheme(theme)
-    const accent = theme.uiAccentCSS
+    const accent = accentCSS(theme)
     document.documentElement.style.setProperty('--accent', accent)
     document.documentElement.style.setProperty('--accent-soft', `${accent}2e`)
     document.documentElement.style.setProperty('--accent-glow', `${accent}66`)
@@ -1786,39 +1787,47 @@ export class App {
 }
 
 // User-preference persistence. Each entry exposes load()/save() backed by
-// localStorage. Defined here (not in persistence.ts) because the defaults
-// depend on runtime values — current theme list, instrument list, etc.
-const themeIndexStore = indexPersisted(
-  'midee.themeIndex',
-  Math.max(
-    0,
-    THEMES.findIndex((t) => t.name === 'Sunset'),
-  ),
-  THEMES.length,
+// localStorage. Defined here (not in persistence.ts) because the rosters they
+// validate against — theme list, instrument list, particle styles — are
+// runtime values owned by other modules.
+//
+// Preferences are stored as stable *ids*, with a one-shot migration from the
+// pre-2026-09 integer-index keys (`midee.*Index`). See `idPersisted`.
+const themeStore = idPersisted<ThemeId>(
+  'midee.theme',
+  'sunset',
+  THEMES.map((t) => t.id),
+  { key: 'midee.themeIndex', ids: THEMES.map((t) => t.id) },
 )
 // New visitors default to Upright (1.2 MB of self-hosted samples) so first-load
 // is fast. Returning users keep whatever they had, including Salamander Grand.
-const instrumentIndexStore = indexPersisted(
-  'midee.instrumentIndex',
-  Math.max(
-    0,
-    INSTRUMENTS.findIndex((i) => i.id === 'upright'),
-  ),
-  INSTRUMENTS.length,
+const instrumentStore = idPersisted<InstrumentId>(
+  'midee.instrument',
+  'upright',
+  INSTRUMENTS.map((i) => i.id),
+  { key: 'midee.instrumentIndex', ids: INSTRUMENTS.map((i) => i.id) },
 )
-const particleIndexStore = indexPersisted(
-  'midee.particleIndex',
-  Math.max(
-    0,
-    PARTICLE_STYLES.findIndex((s) => s.id === 'embers'),
-  ),
-  PARTICLE_STYLES.length,
+const particleStore = idPersisted<ParticleStyle>(
+  'midee.particle',
+  'embers',
+  PARTICLE_STYLES.map((s) => s.id),
+  { key: 'midee.particleIndex', ids: PARTICLE_STYLES.map((s) => s.id) },
 )
 const metronomeBpmStore = numberPersisted('midee.metronomeBpm', 120, 40, 240)
 // Chord readout defaults *on*: it's the headline live-mode cue. The
 // boolean store treats "no preference" as the fallback (true), and only
 // an explicit "false" turns it off.
 const chordOverlayStore = booleanPersisted('midee.chordOverlay', true)
+
+// Persisted ids → the list index the App keeps as runtime state. The stores
+// only ever hand back ids that exist in their roster, so -1 is unreachable;
+// the clamp keeps that guarantee local instead of trusting it at call sites.
+function indexOfId<T extends { id: string }>(list: readonly T[], id: string): number {
+  return Math.max(
+    0,
+    list.findIndex((item) => item.id === id),
+  )
+}
 
 // Strips characters that misbehave in filenames across Windows/macOS/Linux.
 // Falls back to a constant if the result is empty.

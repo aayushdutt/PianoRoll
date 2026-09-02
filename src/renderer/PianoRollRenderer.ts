@@ -7,9 +7,9 @@ import { type EmitCadence, scheduleEmissions } from './emitSchedule'
 import { KeyboardRenderer } from './KeyboardRenderer'
 import { LiveNoteRenderer } from './LiveNoteRenderer'
 import { NoteRenderer } from './NoteRenderer'
-import { ParticleSystem } from './ParticleSystem'
-import type { RenderContext, RenderLayer } from './RenderLayer'
-import { darkTheme, getTrackColor, type Theme } from './theme'
+import { type ParticleStyle, ParticleSystem } from './ParticleSystem'
+import { layersAnimating, type RenderContext, type RenderLayer } from './RenderLayer'
+import { darkTheme, getTrackColor, liveNoteColor, type Theme } from './theme'
 import { Viewport, visibleNoteRange } from './viewport'
 
 // Must match the `--keyboard-h` value in main.css :root and the reset value
@@ -340,20 +340,30 @@ export class PianoRollRenderer {
   }
 
   setKeyboardHeight(px: number): void {
+    if (!this.applyKeyboardHeight(px)) return
+    this.rebuildStaticLayers()
+    this.presentFrame()
+  }
+
+  // Clamp + commit a new keyboard height into the renderer, viewport and the
+  // `--keyboard-h` CSS var. Deliberately does NOT rebuild or present, so a
+  // caller that is about to resize (and therefore rebuild anyway) can apply
+  // the height first and bake the keyboard exactly once. Returns whether the
+  // height actually changed.
+  private applyKeyboardHeight(px: number): boolean {
     const clamped = Math.max(KEYBOARD_HEIGHT_MIN, Math.min(KEYBOARD_HEIGHT_MAX, Math.round(px)))
-    if (clamped === this.keyboardHeight) return
+    if (clamped === this.keyboardHeight) return false
     this.keyboardHeight = clamped
     this.viewport.update({ keyboardHeight: clamped })
     document.documentElement.style.setProperty('--keyboard-h', `${clamped}px`)
-    this.rebuildStaticLayers()
-    this.presentFrame()
+    return true
   }
 
   get currentKeyboardHeight(): number {
     return this.keyboardHeight
   }
 
-  setParticleStyle(style: import('./ParticleSystem').ParticleStyle): void {
+  setParticleStyle(style: ParticleStyle): void {
     this.particles.setStyle(style)
   }
 
@@ -404,11 +414,11 @@ export class PianoRollRenderer {
       (this.loopNoteStore?.hasRenderableNotes ?? false)
     // Anything that changes frame-to-frame without an external event: a
     // running clock (notes scroll), live/loop note trails (rise and decay),
-    // in-flight particles, or external layers. Layers count as always
-    // animating — Learn overlays run per-frame countdowns/celebrations even
-    // on the hub screen, so Learn mode never idle-stops (same as before).
+    // in-flight particles, or external layers. A layer counts as animating
+    // unless it opts out via `isAnimating()` — today's Learn overlays run
+    // per-frame countdowns/celebrations, so Learn mode never idle-stops.
     const animating =
-      clock.playing || hasLive || this.particles.hasActive || this.externalLayers.length > 0
+      clock.playing || hasLive || this.particles.hasActive || layersAnimating(this.externalLayers)
     if (animating) {
       this.idleFrames = 0
       this.renderFrame(clock.currentTime, ticker.deltaMS / 1000, clock.playing)
@@ -564,7 +574,7 @@ export class PianoRollRenderer {
 
       const held = this.liveNoteStore.heldNotes
       const loopHeld = this.loopNoteStore?.heldNotes
-      const liveColor = this.theme.trackColors[0] ?? this.theme.nowLine
+      const liveColor = liveNoteColor(this.theme)
       const nowLineY = this.viewport.nowLineY
 
       for (const [pitch] of held) {
@@ -668,7 +678,7 @@ export class PianoRollRenderer {
   burstParticleAt(pitch: number): void {
     const w = this.viewport.pitchWidth(pitch)
     const cx = this.viewport.pitchToX(pitch) + w / 2
-    const color = this.theme.trackColors[0] ?? this.theme.nowLine
+    const color = liveNoteColor(this.theme)
     this.particles.burst(cx, this.viewport.nowLineY, color, w)
     // Particles animate over the next ~1 s — make sure the loop is running.
     this.wake()
@@ -731,11 +741,7 @@ export class PianoRollRenderer {
   ): void {
     this.practiceHintPending = pending && pending.size > 0 ? pending : null
     this.practiceHintAccepted = accepted && accepted.size > 0 ? accepted : null
-    this.keyboardRenderer.setPracticeHints(
-      this.practiceHintPending,
-      this.practiceHintAccepted,
-      this.theme,
-    )
+    this.keyboardRenderer.setPracticeHints(this.practiceHintPending, this.practiceHintAccepted)
     // Paint once so the hint appears immediately — the ticker may be
     // idle-stopped (paused practice step), so there is no next tick to
     // rely on. Cheap and unconditional beats guessing the loop's state.
@@ -803,12 +809,13 @@ export class PianoRollRenderer {
     // Ignore viewport events during export — the exporter owns canvas size
     // until it restores it in its own finally block.
     if (this.exportMode) return
-    this.resize(window.innerWidth, window.innerHeight)
-    // Re-clamp keyboard height so a portrait-sized keyboard doesn't
-    // dominate after rotation into landscape.
+    // Re-clamp keyboard height so a portrait-sized keyboard doesn't dominate
+    // after rotation into landscape. Applied *before* resize() so the single
+    // rebuildStaticLayers() inside resize() bakes the keyboard once at the
+    // final height, rather than baking twice (old size, then new).
     const { min, max } = viewportKeyboardBounds()
-    const clamped = Math.min(max, Math.max(min, this.keyboardHeight))
-    if (clamped !== this.keyboardHeight) this.setKeyboardHeight(clamped)
+    this.applyKeyboardHeight(Math.min(max, Math.max(min, this.keyboardHeight)))
+    this.resize(window.innerWidth, window.innerHeight)
   }
 
   destroy(): void {
