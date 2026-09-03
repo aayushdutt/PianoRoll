@@ -189,6 +189,7 @@ const fr: Messages = {
   'export.speed.drama.tip': 'Chute plus lente - cinématographique',
   'export.est.minutes': 'environ {min} min',
   'export.est.soon': 'moins d’une minute',
+  'export.warn.large': 'Fichier volumineux · risque de manquer de mémoire sur cet appareil',
   'export.audioFormat': 'Format',
   'export.audio.mp3.hint': 'Léger · lisible partout',
   'export.audio.wav.hint': 'Sans perte · fichier plus lourd',
@@ -204,7 +205,7 @@ const fr: Messages = {
   'export.preparing': 'Préparation…',
   'export.stage.renderingAudio': 'Rendu audio',
   'export.stage.encodingAudio': 'Encodage audio',
-  'export.stage.encoding': 'Encodage',
+  'export.stage.encoding': 'Export en cours',
   'export.stage.finalizing': 'Finalisation',
   'export.stage.saving': 'Enregistrement',
   'export.stage.done': 'Terminé',
@@ -467,7 +468,6 @@ const fr: Messages = {
 
   // ── Toasts / confirmations ─────────────────────────────────
   'toast.export.ready': '{filename} prêt',
-  'toast.export.open': 'Ouvrir',
   'toast.session.saved': 'midee-session.mid · {seconds} s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty':

@@ -12,9 +12,11 @@ import {
   type ExportFps,
   type ExportQuality,
   type ExportUiState,
+  estimateBytes,
   estimateSeconds,
   FORMATS,
   FPS_OPTIONS,
+  LARGE_EXPORT_BYTES,
   previewDims,
   QUALITIES,
   resolutionFor,
@@ -315,9 +317,11 @@ function ExportView(props: ViewProps) {
   // ── Caption ──────────────────────────────────────────────────────────────
   // Line 2 is empty until an export on this device has been timed — the
   // caption reserves its height in CSS so it never shifts when it appears.
-  const caption = (): { specs: string; time: string } => {
+  const caption = (): { specs: string; time: string; large: boolean } => {
     const d = dims()
-    const secs = estimateSeconds(readThroughput(), d, ui.fps, props.deps.pieceDuration())
+    const duration = props.deps.pieceDuration()
+    const secs = estimateSeconds(readThroughput(), d, ui.fps, duration)
+    const bytes = estimateBytes(resolutionFor(ui.format, ui.quality), duration, ui.includeAudio)
     return {
       specs: [`${d.width} × ${d.height}`, t('export.fps.unit', { fps: ui.fps })].join(' · '),
       time:
@@ -326,6 +330,9 @@ function ExportView(props: ViewProps) {
           : secs < 50
             ? t('export.est.soon')
             : t('export.est.minutes', { min: Math.ceil(secs / 60) }),
+      // The whole MP4 is assembled in memory before download; past ~1 GB
+      // that is a real risk on a small machine, so say so.
+      large: bytes > LARGE_EXPORT_BYTES,
     }
   }
 
@@ -391,7 +398,12 @@ function ExportView(props: ViewProps) {
                   </div>
                   <p class="export-caption">
                     <span>{caption().specs}</span>
-                    <span class="export-caption-time">{caption().time}</span>
+                    <span
+                      class="export-caption-time"
+                      classList={{ 'export-caption-warn': caption().large }}
+                    >
+                      {caption().large ? t('export.warn.large') : caption().time}
+                    </span>
                   </p>
                 </div>
 

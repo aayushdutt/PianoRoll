@@ -74,7 +74,7 @@ import { InstrumentMenu } from './ui/InstrumentMenu'
 import { KeyboardResizer } from './ui/KeyboardResizer'
 import type { SessionAction } from './ui/PostSessionModal'
 import { PEDAL_HIDDEN, type PedalIndicatorState, pedalIndicatorState } from './ui/pedalIndicator'
-import { showError, showSuccess, showToast } from './ui/Toast'
+import { showError, showSuccess } from './ui/Toast'
 import { TrackPanel } from './ui/TrackPanel'
 import { installViewportClassSync } from './ui/utils'
 import { whenIdle } from './whenIdle'
@@ -1139,27 +1139,7 @@ export class App {
     }
     let exportStage: 'serialize' | 'audio_render' | 'video_encode' = 'serialize'
 
-    // Stream the MP4 straight to disk where the browser allows it (Chrome/Edge
-    // desktop). The picker needs the click's user activation, so it runs
-    // before anything awaits. Cancelling the dialog cancels the export.
-    let fileHandle: FileSystemFileHandle | undefined
-    if (isVideoOutput && typeof window.showSaveFilePicker === 'function') {
-      try {
-        fileHandle = await window.showSaveFilePicker({
-          suggestedName: `${sanitiseFilename(midi.name)}.mp4`,
-          types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }],
-        })
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          exportModal.close()
-          return
-        }
-        // Any other picker failure: fall back to the in-memory download.
-        console.warn('showSaveFilePicker failed; falling back to download', err)
-      }
-    }
-
-    track('export_started', { ...exportBase, target: fileHandle ? 'file' : 'buffer' })
+    track('export_started', exportBase)
     trackActivation('export_started')
 
     // MIDI-only output skips all render/encode work — just re-serialise the
@@ -1361,7 +1341,6 @@ export class App {
         mode: settings.output,
         filename,
         bitrate: resolveExportBitrate(settings.resolution),
-        ...(fileHandle ? { fileHandle } : {}),
         ...(needsAudio
           ? {
               audio: async (report: (pct: number) => void) =>
@@ -1391,16 +1370,7 @@ export class App {
           }),
       })
       exportModal.close()
-      if (fileHandle && stats.target === 'file') {
-        // A streamed file gets no downloads bubble — offer the open ourselves.
-        const handle = fileHandle
-        showToast(`↓ ${t('toast.export.ready', { filename })}`, 'toast toast--success', 10_000, {
-          label: t('toast.export.open'),
-          onClick: () => void openFileHandle(handle),
-        })
-      } else {
-        this.showSuccess(`↓ ${t('toast.export.ready', { filename })}`)
-      }
+      this.showSuccess(`↓ ${t('toast.export.ready', { filename })}`)
       // Feeds the dialog's "about N min" estimate next time.
       const throughput = throughputFrom({
         framesEncoded: stats.framesEncoded,
@@ -1420,7 +1390,6 @@ export class App {
         codec: stats.codec,
         hw: stats.hw,
         attempts: stats.attempts,
-        target: stats.target,
         audio_included: stats.audioIncluded,
         audio_render_ms: stats.audioRenderMs,
         audio_encode_ms: stats.audioEncodeMs,
@@ -1545,6 +1514,13 @@ export class App {
   }
 
   private openExportModal(): void {
+    // Configuring an export while the piece keeps playing behind the blur is
+    // disorienting; pause like the play button would (status watch stops the
+    // synth). The export itself snapshots/restores the playhead separately.
+    if (this.store.state.mode === 'play' && this.store.state.status === 'playing') {
+      this.clock.pause()
+      this.store.setState('status', 'paused')
+    }
     void this.exportHandle.get().then((m) => m.open())
   }
 
@@ -2013,17 +1989,4 @@ function indexOfId<T extends { id: string }>(list: readonly T[], id: string): nu
 function sanitiseFilename(name: string): string {
   const cleaned = name.replace(/[\\/:*?"<>|]+/g, ' ').trim()
   return cleaned.length > 0 ? cleaned : 'midee'
-}
-
-// Opens a streamed export in a new tab — the nearest thing to the downloads
-// bubble's "open" for a file the browser wrote silently via the save dialog.
-async function openFileHandle(handle: FileSystemFileHandle): Promise<void> {
-  try {
-    const file = await handle.getFile()
-    const url = URL.createObjectURL(file)
-    window.open(url, '_blank', 'noopener')
-    setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  } catch (err) {
-    console.warn('Could not open exported file', err)
-  }
 }

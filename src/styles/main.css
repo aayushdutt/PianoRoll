@@ -6668,25 +6668,6 @@ body.canvas-hidden #kbd-resizer {
   color: #a5f3d0;
 }
 
-.toast--actionable {
-  pointer-events: auto;
-}
-.toast-action {
-  margin-left: 6px;
-  padding: 4px 10px;
-  border-radius: var(--r-pill);
-  border: 1px solid currentColor;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.toast-action:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
 .toast::before {
   content: "";
   display: inline-block;

@@ -187,6 +187,7 @@ export const en = {
   'export.speed.drama.tip': 'Slower fall - cinematic',
   'export.est.minutes': 'about {min} min',
   'export.est.soon': 'under a minute',
+  'export.warn.large': 'Large file · may run out of memory on this device',
   'export.audioFormat': 'Format',
   'export.audio.mp3.hint': 'Small · plays anywhere',
   'export.audio.wav.hint': 'Lossless · larger file',
@@ -202,7 +203,7 @@ export const en = {
   'export.preparing': 'Preparing…',
   'export.stage.renderingAudio': 'Rendering audio',
   'export.stage.encodingAudio': 'Encoding audio',
-  'export.stage.encoding': 'Encoding',
+  'export.stage.encoding': 'Exporting',
   'export.stage.finalizing': 'Finalizing',
   'export.stage.saving': 'Saving',
   'export.stage.done': 'Done',
@@ -494,7 +495,6 @@ export const en = {
 
   // ── Toasts / confirmations ─────────────────────────────────
   'toast.export.ready': '{filename} ready',
-  'toast.export.open': 'Open',
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nothing recorded - play a few notes while Record is on.',

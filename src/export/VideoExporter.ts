@@ -5,11 +5,11 @@
 // the codec process, so overlapping them costs no extra CPU and the wall time
 // becomes max(audio, video) instead of the sum.
 //
-// Output goes straight to disk when the caller hands us a File System Access
-// handle (Chrome/Edge desktop): `fastStart: 'reserve'` reserves the moov up
-// front so packets stream out as they are encoded and the MP4 never sits
-// whole in RAM. Without a handle we fall back to an in-memory buffer + blob
-// download, still with 'reserve' so the file is held once, not twice.
+// Output is muxed into memory with `fastStart: 'reserve'` (the moov is
+// reserved up front, so the file is held once, not assembled twice) and
+// handed to the browser as a normal download — the downloads UI is the one
+// place a user can open or reveal the file, which the File System Access
+// path could not offer.
 //
 // Resilience: codec selection runs two probe passes (hardware-preferred, then
 // software-preferred) and the export retries ONCE on a software plan when the
@@ -26,7 +26,6 @@ import {
   EncodedVideoPacketSource,
   Mp4OutputFormat,
   Output,
-  StreamTarget,
 } from 'mediabunny'
 
 export type ExportStage =
@@ -42,8 +41,6 @@ export type ExportMode = 'av' | 'video-only' | 'audio-only'
 
 export type HwPreference = 'prefer-hardware' | 'prefer-software'
 
-export type ExportTarget = 'file' | 'buffer'
-
 export interface ExportPlanInfo {
   codec: string // human label, e.g. 'H.264 High 4.0'
   codecString: string
@@ -58,7 +55,6 @@ export interface ExportStats {
   codecString: string
   hw: HwPreference
   attempts: number
-  target: ExportTarget
   audioIncluded: boolean
   audioRenderMs: number // 0 when the caller passed a pre-rendered buffer
   audioEncodeMs: number
@@ -82,9 +78,6 @@ export interface ExportOptions {
   audio?: AudioBuffer | AudioProducer
   mode?: ExportMode
   filename?: string
-  // Stream the MP4 into this file instead of building it in memory. The
-  // caller obtains it from `showSaveFilePicker` (needs a user gesture).
-  fileHandle?: FileSystemFileHandle
   onProgress?: ExportProgressCallback
   // Fired at the start of every encode attempt with the chosen codec plan, so
   // the caller can report WHICH encoder path failed if the export later throws.
@@ -287,20 +280,10 @@ export class VideoExporter {
     const dt = 1 / fps
     const totalFrames = Math.max(1, Math.ceil(opts.duration * fps))
 
-    // Sink: disk stream when we have a handle, otherwise memory.
-    let writable: FileSystemWritableFileStream | null = null // owned by Mediabunny once started
-    let bufferTarget: BufferTarget | null = null
-    let target: StreamTarget | BufferTarget
-    if (opts.fileHandle) {
-      writable = await opts.fileHandle.createWritable()
-      target = new StreamTarget(writable, { chunked: true })
-    } else {
-      bufferTarget = new BufferTarget()
-      target = bufferTarget
-    }
+    const bufferTarget = new BufferTarget()
     const output = new Output({
       format: new Mp4OutputFormat({ fastStart: 'reserve' }),
-      target,
+      target: bufferTarget,
     })
     this.output = output
     const videoSource = new EncodedVideoPacketSource(plan.muxerCodec)
@@ -453,22 +436,16 @@ export class VideoExporter {
       let outputBytes = 0
       let finalizeMs = 0
       try {
-        // For a stream target Mediabunny owns the writer: finalize() writes
-        // the reserved moov and closes the file stream, which commits it.
         await output.finalize()
         finalized = true
         finalizeMs = performance.now() - finalizeStart
 
         opts.onProgress?.('Saving', 0)
-        if (opts.fileHandle) {
-          outputBytes = await opts.fileHandle.getFile().then((f) => f.size)
-        } else {
-          const buffer = bufferTarget!.buffer
-          if (!buffer) throw new Error('Export produced no file buffer')
-          outputBytes = buffer.byteLength
-          const blob = new Blob([buffer], { type: 'video/mp4' })
-          triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.mp4')
-        }
+        const buffer = bufferTarget.buffer
+        if (!buffer) throw new Error('Export produced no file buffer')
+        outputBytes = buffer.byteLength
+        const blob = new Blob([buffer], { type: 'video/mp4' })
+        triggerDownload(URL.createObjectURL(blob), opts.filename ?? 'midee.mp4')
       } catch (err) {
         const isCancel = err instanceof DOMException && err.name === 'AbortError'
         throw isCancel ? err : new PostEncodeError(err)
@@ -481,7 +458,6 @@ export class VideoExporter {
         codecString: plan.codecString,
         hw: plan.hw,
         attempts: cfg.attempt,
-        target: opts.fileHandle ? 'file' : 'buffer',
         audioIncluded: withAudio,
         audioRenderMs: Math.round(this.audioRenderMs),
         audioEncodeMs: Math.round(audioEncodeMs),
@@ -496,12 +472,7 @@ export class VideoExporter {
       if (encoder.state !== 'closed') encoder.close()
       this.encoder = null
       this.output = null
-      if (!finalized) {
-        // cancel() closes Mediabunny's writer, which for a file stream
-        // commits whatever was written — so drop the partial file after.
-        await output.cancel().catch(() => {})
-        if (writable) await opts.fileHandle?.remove?.().catch(() => {})
-      }
+      if (!finalized) await output.cancel().catch(() => {})
     }
   }
 

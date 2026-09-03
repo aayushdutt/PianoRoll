@@ -5,7 +5,7 @@
 // Solid or a DOM — the .tsx only owns the canvas strokes.
 
 import type { MidiFile } from '../core/midi/types'
-import { resolveExportDims } from '../export/exportMath'
+import { resolveExportBitrate, resolveExportDims } from '../export/exportMath'
 import type {
   ExportAudioFormat,
   ExportFocus,
@@ -32,6 +32,20 @@ export interface ExportUiState {
   speed: ExportSpeed
   audioFormat: ExportAudioFormat
 }
+
+// Rough output size from the bitrate table; only used to warn when the
+// in-memory MP4 would be big enough to threaten a small machine.
+export function estimateBytes(
+  resolution: ExportResolution,
+  durationSec: number,
+  includeAudio: boolean,
+): number {
+  const video = (resolveExportBitrate(resolution) * durationSec) / 8
+  const audio = includeAudio ? (192_000 * durationSec) / 8 : 0
+  return video + audio
+}
+
+export const LARGE_EXPORT_BYTES = 1024 * 1_048_576
 
 export const QUALITIES: readonly ExportQuality[] = ['720p', '1080p', '2k', '4k', 'match']
 export const FORMATS: readonly ExportFormat[] = ['landscape', 'vertical', 'square']
