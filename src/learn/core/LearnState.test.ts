@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import type { MidiFile } from '../../core/midi/types'
+import { type MidiFile, nominalTempoMap } from '../../core/midi/types'
 import { watch } from '../../store/watch'
 import { createLearnState } from './LearnState'
 
 function fakeMidi(name = 'etude.mid', duration = 15): MidiFile {
-  return { name, duration, bpm: 120, timeSignature: [4, 4], tracks: [] }
+  return {
+    name,
+    duration,
+    bpm: 120,
+    timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
+    tracks: [],
+  }
 }
 
 describe('createLearnState', () => {

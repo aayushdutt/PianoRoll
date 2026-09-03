@@ -1,10 +1,11 @@
 import type { Messages } from './en'
 
 // Polish has four plural categories (one/few/many/other) where en ships only
-// one/other. The two pluralised keys (`tracks.notes`, `postSession.stats`)
-// therefore carry extra `.few` and `.many` forms. They're declared via this
-// intersection so TypeScript still enforces full key parity for everything
-// else — only these four specific extra keys are permitted, not arbitrary ones.
+// one/other. The pluralised keys (`tracks.notes`, `postSession.stats`)
+// therefore carry extra `.few` and `.many` forms.
+// They're declared via this intersection so TypeScript still enforces full key
+// parity for everything else — only these specific extra keys are permitted,
+// not arbitrary ones.
 type PolishPluralKey = `tracks.notes.${'few' | 'many'}` | `postSession.stats.${'few' | 'many'}`
 
 const pl: Messages & Record<PolishPluralKey, string> = {
@@ -42,6 +43,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'topStrip.openMidi': 'Otwórz plik MIDI',
   'topStrip.tracks': 'Ścieżki',
   'topStrip.midi': 'Urządzenie MIDI',
+  'topStrip.pedal': 'Pedał sustain',
   'topStrip.export': 'Eksportuj MP4',
   'topStrip.export.label': 'Eksport',
   'topStrip.mode.play.label': 'Graj',
@@ -98,6 +100,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'hud.mute': 'Wycisz',
   'hud.unmute': 'Włącz dźwięk',
   'hud.speed': 'Prędkość · kliknij, aby zmienić, shift+klik cofa',
+  'hud.transpose': 'Transpozycja · półtony · kliknij wartość, aby zresetować',
   'hud.zoom': 'Powiększenie (wysokość nut)',
   'hud.tip.kbdRefHide': 'Ukryj',
   'hud.tip.kbdRefShow': 'Pokaż układ klawiszy',
@@ -113,6 +116,9 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'hud.aria.seek': 'Przewiń',
   'hud.aria.volume': 'Głośność',
   'hud.aria.speed': 'Prędkość',
+  'hud.aria.transposeDown': 'Transponuj o pół tonu w dół',
+  'hud.aria.transposeUp': 'Transponuj o pół tonu w górę',
+  'hud.aria.transposeReset': 'Zresetuj transpozycję do zera',
   'hud.aria.zoom': 'Powiększenie',
   'hud.aria.metronomeToggle': 'Przełącz metronom',
   'hud.aria.bpmDec': 'Zmniejsz BPM',

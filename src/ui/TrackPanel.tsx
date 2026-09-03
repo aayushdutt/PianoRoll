@@ -18,6 +18,11 @@ interface PanelProps {
   theme: () => Theme
   renderer: PianoRollRenderer
   onTrackEnabledChange: (trackId: string, enabled: boolean) => void
+  // The rows are rebuilt whenever `tracks` changes identity — which now also
+  // happens on a transpose re-derive, not just on a new file. Reading the
+  // live mute state keeps the checkboxes from silently flipping back to "on"
+  // while the synth is still muting the track.
+  isTrackEnabled: (trackId: string) => boolean
   onLoadNew: () => void
   registerPanelEl: (el: HTMLElement) => void
 }
@@ -56,7 +61,7 @@ function TrackPanelView(props: PanelProps) {
                     type="checkbox"
                     class="track-toggle"
                     data-id={tr.id}
-                    checked
+                    checked={props.isTrackEnabled(tr.id)}
                     onChange={(e) => {
                       e.stopPropagation()
                       const enabled = e.currentTarget.checked
@@ -118,6 +123,7 @@ export class TrackPanel {
     renderer: PianoRollRenderer,
     onTrackEnabledChange: (trackId: string, enabled: boolean) => void,
     onLoadNew: () => void,
+    isTrackEnabled: (trackId: string) => boolean = () => true,
   ) {
     const [isOpen, setIsOpen] = createSignal(false)
     const [isSheet, setIsSheet] = createSignal(false)
@@ -141,6 +147,7 @@ export class TrackPanel {
           theme={theme}
           renderer={renderer}
           onTrackEnabledChange={onTrackEnabledChange}
+          isTrackEnabled={isTrackEnabled}
           onLoadNew={() => {
             this.close()
             onLoadNew()

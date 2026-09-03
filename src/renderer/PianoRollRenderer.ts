@@ -505,6 +505,8 @@ export class PianoRollRenderer {
         const [alo, ahi] = visibleNoteRange(track.notes, currentTime, currentTime)
         for (let ni = alo; ni < ahi; ni++) {
           const note = track.notes[ni]!
+          // No key to light up or burst from — see Viewport.hasKey.
+          if (!this.viewport.hasKey(note.pitch)) continue
 
           const key = keyBase + note.pitch
           const awaitingPracticePress = this.practiceHintPending?.has(note.pitch) ?? false
@@ -539,13 +541,7 @@ export class PianoRollRenderer {
         else this.particles.sustainBurst(g.cx, nowLineY, g.color, g.w)
       }
 
-      this.beatGrid.draw(
-        currentTime,
-        this.midi.bpm,
-        this.midi.timeSignature[0] ?? 4,
-        this.viewport,
-        this.theme,
-      )
+      this.beatGrid.draw(currentTime, this.midi, this.viewport, this.theme)
       this.noteRenderer.draw(
         tracks,
         currentTime,

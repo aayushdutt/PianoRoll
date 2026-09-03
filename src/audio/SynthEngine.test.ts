@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MidiFile, MidiNote, MidiTrack } from '../core/midi/types'
+import { type MidiFile, type MidiNote, type MidiTrack, nominalTempoMap } from '../core/midi/types'
 import { fakeAudioContext } from '../test/fakeAudioContext'
 
 // ── Tone + instruments module mocks ────────────────────────────────────────
@@ -163,7 +163,14 @@ function track(id: string, notes: MidiNote[]): MidiTrack {
 
 function makeMidi(tracks: MidiTrack[], bpm = 120): MidiFile {
   const duration = Math.max(0, ...tracks.flatMap((t) => t.notes.map((n) => n.time + n.duration)))
-  return { name: 'test.mid', duration, bpm, timeSignature: [4, 4], tracks }
+  return {
+    name: 'test.mid',
+    duration,
+    bpm,
+    timeSignature: [4, 4],
+    ...nominalTempoMap(bpm, [4, 4]),
+    tracks,
+  }
 }
 
 // Build a SynthEngine with its instrument loaded so play() doesn't await a
@@ -426,6 +433,33 @@ describe('SynthEngine.play — binary-search slicing at fromTime', () => {
       part.callback(0.25, ev)
     }
     expect(instrumentTriggers.map((t) => t.note)).toEqual(['C4'])
+  })
+
+  it('triggers the pedal-extended (releaseAt) length, not the notated duration', async () => {
+    const sustained: MidiNote = { pitch: 60, time: 0, duration: 0.5, velocity: 0.8, releaseAt: 3 }
+    const engine = await loadedEngine(makeMidi([track('a', [sustained])], 120))
+
+    await engine.play(0)
+    const part = holder.parts[0]!
+    for (const [, ev] of part.events) part.callback(0, ev)
+
+    expect(instrumentTriggers[0]?.duration).toBe(3)
+  })
+
+  it('divides the trigger duration by the CURRENT speed, read at trigger time', async () => {
+    // The transport-bpm trick scales event spacing only, so durations must be
+    // scaled here — and a setSpeed after play() must apply without a rebuild.
+    const engine = await loadedEngine(makeMidi([track('a', [note(60, 0, 2)])], 120))
+
+    await engine.play(0)
+    const part = holder.parts[0]!
+    const [, ev] = part.events[0]!
+    part.callback(0, ev)
+    expect(instrumentTriggers[0]?.duration).toBe(2)
+
+    engine.setSpeed(2)
+    part.callback(0, ev)
+    expect(instrumentTriggers[1]?.duration).toBe(1)
   })
 })
 

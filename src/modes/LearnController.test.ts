@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { MidiFile } from '../core/midi/types'
+import { type MidiFile, nominalTempoMap } from '../core/midi/types'
 import { LearnController } from './LearnController'
 
 // LearnOverlay pulls in PixiJS (Container / Graphics) which needs a real
@@ -86,7 +86,8 @@ function makeMidi(name = 'test.mid'): MidiFile {
     name,
     duration: 30,
     bpm: 120,
-    timeSignature: [4, 4] as [number, number],
+    timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
     tracks: [],
   }
 }

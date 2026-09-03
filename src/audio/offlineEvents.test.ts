@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MidiFile, MidiTrack } from '../core/midi/types'
+import { type MidiFile, type MidiTrack, nominalTempoMap } from '../core/midi/types'
 import { buildOfflineEvents } from './offlineEvents'
 
 function track(id: string, pitches: number[]): MidiTrack {
@@ -25,6 +25,7 @@ const midi = (tracks: MidiTrack[]): MidiFile => ({
   duration: 4,
   tracks,
   timeSignature: [4, 4],
+  ...nominalTempoMap(120, [4, 4]),
 })
 
 describe('buildOfflineEvents', () => {
@@ -46,6 +47,18 @@ describe('buildOfflineEvents', () => {
     const m = midi([track('a', [60]), track('b', [64])])
     expect(buildOfflineEvents(m, undefined)).toHaveLength(2)
     expect(buildOfflineEvents(m, new Set())).toHaveLength(2)
+  })
+
+  it('schedules the pedal-extended length when a note has releaseAt', () => {
+    const t = track('a', [60])
+    t.notes[0] = { ...t.notes[0]!, releaseAt: 3 } // notated end is 0.4
+    const events = buildOfflineEvents(midi([t]))
+    expect(events[0]?.duration).toBe(3)
+  })
+
+  it('falls back to the notated duration when there is no releaseAt', () => {
+    const events = buildOfflineEvents(midi([track('a', [60])]))
+    expect(events[0]?.duration).toBe(0.4)
   })
 
   it('returns no events when every track is disabled', () => {

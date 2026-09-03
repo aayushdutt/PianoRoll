@@ -3,7 +3,7 @@ import { INSTRUMENTS, type InstrumentId, SynthEngine } from './audio/SynthEngine
 import { MasterClock } from './core/clock/MasterClock'
 import { type BusNoteEvent, InputBus } from './core/input/InputBus'
 import { lazyHandle } from './core/lazyHandle'
-import { parseMidiFile } from './core/midi/parser'
+import { parseMidiFileWithStats } from './core/midi/parser'
 import type { MidiFile } from './core/midi/types'
 import { detectChord } from './core/music/ChordDetector'
 import {
@@ -71,6 +71,7 @@ import type { ExportSettings } from './ui/ExportModal'
 import { InstrumentMenu } from './ui/InstrumentMenu'
 import { KeyboardResizer } from './ui/KeyboardResizer'
 import type { SessionAction } from './ui/PostSessionModal'
+import { PEDAL_HIDDEN, type PedalIndicatorState, pedalIndicatorState } from './ui/pedalIndicator'
 import { showError, showSuccess } from './ui/Toast'
 import { TrackPanel } from './ui/TrackPanel'
 import { installViewportClassSync } from './ui/utils'
@@ -170,6 +171,9 @@ export class App {
   private firstPlayLogged = false
   private firstLiveNoteLogged = false
   private firstPedalLogged = false
+  // Last state pushed to the top-strip pedal chip; `syncPedalIndicator`
+  // recomputes on every clock tick and only touches the UI on a change.
+  private pedalShown: PedalIndicatorState = PEDAL_HIDDEN
   private playbackMilestones = new Set<number>()
   // Loop station one-shots, scoped to the page session. We want to know
   // whether users ever reach each step in the loop funnel, not count every
@@ -248,7 +252,10 @@ export class App {
         },
       },
       // Bar-snap when the metronome is running — rounds loop length to the
-      // nearest whole bar at current BPM (4/4). Off → freeform length.
+      // nearest whole bar at the metronome's BPM (4/4, like its click). The
+      // looper only runs in Live mode, where the click is the only pulse the
+      // player hears; a file that happens to be loaded is not playing and
+      // must not define the bar. Off → freeform length.
       (raw) => {
         if (!this.metronome.running.value) return raw
         const secPerBar = (60 / this.metronome.bpm.value) * 4
@@ -341,6 +348,7 @@ export class App {
         this.liveNotes.reset()
       },
       onZoom: (pps) => this.renderer.setZoom(pps),
+      onTranspose: (semitones) => this.applyTranspose(semitones),
       onThemeCycle: () => this.cycleTheme(),
       onMidiConnect: () => void this.connectMidi(),
       onOpenTracks: () => this.trackPanel.toggle(),
@@ -439,6 +447,7 @@ export class App {
         trackEvent('track_toggled', { enabled })
       },
       () => this.openFilePicker(),
+      (id) => !this.synth.getDisabledTrackIds().has(id),
     )
     this.trackPanel.setTrigger(this.controls.tracksButton)
 
@@ -535,6 +544,7 @@ export class App {
         // milestones (and the playback_30s activation) for a piece nobody
         // played back.
         if (this.store.state.status === 'exporting') return
+        this.syncPedalIndicator(t)
         // Engagement milestones are mode-agnostic (watched ≥30s counts as
         // a real user regardless of where the clock was ticking).
         for (const m of [30, 60, 120]) {
@@ -578,6 +588,14 @@ export class App {
         () => this.store.state.volume,
         (v) => this.synth.setVolume(v),
       ),
+      // Pedal chip: a mode switch or a new piece changes which holds apply;
+      // the player's own pedal fires straight from the bus. Time-driven
+      // changes ride the clock tick above.
+      watch(
+        () => [this.store.state.mode, this.store.state.loadedMidi] as const,
+        () => this.syncPedalIndicator(),
+      ),
+      this.performanceBus.subscribePedal(() => this.syncPedalIndicator()),
       watch(
         () => this.store.state.speed,
         (s) => {
@@ -652,6 +670,7 @@ export class App {
       this.midiInput.status.subscribe((status) => {
         this.controls.updateMidiStatus(status, this.midiInput.deviceName.value)
         this.dropzone.updateMidiStatus(status, this.midiInput.deviceName.value)
+        this.syncPedalIndicator()
         if (status === 'connected') {
           // Vendor enum instead of raw device name — cardinality-friendly and
           // avoids leaking user-customised device labels.
@@ -682,7 +701,11 @@ export class App {
       resetInteractionState: () => this.resetInteractionState(),
       openFilePicker: () => this.openFilePicker(),
       primeInteractiveAudio: () => this.primeInteractiveAudio(),
-      setLearnFileName: (name) => this.controls.updateLearnFileName(name),
+      setLearnFileName: (name) => {
+        this.controls.updateLearnFileName(name)
+        // Learn's piece lives on LearnState, outside the store watch below.
+        this.syncPedalIndicator()
+      },
     }
 
     // Start in home. <HomeMode/>'s onMount handles the side effects.
@@ -844,8 +867,63 @@ export class App {
     await this.midiInput.requestAccess({ silent: true })
   }
 
-  // Play-mode MIDI loader. Learn has its own loader on LearnController that
-  // never touches AppState — see the mode dispatch at the DropZone callback.
+  // Recomputes the top-strip pedal chip from whatever can hold the pedal right
+  // now — the current mode's piece at `time`, and the player's own pedal —
+  // and pushes it only when it changed. Cheap enough for every clock tick:
+  // one binary search over the piece's holds.
+  private syncPedalIndicator(time = this.clock.currentTime): void {
+    const mode = this.store.state.mode
+    const piece =
+      mode === 'play'
+        ? this.store.state.loadedMidi
+        : mode === 'learn'
+          ? (this.learnControllerHandle.peek()?.learnState.state.loadedMidi ?? null)
+          : null
+    const next = pedalIndicatorState({
+      pieceHolds: piece?.pedal,
+      time,
+      liveDown: this.performanceBus.pedalDown,
+      midiConnected: this.midiInput.status.value === 'connected',
+      // The bus fires before `firstPedalLogged` is set on the very first
+      // press; read the live state too so that press shows the chip.
+      liveEverUsed: this.firstPedalLogged || this.performanceBus.pedalDown,
+    })
+    if (next.visible === this.pedalShown.visible && next.down === this.pedalShown.down) return
+    this.pedalShown = next
+    this.controls.updatePedal(next)
+  }
+
+  // Transpose re-derives `loadedMidi` from `sourceMidi` and pushes the result
+  // down the same three paths a load uses — renderer, synth, scheduler. The
+  // renderer half is free: `store.setTranspose` writes a NEW loadedMidi object,
+  // which re-fires <PlayMode/>'s effect (renderer.loadMidi + trackPanel.render)
+  // synchronously before this method continues.
+  //
+  // One thing a load resets and a transpose must not: the muted tracks
+  // (`synth.load` clears them, `renderer.loadMidi` re-shows every track), so
+  // the mute set is restored right after.
+  private applyTranspose(semitones: number): void {
+    if (this.store.state.mode !== 'play' || this.store.state.sourceMidi === null) return
+    const before = this.store.state.transpose
+    const next = this.store.setTranspose(semitones)
+    if (next === before) return
+    trackEventSettled('transpose_changed', { semitones: next })
+
+    const midi = this.store.state.loadedMidi
+    if (!midi) return
+    const muted = [...this.synth.getDisabledTrackIds()]
+    this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
+    for (const id of muted) {
+      this.synth.setTrackEnabled(id, false)
+      this.renderer.setTrackVisible(id, false)
+    }
+    // Rebuilds the Tone.Part from the new pitches. If the transport is running
+    // it restarts at the same instant, so a transpose mid-playback is seamless;
+    // if it isn't, this just drops the stale schedule.
+    this.synth.seek(this.clock.currentTime)
+    this.liveNotes.reset()
+  }
+
   private async loadMidi(file: File, source: 'drag' | 'picker' = 'picker'): Promise<void> {
     const previousMode = this.store.state.mode
     const previousMidi = this.store.state.loadedMidi
@@ -855,17 +933,23 @@ export class App {
     this.showLoading()
 
     try {
-      const midi = await parseMidiFile(file)
+      const { midi, stats } = await parseMidiFileWithStats(file)
+      trackEvent('midi_parse_quality', {
+        target: 'play',
+        out_of_range_notes: stats.outOfRangeNotes,
+        has_sustain_pedal: stats.hasSustainPedal,
+        tempo_events: stats.tempoEvents,
+      })
+      // completePlayLoad flips mode to 'play'; <PlayMode/>'s effect then
+      // drives renderer.loadMidi, trackPanel.render, document.title, and
+      // dropzone.hide off the new loadedMidi.
+      this.store.completePlayLoad(midi)
       this.synth.load(midi).catch((err) => {
         console.error('SynthEngine.load failed:', err)
         // Visuals load but there's no sound — a silent session-killer that
         // produced zero telemetry before.
         trackEvent('synth_load_failed', { source })
       })
-      // completePlayLoad flips mode to 'play'; <PlayMode/>'s effect then
-      // drives renderer.loadMidi, trackPanel.render, document.title, and
-      // dropzone.hide off the new loadedMidi.
-      this.store.completePlayLoad(midi)
       this.resetPlaybackTelemetry()
       // Recorded only on the success path, so a file the parser choked on
       // never comes back as a recent card. Fire-and-forget by design —
@@ -1013,7 +1097,12 @@ export class App {
     // loaded MidiFile to .mid bytes. Especially useful after "Open in file
     // mode" from a live session, where the raw .mid was never downloaded.
     if (settings.output === 'midi') {
-      const bytes = await midiFileToBytes(midi)
+      // The only "download MIDI" path for a loaded file, and the one place
+      // that must NOT follow the derive step: transpose is a playback
+      // setting, so the .mid the user gets back carries the pitches their
+      // file actually contained. Audio/video below deliberately
+      // export `midi` — the derived file is what you hear and see.
+      const bytes = await midiFileToBytes(this.store.state.sourceMidi ?? midi)
       triggerMidiDownload(bytes, `${sanitiseFilename(midi.name)}.mid`)
       exportModal.close()
       this.showSuccess(`↓ ${sanitiseFilename(midi.name)}.mid`)
@@ -1572,12 +1661,12 @@ export class App {
   // completePlayLoad, <PlayMode/>'s effect owns the surface side effects
   // (renderer.loadMidi, trackPanel.render, dropzone.hide,
   // keyboardInput.enable, document.title) — don't repeat them here.
-  private loadSessionAsFile(midi: import('./core/midi/types').MidiFile): void {
+  private loadSessionAsFile(midi: MidiFile): void {
     this.resetInteractionState()
     this.store.beginPlayLoad()
     this.renderer.clearMidi()
-    this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
     this.store.completePlayLoad(midi)
+    this.synth.load(midi).catch((err) => console.error('SynthEngine.load failed:', err))
     this.resetPlaybackTelemetry()
     // You just performed this and pressed Play — the strongest version of the
     // "you asked for it, so it plays" rule the other loaders follow.

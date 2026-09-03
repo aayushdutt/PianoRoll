@@ -7,7 +7,7 @@ import {
   Part,
   start as toneStart,
 } from 'tone'
-import type { MidiFile } from '../core/midi/types'
+import { audibleDuration, type MidiFile } from '../core/midi/types'
 import { createEventSignal } from '../store/eventSignal'
 import type { AudioEngine } from './AudioEngine'
 import {
@@ -22,6 +22,9 @@ export { INSTRUMENTS } from './instruments'
 
 interface NoteEvent {
   note: string
+  // Audible (pedal-extended) length at 1× speed. Divided by the CURRENT speed
+  // at trigger time — the transport-bpm trick scales event spacing only, and
+  // setSpeed can land mid-playback without rebuilding the Part.
   duration: number
   velocity: number
   trackId: string
@@ -186,7 +189,7 @@ export class SynthEngine implements AudioEngine {
           note.time - fromTime,
           {
             note: midiToNoteName(note.pitch),
-            duration: note.duration,
+            duration: audibleDuration(note),
             velocity: note.velocity,
             trackId: track.id,
           },
@@ -204,7 +207,8 @@ export class SynthEngine implements AudioEngine {
       // voice so overlapping notes from the previous instrument don't linger.
       if (this.disabledTrackIds.has(ev.trackId)) return
       const inst = this.instruments.get(this.currentId)
-      inst?.triggerAttackRelease(ev.note, ev.duration, time, ev.velocity)
+      const speed = this._speed > 0 ? this._speed : 1
+      inst?.triggerAttackRelease(ev.note, ev.duration / speed, time, ev.velocity)
     }, partEvents)
     part.start(0)
     this.scheduledPart = part

@@ -1,4 +1,4 @@
-import type { MidiFile, MidiNote, MidiTrack } from '../core/midi/types'
+import { type MidiFile, type MidiNote, type MidiTrack, nominalTempoMap } from '../core/midi/types'
 import type { CapturedEvent } from './MidiEncoding'
 
 // Converts a live session's captured events into the internal `MidiFile`
@@ -58,6 +58,9 @@ export function sessionToMidiFile(
     duration,
     bpm,
     timeSignature: [4, 4],
+    // Recorded sessions are single-tempo by construction — the map is just the
+    // nominal entry.
+    ...nominalTempoMap(bpm, [4, 4]),
     tracks: [track],
   }
 }

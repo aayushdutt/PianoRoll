@@ -30,6 +30,8 @@ import { isLearnCoachmarkSeen, LearnCoachmark } from './LearnCoachmark'
 
 const SKIP_SECONDS = 10
 
+import { PEDAL_HIDDEN, type PedalIndicatorState } from './pedalIndicator'
+
 export { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN } from './ControlsView'
 
 // Grouped UI state with field-level reactivity. Each top-level key is read
@@ -38,6 +40,7 @@ export { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN } from './ControlsView'
 interface UiStoreShape {
   context: { kicker: string; title: string }
   midi: { status: MidiDeviceStatus; deviceName: string }
+  pedal: PedalIndicatorState
   session: { recording: boolean; elapsed: number }
   loop: { state: LiveLooperState; layerCount: number; progressDeg: number }
   metro: { running: boolean; bpm: number }
@@ -48,6 +51,9 @@ export interface ControlsOptions {
   services: AppServices
   onSeek?: (t: number) => void
   onZoom?: (pps: number) => void
+  // App owns the re-derive: the store swaps `loadedMidi`, then the synth has
+  // to be reloaded and rescheduled. Controls only reports the intent.
+  onTranspose?: (semitones: number) => void
   onThemeCycle?: () => void
   onMidiConnect?: () => void
   onOpenTracks?: () => void
@@ -154,6 +160,7 @@ export class Controls {
     const [octave, setOctave] = createSignal(4)
     const [volume, setVolumeSig] = createSignal(store.state.volume ?? 0.8)
     const [speed, setSpeedSig] = createSignal(store.state.speed ?? 1)
+    const [transpose, setTransposeSig] = createSignal(store.state.transpose ?? 0)
     const [zoom, setZoomSig] = createSignal(ZOOM_DEFAULT)
 
     const [uiStore, setUi] = createStore<UiStoreShape>({
@@ -162,6 +169,7 @@ export class Controls {
         title: t('topStrip.context.ready.title'),
       },
       midi: { status: 'disconnected', deviceName: '' },
+      pedal: PEDAL_HIDDEN,
       session: { recording: false, elapsed: 0 },
       loop: { state: 'idle', layerCount: 0, progressDeg: 0 },
       metro: { running: false, bpm: 120 },
@@ -203,6 +211,7 @@ export class Controls {
             midiDeviceName={() => uiStore.midi.deviceName}
             midiPillLabel={() => getMidiPillLabel(uiStore.midi.status, uiStore.midi.deviceName)}
             midiMenuLabel={() => getMidiMenuLabel(uiStore.midi.status, uiStore.midi.deviceName)}
+            pedal={() => uiStore.pedal}
             dim={dimTopStrip}
             onHome={() => opts.onHome?.()}
             onMode={(m) => opts.onModeRequest?.(m)}
@@ -325,6 +334,8 @@ export class Controls {
             volume={volume}
             speed={speed}
             speedLabel={() => formatSpeed(speed())}
+            transpose={transpose}
+            onTranspose={(v) => opts.onTranspose?.(v)}
             zoom={zoom}
             wakeRef={(fn) => {
               this.hudWake = fn
@@ -410,6 +421,12 @@ export class Controls {
           setHasFile(midi !== null)
           this.refreshUi()
         },
+      ),
+      // The store clamps and resets-on-load, so the chip mirrors the store
+      // rather than holding its own truth.
+      watch(
+        () => store.state.transpose,
+        (n) => setTransposeSig(n),
       ),
       watch(
         () => store.state.duration,
@@ -510,6 +527,11 @@ export class Controls {
   updateMidiStatus(status: MidiDeviceStatus, deviceName: string): void {
     this.setUi('midi', { status, deviceName })
     this.refreshUi()
+  }
+
+  // App computes the state (see pedalIndicator.ts) and only calls on change.
+  updatePedal(state: PedalIndicatorState): void {
+    this.setUi('pedal', state)
   }
 
   // Push the currently-loaded Learn-mode song name into the topbar context.

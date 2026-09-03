@@ -96,6 +96,10 @@ export const icons = {
       `<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>`,
     ),
 
+  // Sustain pedal, front-on: stem over a foot plate. The foot carries a class
+  // so CSS can fill it while the pedal is down.
+  pedal: (size: Size = 14): string =>
+    svgStroke(size, `<path d="M10 3h4v7h-4z"/><path class="ts-pedal-foot" d="M6 10h12l2 9H4z"/>`),
   midi: (size: Size = 14): string =>
     svgStroke(
       size,

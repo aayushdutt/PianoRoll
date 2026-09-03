@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { MidiFile } from '../../../core/midi/types'
+import { type MidiFile, nominalTempoMap } from '../../../core/midi/types'
 import type { AppServices } from '../../../core/services'
 import { createLearnState, type LearnState } from '../../core/LearnState'
 import { cycleSpeedPreset, PlayAlongEngine } from './engine'
@@ -85,6 +85,7 @@ function makeMidi(): MidiFile {
     duration: 60,
     bpm: 120,
     timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
     tracks: [
       {
         id: 'rh',
@@ -113,6 +114,7 @@ function makeSplitHandMidi(): MidiFile {
     duration: 12,
     bpm: 120,
     timeSignature: [4, 4],
+    ...nominalTempoMap(120, [4, 4]),
     tracks: [
       {
         id: 'lh',
@@ -366,6 +368,7 @@ describe('PlayAlongEngine', () => {
       duration: 30,
       bpm: 120,
       timeSignature: [4, 4],
+      ...nominalTempoMap(120, [4, 4]),
       tracks: [
         {
           id: 'rh',

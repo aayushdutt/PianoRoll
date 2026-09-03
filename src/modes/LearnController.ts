@@ -1,4 +1,4 @@
-import { parseMidiFile } from '../core/midi/parser'
+import { parseMidiFileWithStats } from '../core/midi/parser'
 import type { MidiFile } from '../core/midi/types'
 import { forgetRecent, readRecentMidi, rememberRecent } from '../core/recentMidi'
 import { fetchSampleMidi, getSample } from '../core/samples'
@@ -176,7 +176,13 @@ export class LearnController {
   async loadMidiFromFile(file: File, source: 'drag' | 'picker' = 'picker'): Promise<void> {
     this.learnState.beginLoad()
     try {
-      const midi = await parseMidiFile(file)
+      const { midi, stats } = await parseMidiFileWithStats(file)
+      trackEvent('midi_parse_quality', {
+        target: 'learn',
+        out_of_range_notes: stats.outOfRangeNotes,
+        has_sustain_pedal: stats.hasSustainPedal,
+        tempo_events: stats.tempoEvents,
+      })
       await this.consumeMidi(midi)
       // Recents are shared with Play: a file practised here is one click away
       // from the home grid, and vice versa. Fire-and-forget — a storage
@@ -264,6 +270,14 @@ export class LearnController {
     })
   }
 
+  // Learn's counterpart to `AppStore.completePlayLoad`: the single gate every
+  // Learn loader (file, sample, recent, cross-mode hand-off) funnels through.
+  //
+  // No transpose here by design: Play's `transpose` is a per-piece playback
+  // setting on `AppStore`, and Learn keeps its MIDI on `LearnState` precisely
+  // so the two modes never share transport state. Practising a piece a
+  // semitone off what the app told you to play would also be a scoring trap.
+  // Notes off the 88 keys are audible but undrawn; PracticeEngine skips them.
   private async consumeMidi(midi: MidiFile): Promise<void> {
     // A newly selected piece is a fresh practice session. Do not inherit the
     // previous exercise's playhead, hand focus, loop, or wait state.
