@@ -7,7 +7,7 @@
 // behavioral change.
 
 import type { MidiFile } from '../core/midi/types'
-import type { ExportResolution, ExportSpeed } from '../ui/ExportModal'
+import type { ExportFocus, ExportResolution, ExportSpeed } from '../ui/ExportModal'
 import type { ExportStage } from './VideoExporter'
 
 // Scans the MIDI's notes for min/max pitch and pads outward by a few keys so
@@ -29,6 +29,24 @@ export function fitPitchRange(midi: MidiFile): { min: number; max: number } {
   return {
     min: Math.max(21, lo - pad),
     max: Math.min(108, hi + pad),
+  }
+}
+
+export function isSocialPreset(preset: ExportResolution): boolean {
+  return preset === 'vertical' || preset === 'square'
+}
+
+// The one framing policy for social exports, shared by the dialog preview
+// and the real export so the frame you see is the frame you get. Landscape
+// exports keep the live viewport untouched.
+export function exportFraming(
+  settings: { resolution: ExportResolution; focus: ExportFocus; speed: ExportSpeed },
+  midi: MidiFile,
+): { pitchRange?: { min: number; max: number }; pixelsPerSecond?: number } {
+  if (!isSocialPreset(settings.resolution)) return {}
+  return {
+    ...(settings.focus === 'fit' ? { pitchRange: fitPitchRange(midi) } : {}),
+    pixelsPerSecond: speedToPps(settings.speed),
   }
 }
 

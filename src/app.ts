@@ -15,12 +15,10 @@ import { forgetRecent, readRecentMidi, rememberRecent } from './core/recentMidi'
 import { fetchSampleMidi, getSample } from './core/samples'
 import type { AppServices } from './core/services'
 import {
-  fitPitchRange,
+  exportFraming,
   pitchSignature,
   resolveExportBitrate,
-  resolveExportDims,
   resolveExportRender,
-  speedToPps,
   trimAudioBuffer,
 } from './export/exportMath'
 // VideoExporter pulls Mediabunny; OfflineAudioRenderer pulls Tone + instruments.
@@ -139,15 +137,15 @@ export class App {
             height: window.innerHeight,
             resolution: this.renderer.canvasSize.resolution,
           })
-          const social = settings.resolution === 'vertical' || settings.resolution === 'square'
           return this.renderer.renderPreview({
             width: plan.logicalWidth,
             height: plan.logicalHeight,
-            resolution: plan.resolution,
+            // Layout depends only on the logical size, so render no denser
+            // than the thumbnail needs — a 4K preview is a 640px picture.
+            resolution: Math.min(plan.resolution, maxWidth / plan.logicalWidth),
             time: midi.duration * 0.25,
             maxWidth,
-            ...(social && settings.focus === 'fit' ? { pitchRange: fitPitchRange(midi) } : {}),
-            ...(social ? { pixelsPerSecond: speedToPps(settings.speed) } : {}),
+            ...exportFraming(settings, midi),
           })
         },
       })
@@ -1106,7 +1104,6 @@ export class App {
     // no way to correlate against device capability.
     const nav = navigator as Navigator & { deviceMemory?: number }
     const isVideoOutput = settings.output === 'av' || settings.output === 'video-only'
-    const targetDims = isVideoOutput ? resolveExportDims(settings.resolution) : null
     // Fixed LOGICAL stage + a `resolution` multiplier for the pixels. Every
     // renderer constant (keyboard height, glow, line widths) is in logical px,
     // so sizing the logical canvas to 4K would shrink the whole layout instead
@@ -1134,8 +1131,8 @@ export class App {
       midi_duration_s: Math.round(midi.duration),
       hardware_concurrency: nav.hardwareConcurrency ?? null,
       device_memory: nav.deviceMemory ?? null,
-      export_w: targetDims?.width ?? planPixels?.width ?? null,
-      export_h: targetDims?.height ?? planPixels?.height ?? null,
+      export_w: planPixels?.width ?? null,
+      export_h: planPixels?.height ?? null,
     }
     let exportStage: 'serialize' | 'audio_render' | 'video_encode' = 'serialize'
 
@@ -1247,21 +1244,16 @@ export class App {
     // speed for a more cinematic feel; landscape exports leave both untouched.
     const originalPps = this.renderer.currentPixelsPerSecond
     const originalRange = this.renderer.pitchRange
-    const isSocialFormat =
-      needsVideo && (settings.resolution === 'vertical' || settings.resolution === 'square')
+    const framing = needsVideo ? exportFraming(settings, midi) : {}
     let pitchChanged = false
     let ppsChanged = false
-    if (isSocialFormat) {
-      if (settings.focus === 'fit') {
-        const fit = fitPitchRange(midi)
-        this.renderer.setPitchRange(fit.min, fit.max)
-        pitchChanged = true
-      }
-      const pps = speedToPps(settings.speed)
-      if (pps !== originalPps) {
-        this.renderer.setZoom(pps)
-        ppsChanged = true
-      }
+    if (framing.pitchRange) {
+      this.renderer.setPitchRange(framing.pitchRange.min, framing.pitchRange.max)
+      pitchChanged = true
+    }
+    if (framing.pixelsPerSecond !== undefined && framing.pixelsPerSecond !== originalPps) {
+      this.renderer.setZoom(framing.pixelsPerSecond)
+      ppsChanged = true
     }
 
     const filename =

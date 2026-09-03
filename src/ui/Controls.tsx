@@ -608,9 +608,15 @@ export class Controls {
     // Reading scrollWidth/clientWidth after dropping .ts-compact forces a
     // synchronous reflow, but the browser only paints after this callback
     // returns — so re-adding the class (when not clipping) is flicker-free.
-    strip.classList.remove('ts-compact')
-    const clips = title.scrollWidth - title.clientWidth > 1
-    strip.classList.toggle('ts-compact', clips)
+    strip.classList.remove('ts-compact', 'ts-compact-export')
+    const titleClips = title.scrollWidth - title.clientWidth > 1
+    if (!titleClips) return
+    // Tier 1: secondary labels go so the title gets room. Export is the
+    // strip's star action, so it keeps its label unless the strip itself
+    // still overflows (pills pushed off the right edge) — a long title being
+    // ellipsised is fine, pills being unreachable is not.
+    strip.classList.add('ts-compact')
+    if (strip.scrollWidth - strip.clientWidth > 1) strip.classList.add('ts-compact-export')
   }
 
   private handlePlayClick(): void {

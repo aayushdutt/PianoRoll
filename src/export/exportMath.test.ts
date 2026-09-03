@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type MidiFile, type MidiNote, type MidiTrack, nominalTempoMap } from '../core/midi/types'
 import {
+  exportFraming,
   fitPitchRange,
   overallProgress,
   type ProgressMode,
@@ -443,5 +444,21 @@ describe('stageEtaSeconds', () => {
 
   it('approaches zero as the stage completes', () => {
     expect(stageEtaSeconds(120_000, 0.999)).toBeLessThan(1)
+  })
+})
+
+describe('exportFraming', () => {
+  const midi = midiWith([60])
+
+  it('leaves landscape exports alone', () => {
+    expect(exportFraming({ resolution: '1080p', focus: 'fit', speed: 'drama' }, midi)).toEqual({})
+  })
+
+  it('applies fit + fall speed for social formats, fall only for all-keys', () => {
+    const fit = exportFraming({ resolution: 'vertical', focus: 'fit', speed: 'drama' }, midi)
+    expect(fit.pixelsPerSecond).toBe(120)
+    expect(fit.pitchRange).toEqual({ min: 57, max: 63 })
+    const all = exportFraming({ resolution: 'square', focus: 'all', speed: 'compact' }, midi)
+    expect(all).toEqual({ pixelsPerSecond: 300 })
   })
 })

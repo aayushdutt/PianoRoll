@@ -154,16 +154,21 @@ async function getPianoModule(): Promise<PianoModule> {
 // for that — Tone's OfflineContext.render() doesn't either — so an export
 // could start before the IR landed and bake the instrument dry. Every reverb
 // is built through this helper and createInstrument awaits the batch.
-const pendingReverbs: Promise<unknown>[] = []
+// A Set that self-prunes on settle (rather than a drained array) so two
+// instruments being built at once can't steal each other's IR promises;
+// over-waiting on a neighbour's reverb is harmless, and allSettled keeps one
+// failed IR from rejecting an unrelated instrument.
+const pendingReverbs = new Set<Promise<unknown>>()
 function makeReverb(opts: ConstructorParameters<typeof Reverb>[0]): Reverb {
   const r = new Reverb(opts)
-  pendingReverbs.push(r.ready)
+  const ready = r.ready.finally(() => pendingReverbs.delete(ready))
+  pendingReverbs.add(ready)
   return r
 }
 
 export async function createInstrument(id: InstrumentId): Promise<InstrumentRuntime> {
   const inst = await buildInstrument(id)
-  await Promise.all(pendingReverbs.splice(0))
+  await Promise.allSettled([...pendingReverbs])
   return inst
 }
 

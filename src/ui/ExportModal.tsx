@@ -66,8 +66,8 @@ export interface ExportModalDeps {
 }
 
 // Chrome caps `navigator.deviceMemory` at 8, so ≤4 reliably means a genuinely
-// constrained device. 2K/4K previews allocate the full backing store for one
-// frame; on these devices the preview renders at half size instead.
+// constrained device: the preview thumbnail is requested at half width there
+// (App caps the render resolution to the thumbnail, so this halves the work).
 const LOW_MEMORY_DEVICE =
   ((navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8) <= 4
 
@@ -240,8 +240,11 @@ function ExportView(props: ViewProps) {
         isSocial() ? ui.speed : null,
       ],
       () => {
+        if (previewTimer) {
+          clearTimeout(previewTimer)
+          previewTimer = null
+        }
         if (!props.isOpen() || ui.dest !== 'video') return
-        if (previewTimer) clearTimeout(previewTimer)
         previewTimer = setTimeout(() => {
           previewTimer = null
           void drawPreview()
@@ -716,7 +719,8 @@ export class ExportModal {
       fps: 30,
       includeAudio: true,
       focus: 'fit',
-      speed: 'drama',
+      // Standard fall for every social format; Drama and Compact are opt-in.
+      speed: 'standard',
       audioFormat: 'mp3',
     })
     const [stage, setStage] = createSignal(t('export.preparing'))
@@ -753,16 +757,7 @@ export class ExportModal {
           isOpen={isOpen}
           phase={phase}
           ui={ui}
-          set={(key, value) => {
-            this.setUi(key, value)
-            // Vertical reads best with the slow "drama" fall; square with
-            // standard. Applied when the format changes, never on every click,
-            // so a deliberate choice sticks.
-            if (key === 'format') {
-              if (value === 'vertical') this.setUi('speed', 'drama')
-              else if (value === 'square') this.setUi('speed', 'standard')
-            }
-          }}
+          set={(key, value) => this.setUi(key, value)}
           openCount={openCount}
           stage={stage}
           pct={pct}

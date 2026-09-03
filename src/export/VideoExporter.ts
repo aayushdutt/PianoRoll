@@ -310,7 +310,6 @@ export class VideoExporter {
     let videoDone = false
     let audioEncodeMs = 0
     let audioMissing = false
-    let audioTaskError: unknown = null
     this.audioReport = null
     const audioTask = !audioSource
       ? Promise.resolve()
@@ -330,7 +329,13 @@ export class VideoExporter {
             audioEncodeMs = performance.now() - t0
           })
           .catch((err: unknown) => {
-            audioTaskError = err
+            // An audio ENCODE failure (no AAC encoder, mux error) is not a
+            // video-codec fault: degrade to a silent export on the same plan
+            // instead of burning a full video pass on the fallback codec.
+            if (this.cancelled) return
+            console.error('Audio encode failed:', err)
+            opts.onAudioUnavailable?.(err)
+            audioMissing = true
           })
 
     // The video encoder error callback fires asynchronously. Capture the first
@@ -340,9 +345,13 @@ export class VideoExporter {
     let videoMuxDrain = Promise.resolve()
     const encoder = new VideoEncoder({
       output: (chunk, meta) => {
-        videoMuxDrain = videoMuxDrain.then(() =>
-          videoSource.add(EncodedPacket.fromEncodedChunk(chunk), meta),
-        )
+        // Surface mux failures through check() rather than as an unobserved
+        // rejection (a cancelled Output rejects any add() still queued).
+        videoMuxDrain = videoMuxDrain
+          .then(() => videoSource.add(EncodedPacket.fromEncodedChunk(chunk), meta))
+          .catch((e: unknown) => {
+            encoderError ??= e as Error
+          })
       },
       error: (e) => {
         encoderError ??= e as Error
@@ -372,7 +381,6 @@ export class VideoExporter {
 
     const check = (): void => {
       this.throwIfStopped(encoderError)
-      if (audioTaskError) throw audioTaskError
       if (audioMissing) throw new AudioUnavailableError()
     }
 
@@ -472,7 +480,13 @@ export class VideoExporter {
       if (encoder.state !== 'closed') encoder.close()
       this.encoder = null
       this.output = null
-      if (!finalized) await output.cancel().catch(() => {})
+      if (!finalized) {
+        // Stop the attempt's audio encode before the next attempt starts its
+        // own, then release the muxer.
+        if (this.audioEncoder && this.audioEncoder.state !== 'closed') this.audioEncoder.close()
+        await audioTask.catch(() => {})
+        await output.cancel().catch(() => {})
+      }
     }
   }
 
@@ -492,9 +506,11 @@ export class VideoExporter {
     let audioMuxDrain = Promise.resolve()
     const encoder = new AudioEncoder({
       output: (chunk, meta) => {
-        audioMuxDrain = audioMuxDrain.then(() =>
-          audioSource.add(EncodedPacket.fromEncodedChunk(chunk), meta),
-        )
+        audioMuxDrain = audioMuxDrain
+          .then(() => audioSource.add(EncodedPacket.fromEncodedChunk(chunk), meta))
+          .catch((e: unknown) => {
+            encoderError ??= e as Error
+          })
       },
       error: (e) => {
         encoderError ??= e as Error
@@ -565,7 +581,7 @@ export class VideoExporter {
       onProgress(1)
     } finally {
       if (encoder.state !== 'closed') encoder.close()
-      this.audioEncoder = null
+      if (this.audioEncoder === encoder) this.audioEncoder = null
     }
   }
 
