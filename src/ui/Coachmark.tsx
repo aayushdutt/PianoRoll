@@ -49,10 +49,29 @@ function markSeen(key: string): void {
   }
 }
 
+// Bubbles currently on screen across all instances; the body flag stays on
+// until the last one goes.
+let openBubbles = 0
+
+// A bubble must not appear over a modal. Checked when the show timer fires;
+// if one is up, the timer re-arms instead of consuming the once-only slot.
+const OVERLAY_OPEN = '#export-modal.open, #midi-picker-modal.open, #post-session-modal.open'
+const OVERLAY_RETRY_MS = 3000
+function overlayOpen(): boolean {
+  return document.querySelector(OVERLAY_OPEN) !== null
+}
+
 export function Coachmark(props: CoachmarkProps) {
   const placement = (): CoachmarkPlacement => props.placement ?? 'below'
   const [shown, setShown] = createSignal(false)
-  const [pos, setPos] = createSignal<{ top: number; left: number }>({ top: 0, left: 0 })
+  // `left` is the bubble's centre; `arrowX` is where the arrow sits relative
+  // to that centre once the bubble has been clamped inside the viewport.
+  const [pos, setPos] = createSignal<{ top: number; left: number; arrowX: number }>({
+    top: 0,
+    left: 0,
+    arrowX: 0,
+  })
+  let bubbleEl: HTMLDivElement | undefined
   let showTimer: number | null = null
   let hideTimer: number | null = null
   let resizeListener: (() => void) | null = null
@@ -80,8 +99,14 @@ export function Coachmark(props: CoachmarkProps) {
     if (!btn) return
     const r = btn.getBoundingClientRect()
     const gap = 10
+    const margin = 12
     const top = placement() === 'above' ? r.top - gap : r.bottom + gap
-    setPos({ top, left: r.left + r.width / 2 })
+    const anchorX = r.left + r.width / 2
+    // Keep the bubble on screen for anchors near an edge (the Export button
+    // sits at the strip's right end); the arrow stays on the anchor.
+    const half = (bubbleEl?.offsetWidth ?? 0) / 2
+    const left = Math.min(Math.max(anchorX, margin + half), window.innerWidth - margin - half)
+    setPos({ top, left, arrowX: anchorX - left })
   }
 
   // Eligibility flips → arm the show timer; flip back → cancel cleanly.
@@ -91,8 +116,12 @@ export function Coachmark(props: CoachmarkProps) {
     if (alreadySeen(props.storageKey)) return
     if (props.eligible() && !shown()) {
       clearTimers()
-      showTimer = window.setTimeout(() => {
+      const tryShow = (): void => {
         if (!props.eligible()) return
+        if (overlayOpen()) {
+          showTimer = window.setTimeout(tryShow, OVERLAY_RETRY_MS)
+          return
+        }
         const btn = document.getElementById(props.anchorId)
         if (!btn) return
         updatePos()
@@ -100,7 +129,8 @@ export function Coachmark(props: CoachmarkProps) {
         markSeen(props.storageKey)
         props.onShow?.()
         hideTimer = window.setTimeout(() => setShown(false), props.autoDismissMs)
-      }, props.showDelayMs)
+      }
+      showTimer = window.setTimeout(tryShow, props.showDelayMs)
     } else if (!props.eligible()) {
       clearTimers()
       setShown(false)
@@ -112,6 +142,23 @@ export function Coachmark(props: CoachmarkProps) {
   createEffect(() => {
     if (shown() && props.dismissOn?.()) dismiss()
   })
+
+  // The bubble's width is only known once it is in the DOM: re-clamp after
+  // the first paint. Also flag the document so a dimmed idle top strip wakes
+  // up while a bubble points at it (see `.coachmark-open` in main.css).
+  let flagged = false
+  const setFlag = (open: boolean): void => {
+    if (open === flagged) return
+    flagged = open
+    openBubbles += open ? 1 : -1
+    document.body.classList.toggle('coachmark-open', openBubbles > 0)
+  }
+  createEffect(() => {
+    const open = shown()
+    setFlag(open)
+    if (open) requestAnimationFrame(updatePos)
+  })
+  onCleanup(() => setFlag(false))
 
   onMount(() => {
     resizeListener = () => {
@@ -133,10 +180,15 @@ export function Coachmark(props: CoachmarkProps) {
     <Show when={shown()}>
       <Portal>
         <div
+          ref={bubbleEl}
           class={`coachmark coachmark--${placement()}`}
           role="status"
           aria-live="polite"
-          style={{ top: `${pos().top}px`, left: `${pos().left}px` }}
+          style={{
+            top: `${pos().top}px`,
+            left: `${pos().left}px`,
+            '--arrow-x': `calc(50% + ${pos().arrowX}px)`,
+          }}
         >
           <div class="coachmark__arrow" aria-hidden="true" />
           <div class="coachmark__title">{t(props.titleKey)}</div>

@@ -392,6 +392,8 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'coachmark.learn.body': 'Przechodź nuta po nucie w trybie czekania.',
   'coachmark.drag.title': 'Przesuń to gdziekolwiek',
   'coachmark.drag.body': 'Przeciągnij ten uchwyt, aby zmienić położenie panelu.',
+  'coachmark.export.title': 'Zapisz jako wideo',
+  'coachmark.export.body': 'Zamień to w plik MP4 do udostępnienia.',
   'coachmark.dismiss': 'Zamknij',
 
   'midiPicker.aria': 'Otwórz MIDI',

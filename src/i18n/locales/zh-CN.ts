@@ -376,6 +376,8 @@ const zhCN: Messages = {
   'coachmark.learn.body': '用等待模式逐音练习。',
   'coachmark.drag.title': '把它拖到任意位置',
   'coachmark.drag.body': '拖动这个手柄来重新摆放控件。',
+  'coachmark.export.title': '保存为视频',
+  'coachmark.export.body': '把它变成可以分享的 MP4。',
   'coachmark.dismiss': '关闭',
 
   'midiPicker.aria': '打开 MIDI',

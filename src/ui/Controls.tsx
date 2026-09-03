@@ -26,6 +26,7 @@ import {
   ZOOM_DEFAULT,
 } from './ControlsView'
 import { DragCoachmark } from './DragCoachmark'
+import { ExportCoachmark } from './ExportCoachmark'
 import { isLearnCoachmarkSeen, LearnCoachmark } from './LearnCoachmark'
 import { PEDAL_HIDDEN, type PedalIndicatorState } from './pedalIndicator'
 
@@ -232,6 +233,16 @@ export class Controls {
               mode() === 'play' && hasFile() && status() !== 'loading' && status() !== 'exporting'
             }
             onShow={() => setLearnCoachmarkSeen(true)}
+          />
+          <ExportCoachmark
+            eligible={() =>
+              // After the Learn bubble, never alongside it.
+              learnCoachmarkSeen() &&
+              mode() === 'play' &&
+              hasFile() &&
+              status() !== 'loading' &&
+              status() !== 'exporting'
+            }
           />
           <HudView
             mode={mode}

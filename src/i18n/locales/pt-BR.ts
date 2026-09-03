@@ -399,6 +399,8 @@ const ptBR: Messages = {
   'coachmark.learn.body': 'Avance nota por nota com o modo de espera.',
   'coachmark.drag.title': 'Mova para onde quiser',
   'coachmark.drag.body': 'Arraste esta alça para reposicionar os controles.',
+  'coachmark.export.title': 'Salvar como vídeo',
+  'coachmark.export.body': 'Transforme isto em um MP4 para compartilhar.',
   'coachmark.dismiss': 'Fechar',
 
   // ── MidiPickerModal ─────────────────────────────────────────

@@ -973,6 +973,12 @@ body {
   opacity: 0.16;
   pointer-events: none;
 }
+/* A coachmark pointing at a dimmed strip would be pointing at a ghost; wake
+   the strip for as long as the bubble is up. */
+body.coachmark-open #top-strip.strip--dim {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .ts-end {
   display: flex;
@@ -7474,6 +7480,11 @@ body.canvas-hidden #kbd-resizer {
   color: var(--text);
   pointer-events: auto;
 }
+/* A bubble already on screen hides for as long as a modal is up (the show
+   timer itself waits for overlays to close — see Coachmark.tsx). */
+body:has(#export-modal.open, #midi-picker-modal.open, #post-session-modal.open) .coachmark {
+  display: none;
+}
 .coachmark--below {
   transform: translateX(-50%);
   animation: coachmark-in-below 220ms var(--ease-out) both;
@@ -7484,21 +7495,25 @@ body.canvas-hidden #kbd-resizer {
 }
 .coachmark__arrow {
   position: absolute;
-  left: 50%;
+  left: var(--arrow-x, 50%);
   width: 9px;
   height: 9px;
   background: inherit;
   transform: translateX(-50%) rotate(45deg);
 }
+/* The bubble's edge is border + a 1px accent ring (box-shadow); the arrow's
+   two outer edges carry both so it reads as part of the same outline. */
 .coachmark--below .coachmark__arrow {
   top: -5px;
   border-top: 1px solid var(--border-hi);
   border-left: 1px solid var(--border-hi);
+  box-shadow: -1px -1px 0 var(--accent-glow);
 }
 .coachmark--above .coachmark__arrow {
   bottom: -5px;
   border-bottom: 1px solid var(--border-hi);
   border-right: 1px solid var(--border-hi);
+  box-shadow: 1px 1px 0 var(--accent-glow);
 }
 .coachmark__title {
   display: inline-flex;

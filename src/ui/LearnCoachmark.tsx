@@ -6,8 +6,9 @@ import { Coachmark } from './Coachmark'
 // orient.
 
 const STORAGE_KEY = 'midee.coachmark.learnShown'
-const SHOW_DELAY_MS = 8000
-const AUTO_DISMISS_MS = 14000
+// 20 s after load, gone by 30 s — when the Export coachmark takes the strip.
+const SHOW_DELAY_MS = 20_000
+const AUTO_DISMISS_MS = 10_000
 const ANCHOR_ID = 'ts-learn-this'
 
 export function LearnCoachmark(props: { eligible: () => boolean; onShow?: () => void }) {

@@ -403,6 +403,8 @@ const fr: Messages = {
   'coachmark.learn.body': 'Avancez note par note avec le mode attente.',
   'coachmark.drag.title': 'Déplacez-le où vous voulez',
   'coachmark.drag.body': 'Faites glisser cette poignée pour repositionner les contrôles.',
+  'coachmark.export.title': 'Enregistrer en vidéo',
+  'coachmark.export.body': 'Transformez ceci en MP4 à partager.',
   'coachmark.dismiss': 'Fermer',
 
   // ── MidiPickerModal ─────────────────────────────────────────

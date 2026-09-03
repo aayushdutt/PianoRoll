@@ -428,6 +428,8 @@ export const en = {
   'coachmark.learn.body': 'Step through note-by-note with wait-mode.',
   'coachmark.drag.title': 'Move this anywhere',
   'coachmark.drag.body': 'Drag this handle to reposition the controls.',
+  'coachmark.export.title': 'Save as video',
+  'coachmark.export.body': 'Turn this into an MP4 you can share.',
   'coachmark.dismiss': 'Dismiss',
 
   // ── MidiPickerModal ─────────────────────────────────────────
