@@ -1,6 +1,7 @@
 import { Application, Graphics, type Ticker } from 'pixi.js'
 import type { MasterClock } from '../core/clock/MasterClock'
 import type { MidiFile } from '../core/midi/types'
+import { buildMeasureColoring, type MeasureColoring } from '../core/music/measureColoring'
 import type { LiveNoteStore } from '../midi/LiveNoteStore'
 import { BeatGrid } from './BeatGrid'
 import { type EmitCadence, scheduleEmissions } from './emitSchedule'
@@ -104,6 +105,14 @@ export class PianoRollRenderer {
   // the same.
   private activeKeyColors = new Map<number, number>()
   private exportMode = false
+
+  // Chord-degree coloring state. `measureColoring` is the precomputed
+  // one-root-per-measure analysis of the loaded file; it is rebuilt only when
+  // the file or key changes, never per frame — that's what keeps note colors
+  // fixed as the playhead moves.
+  private chordColoring = false
+  private keyFifths = 0
+  private measureColoring: MeasureColoring | null = null
 
   // Next time (in seconds of clock-time) to emit a sustained trail-burst for
   // each active note. Held keys keep breathing out particles at this cadence;
@@ -278,6 +287,7 @@ export class PianoRollRenderer {
     this.particles.clear()
     this.prevActive.clear()
     this.currActive.clear()
+    this.rebuildMeasureColoring()
     this.renderStaticFrame(0)
   }
 
@@ -285,6 +295,8 @@ export class PianoRollRenderer {
     this.midi = null
     this.visibleTrackIds.clear()
     this.practiceFocusTrackIds = null
+    this.measureColoring = null
+    this.noteRenderer.setMeasureColoring(null)
     this.noteRenderer.setTracks([])
     this.noteRenderer.clear()
     this.liveNoteRenderer.clear()
@@ -362,6 +374,36 @@ export class PianoRollRenderer {
 
   setParticleStyle(style: ParticleStyle): void {
     this.particles.setStyle(style)
+  }
+
+  // Toggle chord-degree note coloring across both the scheduled-MIDI and
+  // live-note renderers. Repaints immediately so the change is visible even
+  // while paused (the ticker may be idle-stopped).
+  setChordColoring(enabled: boolean): void {
+    this.chordColoring = enabled
+    this.noteRenderer.setChordColoring(enabled)
+    this.liveNoteRenderer.setChordColoring(enabled)
+    // Building the per-measure analysis is only worthwhile once coloring is on.
+    if (enabled) this.rebuildMeasureColoring()
+    this.presentFrame()
+  }
+
+  // Set the active key signature (fifths on the circle of fifths, -7..+7)
+  // used by chord-degree coloring to resolve scale degrees. Changing the key
+  // shifts scale-degree buckets, so the measure analysis is rebuilt.
+  setKeySignature(keyFifths: number): void {
+    this.keyFifths = keyFifths
+    this.liveNoteRenderer.setKeySignature(keyFifths)
+    this.rebuildMeasureColoring()
+    this.presentFrame()
+  }
+
+  // Recompute the fixed one-root-per-measure analysis for the loaded file and
+  // hand it to the note renderer. Cheap enough to run on load / key change;
+  // never called per frame.
+  private rebuildMeasureColoring(): void {
+    this.measureColoring = this.midi ? buildMeasureColoring(this.midi, this.keyFifths) : null
+    this.noteRenderer.setMeasureColoring(this.measureColoring)
   }
 
   setTheme(theme: Theme): void {

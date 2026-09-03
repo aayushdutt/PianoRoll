@@ -1,5 +1,6 @@
 import { createSignal, For } from 'solid-js'
 import { render } from 'solid-js/web'
+import { KEY_SIGNATURES } from '../core/music/chordColoring'
 import { LOCALES, type LocaleCode, locale, t } from '../i18n'
 import type { ParticleStyle, ParticleStyleInfo } from '../renderer/ParticleSystem'
 import { accentCSS, type Theme } from '../renderer/theme'
@@ -20,6 +21,8 @@ export interface CustomizeMenuCallbacks {
   onSelectParticle: (index: number) => void
   onToggleChord: () => void
   onSelectLocale: (code: LocaleCode) => void
+  onToggleChordColoring: () => void
+  onSelectKey: (fifths: number) => void
 }
 
 interface TriggerProps {
@@ -76,12 +79,16 @@ interface MenuProps {
   themeIndex: () => number
   particleIndex: () => number
   chordOn: () => boolean
+  chordColorOn: () => boolean
+  keyFifths: () => number
   isOpen: () => boolean
   isSheet: () => boolean
   onSelectTheme: (i: number) => void
   onSelectParticle: (i: number) => void
   onToggleChord: () => void
   onSelectLocale: (code: LocaleCode) => void
+  onToggleChordColoring: () => void
+  onSelectKey: (fifths: number) => void
   registerEl: (el: HTMLElement) => void
 }
 
@@ -191,6 +198,44 @@ function MenuView(props: MenuProps) {
           </button>
         </div>
 
+        <div class="customize-section customize-section--toggle">
+          <button
+            class="customize-toggle"
+            classList={{ 'customize-toggle--on': props.chordColorOn() }}
+            type="button"
+            aria-pressed={props.chordColorOn() ? 'true' : 'false'}
+            onClick={() => props.onToggleChordColoring()}
+          >
+            <span class="customize-toggle-body">
+              <span class="customize-toggle-name">Chord colors</span>
+              <span class="customize-toggle-sub">Color notes by chord degree</span>
+            </span>
+            <span class="customize-toggle-switch" aria-hidden="true">
+              <span class="customize-toggle-knob"></span>
+            </span>
+          </button>
+        </div>
+
+        <div
+          class="customize-section customize-section--key"
+          classList={{ 'customize-section--disabled': !props.chordColorOn() }}
+        >
+          <div class="customize-section-head">
+            <span class="customize-section-label">Key signature</span>
+          </div>
+          <select
+            class="customize-key-select"
+            aria-label="Key signature"
+            disabled={!props.chordColorOn()}
+            value={String(props.keyFifths())}
+            onChange={(e) => props.onSelectKey(Number(e.currentTarget.value))}
+          >
+            <For each={KEY_SIGNATURES}>
+              {(k) => <option value={String(k.fifths)}>{k.label}</option>}
+            </For>
+          </select>
+        </div>
+
         <div class="customize-section customize-section--footer">
           <a
             class="customize-feedback-card"
@@ -251,6 +296,10 @@ export class CustomizeMenu {
   private readonly particleIdxFn: () => number
   private readonly setChordOn: (v: boolean) => void
   private readonly chordOnFn: () => boolean
+  private readonly setChordColorOn: (v: boolean) => void
+  private readonly chordColorOnFn: () => boolean
+  private readonly setKeyFifths: (v: number) => void
+  private readonly keyFifthsFn: () => number
   private readonly setIsOpen: (v: boolean) => void
   private readonly setIsSheet: (v: boolean) => void
   private readonly setLabel: (v: string) => void
@@ -284,6 +333,8 @@ export class CustomizeMenu {
     const [themeIdx, setThemeIdx] = createSignal(0)
     const [particleIdx, setParticleIdx] = createSignal(0)
     const [chordOn, setChordOn] = createSignal(false)
+    const [chordColorOn, setChordColorOn] = createSignal(false)
+    const [keyFifths, setKeyFifths] = createSignal(0)
     const [isOpen, setIsOpen] = createSignal(false)
     const [isSheet, setIsSheet] = createSignal(false)
     const [label, setLabel] = createSignal(t('customize.theme'))
@@ -295,6 +346,10 @@ export class CustomizeMenu {
     this.setParticleIdx = setParticleIdx
     this.chordOnFn = chordOn
     this.setChordOn = setChordOn
+    this.chordColorOnFn = chordColorOn
+    this.setChordColorOn = setChordColorOn
+    this.keyFifthsFn = keyFifths
+    this.setKeyFifths = setKeyFifths
     this.setIsOpen = setIsOpen
     this.setIsSheet = setIsSheet
     this.setLabel = setLabel
@@ -334,12 +389,16 @@ export class CustomizeMenu {
           themeIndex={themeIdx}
           particleIndex={particleIdx}
           chordOn={chordOn}
+          chordColorOn={chordColorOn}
+          keyFifths={keyFifths}
           isOpen={isOpen}
           isSheet={isSheet}
           onSelectTheme={(i) => callbacks.onSelectTheme(i)}
           onSelectParticle={(i) => callbacks.onSelectParticle(i)}
           onToggleChord={() => callbacks.onToggleChord()}
           onSelectLocale={(code) => callbacks.onSelectLocale(code)}
+          onToggleChordColoring={() => callbacks.onToggleChordColoring()}
+          onSelectKey={(fifths) => callbacks.onSelectKey(fifths)}
           registerEl={(el) => {
             this.menu = el
           }}
@@ -366,6 +425,14 @@ export class CustomizeMenu {
 
   setChord(on: boolean): void {
     this.setChordOn(on)
+  }
+
+  setChordColoring(on: boolean): void {
+    this.setChordColorOn(on)
+  }
+
+  setKeySignature(fifths: number): void {
+    this.setKeyFifths(fifths)
   }
 
   // ── Open / close ──────────────────────────────────────────────────────
@@ -424,6 +491,12 @@ export class CustomizeMenu {
   }
   isChordOn(): boolean {
     return this.chordOnFn()
+  }
+  isChordColoringOn(): boolean {
+    return this.chordColorOnFn()
+  }
+  currentKeyFifths(): number {
+    return this.keyFifthsFn()
   }
 
   dispose(): void {
