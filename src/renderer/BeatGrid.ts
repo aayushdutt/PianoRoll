@@ -11,15 +11,15 @@ import { forEachBeatLine, type TempoMapSource } from '../core/midi/tempoMap'
 import type { Theme } from './theme'
 import type { Viewport } from './viewport'
 
-// How far past the visible window the cache is built. The walk restarts from
-// 0 on each extension, so keep extensions rare.
-const CACHE_MARGIN_SECONDS = 300
+// `MidiFile` satisfies this; the duration bounds the walk.
+export interface BeatGridSource extends TempoMapSource {
+  duration: number
+}
 
 export class BeatGrid {
   readonly graphics: Graphics
 
-  private cachedMap: TempoMapSource | null = null
-  private cachedEnd = -1
+  private cachedFor: BeatGridSource | null = null
   private times: number[] = []
   private isBar: boolean[] = []
 
@@ -32,15 +32,14 @@ export class BeatGrid {
     this.graphics.clear()
   }
 
-  draw(currentTime: number, map: TempoMapSource, viewport: Viewport, theme: Theme): void {
+  draw(currentTime: number, piece: BeatGridSource, viewport: Viewport, theme: Theme): void {
     const g = this.graphics
     g.clear()
+    if (piece !== this.cachedFor) this.rebuild(piece)
 
     // Computed getters — these update automatically with zoom.
     const visStart = Math.max(0, currentTime - viewport.trailSeconds - 0.5)
     const visEnd = currentTime + viewport.lookaheadSeconds + 0.5
-    if (map !== this.cachedMap || visEnd > this.cachedEnd) this.rebuild(map, visEnd)
-
     const canvasWidth = viewport.config.canvasWidth
     const rollHeight = viewport.rollHeight
     const times = this.times
@@ -62,14 +61,16 @@ export class BeatGrid {
     }
   }
 
-  private rebuild(map: TempoMapSource, needEnd: number): void {
-    this.cachedMap = map
-    this.cachedEnd = needEnd + CACHE_MARGIN_SECONDS
+  // Walks the whole piece and one bar past it, so the grid ends on the bar
+  // line that closes the final bar instead of mid-bar at the last note-off.
+  private rebuild(piece: BeatGridSource): void {
+    this.cachedFor = piece
     this.times.length = 0
     this.isBar.length = 0
-    forEachBeatLine(map, 0, this.cachedEnd, (time, bar) => {
+    forEachBeatLine(piece, 0, Number.POSITIVE_INFINITY, (time, bar) => {
       this.times.push(time)
       this.isBar.push(bar)
+      if (bar && time >= piece.duration) return false
     })
   }
 }

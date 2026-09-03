@@ -6,12 +6,7 @@ import type { AppServices } from '../../../core/services'
 import { watch } from '../../../store/watch'
 import type { LearnState } from '../../core/LearnState'
 import { classifyArticulation } from '../../core/scoring'
-import {
-  type BarTempo,
-  type LoopRegion,
-  makeRegionFromBars,
-  wrapIfAtEnd,
-} from '../../engines/LoopRegion'
+import { type LoopRegion, makeRegionFromBars, wrapIfAtEnd } from '../../engines/LoopRegion'
 import { PracticeEngine } from '../../engines/PracticeEngine'
 
 // Composes wait-mode (PracticeEngine) with loop-region + a
@@ -317,17 +312,13 @@ export class PlayAlongEngine {
     this.resumeAfterPracticeFilterChange()
   }
 
-  // `bpm` is the fallback for callers with no file attached; when one is, the
-  // attached file's tempo + meter map wins so "last 4 bars" means the bars the
-  // user actually heard.
   setLoopFromBars(
     bars: number | null,
     playhead: number,
     pieceDuration: number,
     bpm: number,
   ): LoopRegion | null {
-    const tempo: BarTempo = this.currentMidi ?? bpm
-    const region = bars === null ? null : makeRegionFromBars(playhead, bars, tempo, pieceDuration)
+    const region = bars === null ? null : makeRegionFromBars(playhead, bars, bpm, pieceDuration)
     this.setState('loopRegion', region)
     return region
   }

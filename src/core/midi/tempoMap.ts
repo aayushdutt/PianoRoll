@@ -13,8 +13,7 @@
 // - `transport.bpm` call sites must keep using the scalar `MidiFile.bpm`.
 //   Nothing here is for them.
 // - The walker is a plain beat-by-beat loop from each meter anchor. It is
-//   not meant to run per frame: BeatGrid caches its output per file, and the
-//   loop helpers run on user actions.
+//   not meant to run per frame: BeatGrid walks the piece once per file.
 
 import type { MeterEntry, TempoEntry } from './types'
 
@@ -138,32 +137,4 @@ export function barBoundariesBetween(src: TempoMapSource, from: number, to: numb
     if (isBar) out.push(time)
   })
   return out
-}
-
-// Start of the bar containing `time` (i.e. snap down to a bar line).
-export function barStartAtOrBefore(src: TempoMapSource, time: number): number {
-  if (time <= 0) return 0
-  // Half a millisecond of slack so a time sitting exactly on a bar line snaps
-  // to itself rather than to the previous bar through float drift.
-  const cutoff = time + 0.0005
-  let last = 0
-  forEachBeatLine(src, 0, cutoff, (t, isBar) => {
-    if (isBar) last = t
-  })
-  return Math.min(last, time)
-}
-
-// Seconds spanned by the `bars` bars immediately preceding `endTime`, using
-// the real map rather than a constant. Clamps at 0 (the piece start).
-export function barSpanBefore(src: TempoMapSource, endTime: number, bars: number): number {
-  if (bars <= 0 || endTime <= 0) return 0
-  const lines = barBoundariesBetween(src, 0, endTime + 0.0005)
-  if (lines.length === 0) return endTime
-  const start = lines.length > bars ? lines[lines.length - 1 - bars]! : 0
-  return Math.max(0, endTime - start)
-}
-
-// Narrowing helper for the `number | TempoMapSource` overloads in LoopRegion.
-export function isTempoMapSource(v: number | TempoMapSource): v is TempoMapSource {
-  return typeof v === 'object' && v !== null && Array.isArray((v as TempoMapSource).tempos)
 }

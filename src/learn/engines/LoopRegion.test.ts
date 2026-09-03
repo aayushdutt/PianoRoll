@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import type { TempoMapSource } from '../../core/midi/tempoMap'
 import { barSnap, barsToSeconds, makeRegionFromBars, wrapIfAtEnd } from './LoopRegion'
 
 describe('barsToSeconds', () => {
@@ -87,59 +86,5 @@ describe('wrapIfAtEnd', () => {
     // Tight epsilon → have to be essentially at end.
     expect(wrapIfAtEnd(19.997, { start: 10, end: 20 }, 0.001)).toBeNull()
     expect(wrapIfAtEnd(19.9995, { start: 10, end: 20 }, 0.001)).toBe(10)
-  })
-})
-
-// ── Tempo-map path ────────────────────────────────────────────────────────
-
-// 4/4 @ 120 for the first 4 s (2 s bars at 0, 2), then 3/4 @ 60 (3 s bars at
-// 4, 7, 10, 13). The scalar-BPM path can't express this.
-const changed: TempoMapSource = {
-  tempos: [
-    { time: 0, bpm: 120 },
-    { time: 4, bpm: 60 },
-  ],
-  timeSignatures: [
-    { time: 0, numerator: 4, denominator: 4 },
-    { time: 4, numerator: 3, denominator: 4 },
-  ],
-}
-
-describe('barSnap with a tempo map', () => {
-  it('snaps to real bar lines across the meter change', () => {
-    expect(barSnap(3.9, changed, true)).toBeCloseTo(2, 9)
-    expect(barSnap(6.9, changed, true)).toBeCloseTo(4, 9)
-    expect(barSnap(9.9, changed, true)).toBeCloseTo(7, 9)
-  })
-
-  it('still respects the enabled flag', () => {
-    expect(barSnap(3.9, changed, false)).toBe(3.9)
-  })
-
-  it('differs from the scalar path, which is the whole point', () => {
-    // Nominal 120 bpm 4/4 would snap 9.9 to 8; the map says 7.
-    expect(barSnap(9.9, 120, true)).toBe(8)
-  })
-})
-
-describe('makeRegionFromBars with a tempo map', () => {
-  it('spans the bars actually played, not a constant', () => {
-    // Two bars back from 13 s = 7 s (both 3 s wide).
-    expect(makeRegionFromBars(13, 2, changed, 60)).toEqual({ start: 7, end: 13 })
-  })
-
-  it('handles a window straddling the tempo/meter change', () => {
-    // 7 → 4 (3 s) → 2 (2 s) = 5 s of music, vs 4 s under the nominal tempo.
-    const r = makeRegionFromBars(7, 2, changed, 60)
-    expect(r?.start).toBeCloseTo(2, 9)
-    expect(r?.end).toBeCloseTo(7, 9)
-  })
-
-  it('shortens near the piece start like the scalar path', () => {
-    expect(makeRegionFromBars(3, 8, changed, 60)).toEqual({ start: 0, end: 3 })
-  })
-
-  it('still returns the whole piece for a null bar count', () => {
-    expect(makeRegionFromBars(5, null, changed, 42)).toEqual({ start: 0, end: 42 })
   })
 })

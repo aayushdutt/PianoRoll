@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { parseMidiFile } from './parser'
 import {
   barBoundariesBetween,
-  barSpanBefore,
-  barStartAtOrBefore,
   beatLinesBetween,
-  isTempoMapSource,
   meterAt,
   secondsPerBarAt,
   secondsPerBeatAt,
@@ -172,48 +169,5 @@ describe('barBoundariesBetween', () => {
     expect(noteTimes).toEqual([0, 2, 4, 7])
     const bars = barBoundariesBetween(midi, 0, 7).map((t) => Number(t.toFixed(6)))
     expect(bars).toEqual(noteTimes)
-  })
-})
-
-// ── Bar snapping ──────────────────────────────────────────────────────────
-
-describe('barStartAtOrBefore', () => {
-  it('snaps down to the containing bar', () => {
-    expect(barStartAtOrBefore(changed, 1.9)).toBeCloseTo(0, 9)
-    expect(barStartAtOrBefore(changed, 3.9)).toBeCloseTo(2, 9)
-    expect(barStartAtOrBefore(changed, 6.9)).toBeCloseTo(4, 9)
-    expect(barStartAtOrBefore(changed, 9.9)).toBeCloseTo(7, 9)
-  })
-
-  it('is idempotent on a bar line and clamps at 0', () => {
-    expect(barStartAtOrBefore(changed, 7)).toBeCloseTo(7, 9)
-    expect(barStartAtOrBefore(changed, -3)).toBe(0)
-  })
-})
-
-describe('barSpanBefore', () => {
-  it('measures real bars, not a constant', () => {
-    // Two bars back from 13 s: 13 → 10 → 7, all 3 s wide.
-    expect(barSpanBefore(changed, 13, 2)).toBeCloseTo(6, 9)
-    // Two bars back from 4 s: 4 → 2 → 0, 2 s wide each.
-    expect(barSpanBefore(changed, 4, 2)).toBeCloseTo(4, 9)
-    // Spanning the change: 7 → 4 (3 s) → 2 (2 s).
-    expect(barSpanBefore(changed, 7, 2)).toBeCloseTo(5, 9)
-  })
-
-  it('clamps to the piece start when fewer bars have elapsed', () => {
-    expect(barSpanBefore(changed, 3, 8)).toBeCloseTo(3, 9)
-  })
-
-  it('returns 0 for a non-positive request', () => {
-    expect(barSpanBefore(changed, 10, 0)).toBe(0)
-    expect(barSpanBefore(changed, 0, 4)).toBe(0)
-  })
-})
-
-describe('isTempoMapSource', () => {
-  it('separates a bpm scalar from a map', () => {
-    expect(isTempoMapSource(120)).toBe(false)
-    expect(isTempoMapSource(flat)).toBe(true)
   })
 })
