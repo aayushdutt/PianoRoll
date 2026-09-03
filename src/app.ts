@@ -1090,7 +1090,28 @@ export class App {
       export_h: isVideoOutput ? (targetDims?.height ?? this.renderer.canvasSize.height) : null,
     }
     let exportStage: 'serialize' | 'audio_render' | 'video_encode' = 'serialize'
-    track('export_started', exportBase)
+
+    // Stream the MP4 straight to disk where the browser allows it (Chrome/Edge
+    // desktop). The picker needs the click's user activation, so it runs
+    // before anything awaits. Cancelling the dialog cancels the export.
+    let fileHandle: FileSystemFileHandle | undefined
+    if (isVideoOutput && typeof window.showSaveFilePicker === 'function') {
+      try {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: `${sanitiseFilename(midi.name)}.mp4`,
+          types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }],
+        })
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          exportModal.close()
+          return
+        }
+        // Any other picker failure: fall back to the in-memory download.
+        console.warn('showSaveFilePicker failed; falling back to download', err)
+      }
+    }
+
+    track('export_started', { ...exportBase, target: fileHandle ? 'file' : 'buffer' })
     trackActivation('export_started')
 
     // MIDI-only output skips all render/encode work — just re-serialise the
@@ -1217,37 +1238,34 @@ export class App {
     }
 
     const filename =
-      settings.output === 'audio-only' ? `midee.${settings.audioFormat}` : 'midee.mp4'
+      settings.output === 'audio-only'
+        ? `${sanitiseFilename(midi.name)}.${settings.audioFormat}`
+        : `${sanitiseFilename(midi.name)}.mp4`
+
+    // One render config for both paths: sequential for audio-only, or handed
+    // to the exporter as a producer so it overlaps the video encode for av.
+    const renderAudio = async (report: (pct: number) => void): Promise<AudioBuffer> => {
+      const { renderAudioOffline } = await import('./audio/OfflineAudioRenderer')
+      return renderAudioOffline({
+        midi,
+        instrumentId: INSTRUMENTS[this.instrumentIndex]!.id,
+        volume: this.store.state.volume,
+        disabledTrackIds: this.synth.getDisabledTrackIds(),
+        onRenderAudioProgressMode: (d) => exportModal.setRenderAudioProgressMode(d),
+        onProgress: report,
+      })
+    }
 
     let audioRenderMs = 0
     try {
       let audioBuffer: AudioBuffer | undefined
-      if (needsAudio) {
-        // Load without VideoExporter: that chunk embeds Mediabunny (~tens of kB
-        // parsed) and must not run before / in parallel with offline audio setup.
-        const { renderAudioOffline } = await import('./audio/OfflineAudioRenderer')
+      if (settings.output === 'audio-only') {
         exportStage = 'audio_render'
         onExportProgress('Rendering audio', 0)
         const audioRenderStart = performance.now()
-        try {
-          audioBuffer = await renderAudioOffline({
-            midi,
-            instrumentId: INSTRUMENTS[this.instrumentIndex]!.id,
-            volume: this.store.state.volume,
-            disabledTrackIds: this.synth.getDisabledTrackIds(),
-            onRenderAudioProgressMode: (d) => exportModal.setRenderAudioProgressMode(d),
-            onProgress: (pct) => onExportProgress('Rendering audio', pct),
-          })
-          audioRenderMs = Math.round(performance.now() - audioRenderStart)
-        } catch (err) {
-          console.error('Offline audio render failed:', err)
-          // Audio-only has nothing to export without it — surface the error.
-          if (settings.output === 'audio-only') throw err
-          // av / video-only continue silently without sound — a real quality
-          // hit that was previously invisible. Mark it as a degradation.
-          trackEvent('export_degraded', { stage: 'audio_render', output: settings.output })
-          this.showError(t('error.audio.renderFailed'))
-        }
+        // Nothing to export without it — surface the error.
+        audioBuffer = await renderAudio((pct) => onExportProgress('Rendering audio', pct))
+        audioRenderMs = Math.round(performance.now() - audioRenderStart)
       }
 
       // Audio-only ships WAV or MP3 — both are macOS-Gatekeeper-safe legacy audio
@@ -1290,18 +1308,25 @@ export class App {
       const exporter = new VideoExporter(this.renderer.canvas)
       this.currentExporter = exporter
 
-      const exportAudio =
-        audioBuffer && settings.output === 'av'
-          ? trimAudioBuffer(audioBuffer, midi.duration)
-          : audioBuffer
-
       const stats = await exporter.export({
         fps: settings.fps,
         duration: midi.duration,
         mode: settings.output,
         filename,
         bitrate: resolveExportBitrate(settings.resolution),
-        ...(exportAudio ? { audio: exportAudio } : {}),
+        ...(fileHandle ? { fileHandle } : {}),
+        ...(needsAudio
+          ? {
+              audio: async (report: (pct: number) => void) =>
+                trimAudioBuffer(await renderAudio(report), midi.duration),
+              // av continues without sound — a real quality hit that used to
+              // be invisible. Mark it as a degradation.
+              onAudioUnavailable: () => {
+                trackEvent('export_degraded', { stage: 'audio_render', output: settings.output })
+                this.showError(t('error.audio.renderFailed'))
+              },
+            }
+          : {}),
         onSeek: (t) => this.clock.seek(t),
         onRenderFrame: (t, dt) => this.renderer.renderManualFrame(t, dt),
         onProgress: onExportProgress,
@@ -1327,7 +1352,9 @@ export class App {
         codec: stats.codec,
         hw: stats.hw,
         attempts: stats.attempts,
-        audio_render_ms: audioRenderMs,
+        target: stats.target,
+        audio_included: stats.audioIncluded,
+        audio_render_ms: stats.audioRenderMs,
         audio_encode_ms: stats.audioEncodeMs,
         video_encode_ms: stats.videoEncodeMs,
         finalize_ms: stats.finalizeMs,

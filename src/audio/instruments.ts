@@ -149,7 +149,25 @@ async function getPianoModule(): Promise<PianoModule> {
   return pianoModule
 }
 
+// Tone.Reverb renders its impulse response asynchronously (a nested offline
+// render) and only then attaches it to the convolver. Nothing downstream waits
+// for that — Tone's OfflineContext.render() doesn't either — so an export
+// could start before the IR landed and bake the instrument dry. Every reverb
+// is built through this helper and createInstrument awaits the batch.
+const pendingReverbs: Promise<unknown>[] = []
+function makeReverb(opts: ConstructorParameters<typeof Reverb>[0]): Reverb {
+  const r = new Reverb(opts)
+  pendingReverbs.push(r.ready)
+  return r
+}
+
 export async function createInstrument(id: InstrumentId): Promise<InstrumentRuntime> {
+  const inst = await buildInstrument(id)
+  await Promise.all(pendingReverbs.splice(0))
+  return inst
+}
+
+async function buildInstrument(id: InstrumentId): Promise<InstrumentRuntime> {
   switch (id) {
     case 'piano':
       return await createPiano()
@@ -231,7 +249,7 @@ function createPad(): InstrumentRuntime {
   })
   synth.volume.value = -10
   const filter = new Filter({ frequency: 1600, type: 'lowpass', rolloff: -12 })
-  const reverb = new Reverb({ decay: 3.5, wet: 0.35 })
+  const reverb = makeReverb({ decay: 3.5, wet: 0.35 })
   synth.chain(filter, reverb, getDestination())
   return wrapPolySynth(synth)
 }
@@ -260,7 +278,7 @@ function createMarimba(): InstrumentRuntime {
     modulationEnvelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.08 },
   })
   synth.volume.value = -4
-  const reverb = new Reverb({ decay: 1.2, wet: 0.2 })
+  const reverb = makeReverb({ decay: 1.2, wet: 0.2 })
   synth.chain(reverb, getDestination())
   return wrapPolySynth(synth)
 }
@@ -278,7 +296,7 @@ function createBells(): InstrumentRuntime {
     modulationEnvelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 1.8 },
   })
   synth.volume.value = -8
-  const reverb = new Reverb({ decay: 4.0, wet: 0.4 })
+  const reverb = makeReverb({ decay: 4.0, wet: 0.4 })
   synth.chain(reverb, getDestination())
   return wrapPolySynth(synth)
 }
@@ -292,7 +310,7 @@ function createStrings(): InstrumentRuntime {
   })
   synth.volume.value = -12
   const filter = new Filter({ frequency: 2400, type: 'lowpass', rolloff: -12 })
-  const reverb = new Reverb({ decay: 2.4, wet: 0.32 })
+  const reverb = makeReverb({ decay: 2.4, wet: 0.32 })
   synth.chain(filter, reverb, getDestination())
   return wrapPolySynth(synth)
 }
@@ -528,7 +546,7 @@ const SAMPLED_SPECS: Partial<Record<InstrumentId, SampleSpec>> = {
 async function createViolin(): Promise<InstrumentRuntime> {
   try {
     return await createSampled(SAMPLED_SPECS.violin!, (s) => {
-      const reverb = new Reverb({ decay: 1.8, wet: 0.22 })
+      const reverb = makeReverb({ decay: 1.8, wet: 0.22 })
       s.chain(reverb, getDestination())
     })
   } catch (err) {
@@ -540,7 +558,7 @@ async function createViolin(): Promise<InstrumentRuntime> {
 async function createFlute(): Promise<InstrumentRuntime> {
   try {
     return await createSampled(SAMPLED_SPECS.flute!, (s) => {
-      const reverb = new Reverb({ decay: 1.4, wet: 0.18 })
+      const reverb = makeReverb({ decay: 1.4, wet: 0.18 })
       s.chain(reverb, getDestination())
     })
   } catch (err) {
@@ -559,7 +577,7 @@ async function createUpright(): Promise<InstrumentRuntime> {
     return await createSampled(SAMPLED_SPECS.upright!, (s) => {
       // Slight room reverb — the upright sits "in the room" vs the Grand's
       // concert stage, but neither wants heavy ambience.
-      const reverb = new Reverb({ decay: 1.4, wet: 0.15 })
+      const reverb = makeReverb({ decay: 1.4, wet: 0.15 })
       s.chain(reverb, getDestination())
     })
   } catch (err) {
@@ -585,7 +603,7 @@ function createDigitalPiano(): InstrumentRuntime {
   // the bright "stage piano" it's meant to be.
   synth.volume.value = 2
   const chorus = new Chorus(1.1, 2.0, 0.2).start()
-  const reverb = new Reverb({ decay: 1.1, wet: 0.14 })
+  const reverb = makeReverb({ decay: 1.1, wet: 0.14 })
   synth.chain(chorus, reverb, getDestination())
   return wrapPolySynth(synth)
 }
@@ -595,7 +613,7 @@ async function createGuitar(): Promise<InstrumentRuntime> {
     // Guitar has a dense sample map (every semitone A2..G#4), so interpolation
     // artefacts are minimal and the plucked attack reads cleanly.
     return await createSampled(SAMPLED_SPECS.guitar!, (s) => {
-      const reverb = new Reverb({ decay: 1.2, wet: 0.14 })
+      const reverb = makeReverb({ decay: 1.2, wet: 0.14 })
       s.chain(reverb, getDestination())
     })
   } catch (err) {

@@ -175,7 +175,6 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'export.stage.finalizing': 'Finalizowanie',
   'export.stage.saving': 'Zapisywanie',
   'export.stage.done': 'Gotowe',
-  'export.step': 'Krok {step} z {total}',
   'export.eta.minutes': '~{min} min do końca',
   'export.eta.soon': 'mniej niż minuta do końca',
   'export.error.title': 'Eksport nie powiódł się',

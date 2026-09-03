@@ -111,8 +111,7 @@ export function resolveExportDims(
 }
 
 // ── Staged progress ─────────────────────────────────────────────────────────
-// Maps each encoder stage onto a fixed window of ONE overall progress bar, plus
-// a "Step k of N" position. The old per-stage bar reset to 0% on every stage
+// Maps each encoder stage onto a fixed window of ONE overall progress bar. The old per-stage bar reset to 0% on every stage
 // change, which read as "stuck in a loop" — PostHog showed a 24.5 s median
 // cancel time. Window sizes are rough wall-clock weights; exactness doesn't
 // matter because the bar is clamped monotonic by the caller. Only the modes
@@ -121,31 +120,32 @@ export function resolveExportDims(
 export type ProgressMode = 'av' | 'video-only' | 'audio-only'
 
 export interface StageWindow {
-  step: number
-  totalSteps: number
   from: number // overall-bar fraction where this stage begins
   to: number // …and ends
 }
 
 const STAGE_WINDOWS: Record<ProgressMode, Partial<Record<ExportStage, StageWindow>>> = {
+  // Audio renders and encodes concurrently with the video loop, so the bar
+  // follows the encode; the two audio stages only surface if audio is still
+  // in flight after the last video frame, hence their thin windows.
   av: {
-    'Rendering audio': { step: 1, totalSteps: 3, from: 0, to: 0.2 },
-    'Encoding audio': { step: 1, totalSteps: 3, from: 0.2, to: 0.25 },
-    Encoding: { step: 2, totalSteps: 3, from: 0.25, to: 0.93 },
-    Finalizing: { step: 3, totalSteps: 3, from: 0.93, to: 0.98 },
-    Saving: { step: 3, totalSteps: 3, from: 0.98, to: 1 },
-    Done: { step: 3, totalSteps: 3, from: 1, to: 1 },
+    Encoding: { from: 0, to: 0.9 },
+    'Rendering audio': { from: 0.9, to: 0.93 },
+    'Encoding audio': { from: 0.93, to: 0.95 },
+    Finalizing: { from: 0.95, to: 0.98 },
+    Saving: { from: 0.98, to: 1 },
+    Done: { from: 1, to: 1 },
   },
   'video-only': {
-    Encoding: { step: 1, totalSteps: 2, from: 0, to: 0.9 },
-    Finalizing: { step: 2, totalSteps: 2, from: 0.9, to: 0.98 },
-    Saving: { step: 2, totalSteps: 2, from: 0.98, to: 1 },
-    Done: { step: 2, totalSteps: 2, from: 1, to: 1 },
+    Encoding: { from: 0, to: 0.9 },
+    Finalizing: { from: 0.9, to: 0.98 },
+    Saving: { from: 0.98, to: 1 },
+    Done: { from: 1, to: 1 },
   },
   'audio-only': {
-    'Rendering audio': { step: 1, totalSteps: 2, from: 0, to: 0.85 },
-    Saving: { step: 2, totalSteps: 2, from: 0.85, to: 1 },
-    Done: { step: 2, totalSteps: 2, from: 1, to: 1 },
+    'Rendering audio': { from: 0, to: 0.85 },
+    Saving: { from: 0.85, to: 1 },
+    Done: { from: 1, to: 1 },
   },
 }
 
@@ -153,7 +153,7 @@ const STAGE_WINDOWS: Record<ProgressMode, Partial<Record<ExportStage, StageWindo
 // 'av' export whose audio render failed skips 'Encoding audio') — the bar
 // stays sane instead of throwing mid-export.
 export function stageWindow(mode: ProgressMode, stage: ExportStage): StageWindow {
-  return STAGE_WINDOWS[mode][stage] ?? { step: 1, totalSteps: 1, from: 0, to: 1 }
+  return STAGE_WINDOWS[mode][stage] ?? { from: 0, to: 1 }
 }
 
 // Overall-bar position for a per-stage fraction. Callers clamp monotonic.

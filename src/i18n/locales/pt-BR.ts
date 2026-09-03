@@ -196,7 +196,6 @@ const ptBR: Messages = {
   'export.stage.finalizing': 'Finalizando',
   'export.stage.saving': 'Salvando',
   'export.stage.done': 'Concluído',
-  'export.step': 'Etapa {step} de {total}',
   'export.eta.minutes': '~{min} min restantes',
   'export.eta.soon': 'menos de um minuto restante',
   'export.error.title': 'Falha na exportação',

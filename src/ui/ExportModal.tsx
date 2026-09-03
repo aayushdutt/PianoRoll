@@ -1,11 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import { Portal, render } from 'solid-js/web'
-import {
-  overallProgress,
-  type ProgressMode,
-  stageEtaSeconds,
-  stageWindow,
-} from '../export/exportMath'
+import { overallProgress, type ProgressMode, stageEtaSeconds } from '../export/exportMath'
 import type { ExportStage } from '../export/VideoExporter'
 import { t } from '../i18n'
 import { icons } from './icons'
@@ -119,7 +114,6 @@ interface ViewProps {
   speed: () => ExportSpeed
   setSpeed: (v: ExportSpeed) => void
   stage: () => string
-  stepLabel: () => string
   pct: () => number
   eta: () => string
   indeterminate: () => boolean
@@ -343,9 +337,6 @@ function ExportView(props: ViewProps) {
             }}
           >
             <div class="export-spinner"></div>
-            <Show when={props.stepLabel()}>
-              <div class="export-step">{props.stepLabel()}</div>
-            </Show>
             <div class="export-stage">{props.stage()}</div>
             <div class="export-progress-wrap">
               <div
@@ -412,7 +403,6 @@ export class ExportModal {
   private readonly setSpeed: (v: ExportSpeed) => void
   private readonly readSpeed: () => ExportSpeed
   private readonly setStage: (v: string) => void
-  private readonly setStepLabel: (v: string) => void
   private readonly setPct: (v: number) => void
   private readonly readPct: () => number
   private readonly setEta: (v: string) => void
@@ -450,7 +440,6 @@ export class ExportModal {
     const [focus, setFocus] = createSignal<ExportFocus>('fit')
     const [speed, setSpeed] = createSignal<ExportSpeed>('drama')
     const [stage, setStage] = createSignal(t('export.preparing'))
-    const [stepLabel, setStepLabel] = createSignal('')
     const [pct, setPct] = createSignal(0)
     const [eta, setEta] = createSignal('')
     const [indeterminate, setIndet] = createSignal(false)
@@ -474,7 +463,6 @@ export class ExportModal {
     this.setSpeed = setSpeed
     this.readSpeed = speed
     this.setStage = setStage
-    this.setStepLabel = setStepLabel
     this.setPct = setPct
     this.readPct = pct
     this.setEta = setEta
@@ -511,7 +499,6 @@ export class ExportModal {
           speed={speed}
           setSpeed={(v) => this.setSpeed(v)}
           stage={stage}
-          stepLabel={stepLabel}
           pct={pct}
           eta={eta}
           indeterminate={indeterminate}
@@ -583,8 +570,6 @@ export class ExportModal {
     const stagePct = indet ? 0 : pct
 
     if (mode) {
-      const w = stageWindow(mode, stage)
-      this.setStepLabel(t('export.step', { step: w.step, total: w.totalSteps }))
       // Monotonic: a software-fallback retry restarts the encode stage at 0 -
       // the bar holds its high-water mark instead of jumping backwards.
       this.setPct(Math.max(this.readPct(), overallProgress(mode, stage, stagePct)))
@@ -628,7 +613,6 @@ export class ExportModal {
     this.stageStartedAt = 0
     this.setPct(0)
     this.setIndet(false)
-    this.setStepLabel('')
     this.setEta('')
     this.setStage(t('export.preparing'))
     this.setErrorMessage('')

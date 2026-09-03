@@ -319,7 +319,7 @@ describe('pitchSignature', () => {
 describe('stageWindow / overallProgress', () => {
   it('covers 0→1 contiguously for every progress mode', () => {
     const sequences: Record<ProgressMode, string[]> = {
-      av: ['Rendering audio', 'Encoding audio', 'Encoding', 'Finalizing', 'Saving'],
+      av: ['Encoding', 'Rendering audio', 'Encoding audio', 'Finalizing', 'Saving'],
       'video-only': ['Encoding', 'Finalizing', 'Saving'],
       'audio-only': ['Rendering audio', 'Saving'],
     }
@@ -337,34 +337,21 @@ describe('stageWindow / overallProgress', () => {
     }
   })
 
-  it('numbers steps monotonically and agrees on totalSteps within a mode', () => {
-    const w1 = stageWindow('av', 'Rendering audio')
-    const w2 = stageWindow('av', 'Encoding')
-    const w3 = stageWindow('av', 'Saving')
-    expect(w1.totalSteps).toBe(3)
-    expect([w1.step, w2.step, w3.step]).toEqual([1, 2, 3])
-  })
-
   it('maps per-stage pct into the stage window on the overall bar', () => {
-    // av encode runs 0.25→0.93: halfway through it = 0.59 overall.
-    expect(overallProgress('av', 'Encoding', 0.5)).toBeCloseTo(0.59, 10)
-    expect(overallProgress('av', 'Encoding', 0)).toBeCloseTo(0.25, 10)
-    expect(overallProgress('av', 'Encoding', 1)).toBeCloseTo(0.93, 10)
+    // av encode runs 0→0.9: halfway through it = 0.45 overall.
+    expect(overallProgress('av', 'Encoding', 0.5)).toBeCloseTo(0.45, 10)
+    expect(overallProgress('av', 'Encoding', 0)).toBeCloseTo(0, 10)
+    expect(overallProgress('av', 'Encoding', 1)).toBeCloseTo(0.9, 10)
   })
 
   it('clamps out-of-range pct instead of escaping the stage window', () => {
-    expect(overallProgress('av', 'Encoding', -0.5)).toBeCloseTo(0.25, 10)
-    expect(overallProgress('av', 'Encoding', 1.7)).toBeCloseTo(0.93, 10)
+    expect(overallProgress('av', 'Encoding', -0.5)).toBeCloseTo(0, 10)
+    expect(overallProgress('av', 'Encoding', 1.7)).toBeCloseTo(0.9, 10)
   })
 
   it('falls back to a full-range single step for stages a mode never emits', () => {
     // video-only never renders audio; the fallback keeps the bar sane.
-    expect(stageWindow('video-only', 'Rendering audio')).toEqual({
-      step: 1,
-      totalSteps: 1,
-      from: 0,
-      to: 1,
-    })
+    expect(stageWindow('video-only', 'Rendering audio')).toEqual({ from: 0, to: 1 })
   })
 
   it("'Done' pins the bar at 100% in every mode", () => {

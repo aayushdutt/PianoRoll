@@ -200,7 +200,6 @@ export const en = {
   'export.stage.finalizing': 'Finalizing',
   'export.stage.saving': 'Saving',
   'export.stage.done': 'Done',
-  'export.step': 'Step {step} of {total}',
   'export.eta.minutes': '~{min} min left',
   'export.eta.soon': 'less than a minute left',
   'export.error.title': 'Export failed',

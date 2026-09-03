@@ -42,7 +42,15 @@ export const BENCH_FIXTURES: readonly BenchFixture[] = [
   },
 ]
 
-export type BenchSuite = 'frame' | 'attribution' | 'live' | 'idle' | 'pacing' | 'export'
+export type BenchSuite =
+  | 'frame'
+  | 'attribution'
+  | 'live'
+  | 'idle'
+  | 'pacing'
+  | 'export'
+  | 'exportlab'
+  | 'audiorender'
 
 export interface BenchEnv {
   ua: string
@@ -624,6 +632,208 @@ async function suiteExport(ctx: AppCtxValue, fixtureId: string): Promise<Record<
   }
 }
 
+// ── exportlab: variant sweep for the export loop ───────────────────────────
+// Answers "which knob moves encode throughput on THIS machine": capture path
+// (VideoFrame(canvas) vs readPixels vs 2D copy vs ImageBitmap), encoder
+// latencyMode / hardware preference, and backpressure strategy. Each variant
+// runs the same frames on a fresh encoder; chunks are discarded.
+
+interface LabVariant {
+  name: string
+  latencyMode?: 'quality' | 'realtime'
+  hw?: 'prefer-hardware' | 'prefer-software' | 'no-preference'
+  capture: 'canvas' | 'canvas-discard' | 'readpixels' | '2d' | 'bitmap'
+  maxQueue: number
+  wait: 'timeout' | 'dequeue' | 'yield'
+  bitrateMode?: 'constant' | 'variable'
+}
+
+const LAB_VARIANTS: LabVariant[] = [
+  { name: 'base', capture: 'canvas', maxQueue: 20, wait: 'timeout' },
+  { name: 'dequeue', capture: 'canvas', maxQueue: 20, wait: 'dequeue' },
+  { name: 'yield', capture: 'canvas', maxQueue: 20, wait: 'yield' },
+  { name: 'q4', capture: 'canvas', maxQueue: 4, wait: 'dequeue' },
+  { name: 'q60', capture: 'canvas', maxQueue: 60, wait: 'dequeue' },
+  { name: 'quality', capture: 'canvas', maxQueue: 20, wait: 'dequeue', latencyMode: 'quality' },
+  { name: 'nopref', capture: 'canvas', maxQueue: 20, wait: 'dequeue', hw: 'no-preference' },
+  { name: 'sw', capture: 'canvas', maxQueue: 20, wait: 'dequeue', hw: 'prefer-software' },
+  { name: 'cbr', capture: 'canvas', maxQueue: 20, wait: 'dequeue', bitrateMode: 'constant' },
+  { name: 'discard', capture: 'canvas-discard', maxQueue: 20, wait: 'dequeue' },
+  { name: 'readpx', capture: 'readpixels', maxQueue: 20, wait: 'dequeue' },
+  { name: 'copy2d', capture: '2d', maxQueue: 20, wait: 'dequeue' },
+  { name: 'bitmap', capture: 'bitmap', maxQueue: 20, wait: 'dequeue' },
+]
+
+async function suiteExportLab(
+  ctx: AppCtxValue,
+  fixtureId: string,
+): Promise<Record<string, number>> {
+  if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
+    throw new Error('WebCodecs unavailable - exportlab cannot run in this browser')
+  }
+  const midi = await loadFixture(ctx, fixtureId)
+  const { renderer, clock } = ctx.services
+  const canvas = renderer.canvas
+  const FPS = 30
+  const DT = 1 / FPS
+  const FRAMES = 300
+  const width = canvas.width & ~1
+  const height = canvas.height & ~1
+  const t0 = midi.duration * 0.25
+  const keyEvery = FPS * 2
+  const out: Record<string, number> = {}
+
+  const gl = (renderer as unknown as { app: { renderer: { gl?: WebGL2RenderingContext } } }).app
+    .renderer.gl
+  const pixelBuf = new Uint8Array(width * height * 4)
+  const off = new OffscreenCanvas(width, height)
+  const ctx2d = off.getContext('2d')!
+
+  renderer.pauseAutoRender()
+  try {
+    for (const v of LAB_VARIANTS) {
+      progress(`exportlab:${v.name}`)
+      const config: VideoEncoderConfig = {
+        codec: 'avc1.640028',
+        width,
+        height,
+        bitrate: 8_000_000,
+        framerate: FPS,
+        hardwareAcceleration: v.hw ?? 'prefer-hardware',
+        latencyMode: v.latencyMode ?? 'realtime',
+        ...(v.bitrateMode ? { bitrateMode: v.bitrateMode } : {}),
+      }
+      if (!(await VideoEncoder.isConfigSupported(config)).supported) {
+        out[`${v.name}_fps`] = -1
+        continue
+      }
+      let encoderError: Error | null = null
+      let wake: (() => void) | null = null
+      const encoder = new VideoEncoder({
+        output: () => {},
+        error: (e) => {
+          encoderError ??= e as Error
+        },
+      })
+      encoder.ondequeue = () => {
+        wake?.()
+      }
+      encoder.configure(config)
+      let stallMs = 0
+      const wallStart = performance.now()
+      try {
+        for (let i = 0; i < FRAMES; i++) {
+          if (encoderError) throw encoderError
+          const t = t0 + i * DT
+          clock.seek(t)
+          renderer.renderManualFrame(t, DT)
+          const timestamp = Math.round((i * 1_000_000) / FPS)
+          let frame: VideoFrame
+          switch (v.capture) {
+            case 'canvas':
+              frame = new VideoFrame(canvas, {
+                timestamp,
+                visibleRect: { x: 0, y: 0, width, height },
+              })
+              break
+            case 'canvas-discard':
+              frame = new VideoFrame(canvas, {
+                timestamp,
+                alpha: 'discard',
+                visibleRect: { x: 0, y: 0, width, height },
+              })
+              break
+            case 'readpixels': {
+              if (!gl) throw new Error('no gl')
+              gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixelBuf)
+              frame = new VideoFrame(pixelBuf, {
+                format: 'RGBA',
+                codedWidth: width,
+                codedHeight: height,
+                timestamp,
+              })
+              break
+            }
+            case '2d':
+              ctx2d.drawImage(canvas, 0, 0)
+              frame = new VideoFrame(off, { timestamp })
+              break
+            case 'bitmap': {
+              const bmp = await createImageBitmap(canvas)
+              frame = new VideoFrame(bmp, { timestamp })
+              bmp.close()
+              break
+            }
+          }
+          encoder.encode(frame, { keyFrame: i % keyEvery === 0 })
+          frame.close()
+
+          if (encoder.encodeQueueSize > v.maxQueue) {
+            const s0 = performance.now()
+            while (encoder.encodeQueueSize > v.maxQueue / 2) {
+              if (encoderError) throw encoderError
+              if (v.wait === 'timeout') await sleep(0)
+              else if (v.wait === 'yield') await yieldNow()
+              else {
+                // dequeue can be coalesced/missed; a short timer bounds the wait.
+                await new Promise<void>((r) => {
+                  const timer = setTimeout(r, 20)
+                  wake = () => {
+                    clearTimeout(timer)
+                    r()
+                  }
+                })
+              }
+            }
+            stallMs += performance.now() - s0
+          }
+        }
+        await encoder.flush()
+        if (encoderError) throw encoderError
+        const wallMs = performance.now() - wallStart
+        out[`${v.name}_fps`] = round(FRAMES / (wallMs / 1000))
+        out[`${v.name}_stall`] = round(stallMs)
+      } catch (err) {
+        console.warn(`[exportlab] ${v.name} failed`, err)
+        out[`${v.name}_fps`] = -2
+      } finally {
+        if (encoder.state !== 'closed') encoder.close()
+      }
+    }
+  } finally {
+    renderer.resumeAutoRender()
+  }
+  return out
+}
+
+function yieldNow(): Promise<void> {
+  const s = (globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }).scheduler
+  return s?.yield ? s.yield() : new Promise((r) => setTimeout(r, 0))
+}
+
+// ── audiorender: offline audio render cost per instrument ─────────────────
+// How long the "Rendering audio" export stage takes relative to the piece
+// (realtime factor), for a sampled instrument and a convolution-reverb synth.
+async function suiteAudioRender(
+  ctx: AppCtxValue,
+  fixtureId: string,
+): Promise<Record<string, number>> {
+  const midi = await loadFixture(ctx, fixtureId)
+  const { renderAudioOffline } = await import('../audio/OfflineAudioRenderer')
+  const out: Record<string, number> = { durationS: round(midi.duration) }
+  for (const id of ['piano', 'upright', 'bells', 'digital'] as const) {
+    progress(`audiorender:${id}`)
+    // Warm the sample cache so the number is the render, not the download.
+    await renderAudioOffline({ midi: { ...midi, duration: 2 }, instrumentId: id, volume: 0.8 })
+    const t0 = performance.now()
+    await renderAudioOffline({ midi, instrumentId: id, volume: 0.8 })
+    const ms = performance.now() - t0
+    out[`${id}_ms`] = round(ms)
+    out[`${id}_xRealtime`] = round(midi.duration / (ms / 1000))
+  }
+  return out
+}
+
 function heapMB(): number {
   const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
   return mem ? mem.usedJSHeapSize / (1024 * 1024) : 0
@@ -641,6 +851,8 @@ const SUITES: Record<
   idle: suiteIdle,
   pacing: suitePacing,
   export: suiteExport,
+  exportlab: suiteExportLab,
+  audiorender: suiteAudioRender,
 }
 
 export async function maybeRunBench(ctx: AppCtxValue): Promise<void> {

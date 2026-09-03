@@ -37,7 +37,7 @@
     "@tonejs/piano": "^0.2.1",
     "@vercel/analytics": "^2.0.1",
     "events": "^3.3.0",
-    "mediabunny": "^1.41.0",
+    "mediabunny": "^1.55.6",
     "pixi-filters": "^6.0.1",
     "pixi.js": "^8.4.0",
     "posthog-js": "^1.369.3",

@@ -167,7 +167,6 @@ const zhCN: Messages = {
   'export.stage.finalizing': '正在收尾',
   'export.stage.saving': '正在保存',
   'export.stage.done': '完成',
-  'export.step': '第 {step} 步，共 {total} 步',
   'export.eta.minutes': '预计还需 {min} 分钟',
   'export.eta.soon': '不到一分钟',
   'export.error.title': '导出失败',

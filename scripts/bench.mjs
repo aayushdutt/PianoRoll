@@ -174,6 +174,8 @@ async function newPage(browser, args) {
   }
   if (args.dpr) ctxOpts.deviceScaleFactor = args.dpr
   const context = await browser.newContext(ctxOpts)
+  // Headed runs would otherwise show the Web MIDI prompt the app fires on boot.
+  await context.grantPermissions(['midi', 'midi-sysex']).catch(() => {})
   const page = await context.newPage()
   page.on('pageerror', (err) => console.error(`  [page error] ${err.message}`))
   page.on('crash', () => console.error('  [page CRASHED]'))

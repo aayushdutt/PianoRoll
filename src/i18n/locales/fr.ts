@@ -199,7 +199,6 @@ const fr: Messages = {
   'export.stage.finalizing': 'Finalisation',
   'export.stage.saving': 'Enregistrement',
   'export.stage.done': 'Terminé',
-  'export.step': 'Étape {step} sur {total}',
   'export.eta.minutes': '~{min} min restantes',
   'export.eta.soon': "moins d'une minute restante",
   'export.error.title': "Échec de l'export",

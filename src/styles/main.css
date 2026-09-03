@@ -5721,14 +5721,6 @@ body.canvas-hidden #kbd-resizer {
 
 /* "Step k of N" above the stage name — orients the user across the
    multi-stage pipeline so per-stage transitions don't read as restarts. */
-.export-step {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin-bottom: -8px;
-}
 
 .export-eta {
   font-size: 12px;
