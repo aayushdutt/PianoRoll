@@ -8,10 +8,16 @@ import { Portal, render } from 'solid-js/web'
 // We render via Portal so the toast DOM lives under <body> regardless of
 // where the mount is wired up, preserving the fixed-position CSS layout.
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 interface ToastEntry {
   id: number
   message: string
   className: string
+  action?: ToastAction
 }
 
 let nextId = 1
@@ -24,20 +30,47 @@ function ensureMounted(): void {
   render(
     () => (
       <Portal mount={document.body}>
-        <For each={toasts()}>{(toast) => <div class={toast.className}>{toast.message}</div>}</For>
+        <For each={toasts()}>
+          {(toast) => (
+            <div class={toast.className} classList={{ 'toast--actionable': !!toast.action }}>
+              <span>{toast.message}</span>
+              {toast.action && (
+                <button
+                  type="button"
+                  class="toast-action"
+                  onClick={() => {
+                    toast.action?.onClick()
+                    dismiss(toast.id)
+                  }}
+                >
+                  {toast.action.label}
+                </button>
+              )}
+            </div>
+          )}
+        </For>
       </Portal>
     ),
     document.createElement('div'),
   )
 }
 
-export function showToast(message: string, className: string, duration: number): void {
+function dismiss(id: number): void {
+  setToasts((prev) => prev.filter((t) => t.id !== id))
+}
+
+// `action` renders a button inside the toast (e.g. "Open" for a file the
+// browser saved silently); such toasts accept pointer events.
+export function showToast(
+  message: string,
+  className: string,
+  duration: number,
+  action?: ToastAction,
+): void {
   ensureMounted()
   const id = nextId++
-  setToasts((prev) => [...prev, { id, message, className }])
-  setTimeout(() => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-  }, duration)
+  setToasts((prev) => [...prev, { id, message, className, ...(action ? { action } : {}) }])
+  setTimeout(() => dismiss(id), duration)
 }
 
 export function showError(message: string): void {

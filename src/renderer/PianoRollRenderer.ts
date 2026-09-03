@@ -797,15 +797,69 @@ export class PianoRollRenderer {
     this.presentFrame()
   }
 
+  // One frame of the piece at an export size, for the export dialog's
+  // preview. Temporarily resizes the (hidden-behind-the-modal) canvas, draws
+  // the frame, snapshots it, then restores everything synchronously in the
+  // same task so the live canvas never presents the intermediate size.
+  // Returns null while an export owns the canvas or nothing is loaded.
+  // `width`/`height` are LOGICAL px; `resolution` (default 1) multiplies them
+  // into the backing store exactly like a real export, so the preview shows the
+  // format's true proportions rather than a shrunk layout.
+  async renderPreview(o: {
+    width: number
+    height: number
+    resolution?: number
+    time: number
+    pitchRange?: { min: number; max: number }
+    pixelsPerSecond?: number
+    maxWidth: number
+  }): Promise<ImageBitmap | null> {
+    if (!this.midi || this.exportMode) return null
+    const { resolution } = this.canvasSize
+    const range = this.pitchRange
+    const pps = this.pixelsPerSecond
+    const lastTime = this.lastRenderTime
+    let pending: Promise<ImageBitmap> | null = null
+    try {
+      this.resize(o.width, o.height, o.resolution ?? 1)
+      if (o.pitchRange) this.setPitchRange(o.pitchRange.min, o.pitchRange.max)
+      if (o.pixelsPerSecond !== undefined) this.setZoom(o.pixelsPerSecond)
+      this.renderStaticFrame(o.time)
+      // createImageBitmap copies the canvas at call time; the restore below
+      // runs before the promise settles.
+      // Downscale from the BACKING STORE, not the logical size — a 4K preview
+      // renders at 1920x1080 logical / resolution 2, and scaling by the logical
+      // width would throw away half the pixels the modal asked for.
+      const pixelW = this.canvas.width
+      const pixelH = this.canvas.height
+      const scale = Math.min(1, o.maxWidth / pixelW)
+      pending = createImageBitmap(this.canvas, {
+        resizeWidth: Math.max(1, Math.round(pixelW * scale)),
+        resizeHeight: Math.max(1, Math.round(pixelH * scale)),
+        resizeQuality: 'high',
+      })
+    } finally {
+      if (o.pixelsPerSecond !== undefined) this.setZoom(pps)
+      if (o.pitchRange) this.setPitchRange(range.min, range.max)
+      this.fitToWindow(resolution)
+      this.renderStaticFrame(lastTime)
+    }
+    return pending
+  }
+
   private handleResize = (): void => {
     // Ignore viewport events during export — the exporter owns canvas size
     // until it restores it in its own finally block.
     if (this.exportMode) return
+    this.fitToWindow()
+  }
+
+  private fitToWindow(resolution?: number): void {
     // Re-clamp keyboard height (rotation) before resize() so the keyboard
     // bakes once at the final height.
     const { min, max } = viewportKeyboardBounds()
     this.applyKeyboardHeight(Math.min(max, Math.max(min, this.keyboardHeight)))
-    this.resize(window.innerWidth, window.innerHeight)
+    this.resize(window.innerWidth, window.innerHeight, resolution)
   }
 
   destroy(): void {

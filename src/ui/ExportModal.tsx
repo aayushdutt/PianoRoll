@@ -1,15 +1,40 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createEffect, createSignal, For, on, onCleanup, Show } from 'solid-js'
+import { createStore } from 'solid-js/store'
 import { Portal, render } from 'solid-js/web'
+import type { MidiFile } from '../core/midi/types'
 import { overallProgress, type ProgressMode, stageEtaSeconds } from '../export/exportMath'
 import type { ExportStage } from '../export/VideoExporter'
 import { t } from '../i18n'
+import {
+  activityBuckets,
+  type ExportDest,
+  type ExportFormat,
+  type ExportFps,
+  type ExportQuality,
+  type ExportUiState,
+  estimateSeconds,
+  FORMATS,
+  FPS_OPTIONS,
+  previewDims,
+  QUALITIES,
+  resolutionFor,
+  THROUGHPUT_KEY,
+  toExportSettings,
+} from './exportSettings'
 import { icons } from './icons'
 
-// Supported export resolution presets. `match` keeps the current canvas size
-// (whatever the user's window is) — useful for already-well-sized displays or
-// for users who've tuned the window to look exactly how they want. `vertical`
-// (1080×1920) and `square` (1080×1080) target TikTok/Reels/Shorts and
-// Instagram feed respectively.
+// The export dialog. Three destinations (Video · Audio · MIDI) as tabs; the
+// Video tab shows a real rendered frame of the piece at the chosen format
+// next to the settings, with the caption carrying the honest numbers
+// (dimensions, fps, and — once this device has measured one export — how long
+// it takes here). Audio and MIDI reuse the same two-column shape with a glyph
+// on the stage, so switching tabs never resizes the card. Layout: two columns
+// on desktop, one column under 760px, bottom sheet on phones — see .export-*
+// in main.css.
+//
+// `ExportSettings` is the contract with App.startExport and is unchanged; the
+// dialog's own state (`ExportUiState`) maps onto it in exportSettings.ts.
+
 export type ExportResolution = 'match' | '720p' | '1080p' | '2k' | '4k' | 'vertical' | 'square'
 export type ExportOutput = 'av' | 'video-only' | 'audio-only' | 'midi'
 export type ExportFocus = 'fit' | 'all'
@@ -27,92 +52,45 @@ export interface ExportSettings {
   audioFormat: ExportAudioFormat
 }
 
-// Built lazily inside the view so each `t()` call is reactive — flipping
-// locale at runtime swaps the labels/hints without remounting the modal.
-interface PresetCard {
-  id: ExportResolution
-  label: string
-  dim: string
-  aspect: 'landscape' | 'vertical' | 'square' | 'match'
-  hint?: string
+// What the dialog needs from the app to draw the preview and the caption.
+export interface ExportModalDeps {
+  pieceDuration: () => number
+  canvasSize: () => { width: number; height: number }
+  renderPreview: (settings: ExportSettings, maxWidth: number) => Promise<ImageBitmap | null>
+  /** The loaded piece — drives the Audio/MIDI stage drawings and detail rows. */
+  piece: () => MidiFile | null
+  /** Display name of the voice the audio export will render with. */
+  instrumentName: () => string
 }
 
 // Chrome caps `navigator.deviceMemory` at 8, so ≤4 reliably means a genuinely
-// constrained device. 2K/4K exports build the whole MP4 in memory — on these
-// devices that's the top OOM suspect (PostHog: ~7% of exports die silently).
+// constrained device. 2K/4K previews allocate the full backing store for one
+// frame; on these devices the preview renders at half size instead.
 const LOW_MEMORY_DEVICE =
   ((navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8) <= 4
-
-function buildPresets(): readonly PresetCard[] {
-  const heavyHint = (base: string): string =>
-    LOW_MEMORY_DEVICE ? `${base} · ${t('export.preset.lowMemory.hint')}` : base
-  return [
-    { id: '1080p', label: '1080p', dim: '1920 × 1080', aspect: 'landscape' },
-    { id: '720p', label: '720p', dim: '1280 × 720', aspect: 'landscape' },
-    {
-      id: '2k',
-      label: '2K',
-      dim: '2560 × 1440',
-      aspect: 'landscape',
-      hint: heavyHint(t('export.preset.2k.hint')),
-    },
-    {
-      id: '4k',
-      label: '4K',
-      dim: '3840 × 2160',
-      aspect: 'landscape',
-      hint: heavyHint(t('export.preset.4k.hint')),
-    },
-    {
-      id: 'vertical',
-      label: t('export.preset.vertical'),
-      dim: '1080 × 1920',
-      aspect: 'vertical',
-      hint: t('export.preset.vertical.hint'),
-    },
-    {
-      id: 'square',
-      label: t('export.preset.square'),
-      dim: '1080 × 1080',
-      aspect: 'square',
-      hint: t('export.preset.square.hint'),
-    },
-    {
-      id: 'match',
-      label: t('export.preset.match'),
-      dim: t('export.preset.match.dim'),
-      aspect: 'match',
-    },
-  ]
-}
-
-const FPS_OPTIONS = [24, 30, 60] as const
 
 // Coarse-pointer devices are exactly where exports fail/crawl in the field
 // (iOS 39% / Android 68% completion vs Mac 90%). Default them to 720p — the
 // user can still pick anything.
-function defaultResolution(): ExportResolution {
+function defaultQuality(): ExportQuality {
   return window.matchMedia?.('(pointer: coarse)').matches ? '720p' : '1080p'
 }
+
+const PREVIEW_MAX_WIDTH = 640
+const PREVIEW_DEBOUNCE_MS = 120
+const WAVEFORM_BARS = 56
 
 type Phase = 'settings' | 'progress' | 'error'
 
 interface ViewProps {
   container: HTMLElement
+  deps: ExportModalDeps
   isOpen: () => boolean
   phase: () => Phase
-  fps: () => number
-  setFps: (v: number) => void
-  resolution: () => ExportResolution
-  setResolution: (v: ExportResolution) => void
-  output: () => ExportOutput
-  setOutput: (v: ExportOutput) => void
-  audioFormat: () => ExportAudioFormat
-  setAudioFormat: (v: ExportAudioFormat) => void
-  focus: () => ExportFocus
-  setFocus: (v: ExportFocus) => void
-  speed: () => ExportSpeed
-  setSpeed: (v: ExportSpeed) => void
+  ui: ExportUiState
+  set: <K extends keyof ExportUiState>(key: K, value: ExportUiState[K]) => void
+  // Increments on open so the preview re-renders for a new piece.
+  openCount: () => number
   stage: () => string
   pct: () => number
   eta: () => string
@@ -125,10 +103,233 @@ interface ViewProps {
   onCancelProgress: () => void
 }
 
+function readThroughput(): number | null {
+  try {
+    const raw = localStorage.getItem(THROUGHPUT_KEY)
+    const n = raw === null ? Number.NaN : Number(raw)
+    return Number.isFinite(n) && n > 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
+function formatDuration(sec: number): string {
+  const total = Math.max(0, Math.round(sec))
+  return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`
+}
+
+// Honest numbers for the Audio caption: lamejs runs CBR 192 (src/export/mp3.ts)
+// and the offline render is 44.1 kHz, which audioBufferToWav writes as 16-bit.
+const AUDIO_SPEC: Record<ExportAudioFormat, string> = {
+  mp3: '192 kbps',
+  wav: '16-bit 44.1 kHz',
+}
+
+// Stage size used before layout has measured the canvas (first paint of a tab).
+const STAGE_FALLBACK = { width: 300, height: 169 }
+
+/** Size the backing store to the laid-out box and return CSS-pixel dimensions. */
+function fitCanvas(canvas: HTMLCanvasElement): { w: number; h: number; dpr: number } {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  const w = canvas.clientWidth || STAGE_FALLBACK.width
+  const h = canvas.clientHeight || STAGE_FALLBACK.height
+  canvas.width = Math.round(w * dpr)
+  canvas.height = Math.round(h * dpr)
+  return { w, h, dpr }
+}
+
+function readAccent(el: Element): string {
+  return getComputedStyle(el).getPropertyValue('--accent').trim() || '#6366f1'
+}
+
+/** Two-column spec sheet shared by the Audio and MIDI tabs. */
+function Details(props: { rows: readonly { k: string; v: string }[] }) {
+  return (
+    <dl class="export-kv">
+      <For each={props.rows}>
+        {(row) => (
+          <div class="export-kv-row">
+            <dt class="export-kv-k">{row.k}</dt>
+            <dd class="export-kv-v">{row.v}</dd>
+          </div>
+        )}
+      </For>
+    </dl>
+  )
+}
+
+function Segmented<T extends string | number>(props: {
+  value: () => T
+  options: readonly T[]
+  label: (v: T) => string
+  tip?: (v: T) => string | undefined
+  disabled?: () => boolean
+  onChange: (v: T) => void
+}) {
+  return (
+    <div class="fps-group export-seg" aria-disabled={props.disabled?.()}>
+      <For each={props.options}>
+        {(v) => (
+          <button
+            type="button"
+            class="fps-btn"
+            aria-pressed={props.value() === v}
+            classList={{ 'fps-btn--on': props.value() === v }}
+            title={props.tip?.(v)}
+            disabled={props.disabled?.()}
+            onClick={() => props.onChange(v)}
+          >
+            {props.label(v)}
+          </button>
+        )}
+      </For>
+    </div>
+  )
+}
+
 function ExportView(props: ViewProps) {
-  const noVideo = (): boolean => props.output() === 'audio-only' || props.output() === 'midi'
-  const isSocial = (): boolean =>
-    !noVideo() && (props.resolution() === 'vertical' || props.resolution() === 'square')
+  const ui = props.ui
+  const isSocial = (): boolean => ui.format !== 'landscape'
+  const settings = (): ExportSettings => toExportSettings(ui)
+  const dims = (): { width: number; height: number } => previewDims(ui, props.deps.canvasSize())
+
+  // ── Preview ──────────────────────────────────────────────────────────────
+  let stageCanvas: HTMLCanvasElement | undefined
+  const [previewReady, setPreviewReady] = createSignal(false)
+  let previewTimer: ReturnType<typeof setTimeout> | null = null
+  let previewSeq = 0
+
+  const drawPreview = async (): Promise<void> => {
+    const seq = ++previewSeq
+    const s = settings()
+    const maxWidth = LOW_MEMORY_DEVICE ? PREVIEW_MAX_WIDTH / 2 : PREVIEW_MAX_WIDTH
+    let bitmap: ImageBitmap | null = null
+    try {
+      bitmap = await props.deps.renderPreview(s, maxWidth)
+    } catch (err) {
+      console.warn('Export preview failed', err)
+    }
+    if (seq !== previewSeq || !stageCanvas) {
+      bitmap?.close()
+      return
+    }
+    if (!bitmap) {
+      setPreviewReady(false)
+      return
+    }
+    stageCanvas.width = bitmap.width
+    stageCanvas.height = bitmap.height
+    stageCanvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+    bitmap.close()
+    setPreviewReady(true)
+  }
+
+  // Re-render on anything that changes the frame; debounced so a quick run
+  // of clicks costs one render. Framing/fall only matter for social formats.
+  createEffect(
+    on(
+      () => [
+        props.isOpen(),
+        props.openCount(),
+        ui.dest,
+        ui.format,
+        ui.quality,
+        isSocial() ? ui.focus : null,
+        isSocial() ? ui.speed : null,
+      ],
+      () => {
+        if (!props.isOpen() || ui.dest !== 'video') return
+        if (previewTimer) clearTimeout(previewTimer)
+        previewTimer = setTimeout(() => {
+          previewTimer = null
+          void drawPreview()
+        }, PREVIEW_DEBOUNCE_MS)
+      },
+    ),
+  )
+  onCleanup(() => {
+    if (previewTimer) clearTimeout(previewTimer)
+  })
+
+  // ── Audio / MIDI stage drawings ──────────────────────────────────────────
+  // No frame to render for these two, so the stage shows the piece itself.
+  // Geometry is pure (exportSettings.ts); here we only stroke it.
+  let waveCanvas: HTMLCanvasElement | undefined
+
+  const drawWaveform = (): void => {
+    const canvas = waveCanvas
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
+    const { w, h, dpr } = fitCanvas(canvas)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, w, h)
+    // ~56 bars across 300px: a bar every 5px reads as a waveform, not a
+    // barcode. Values are compressed so one held chord doesn't dwarf the
+    // rest, smoothed with their neighbours, then renormalised to the peak.
+    const raw = activityBuckets(props.deps.piece(), WAVEFORM_BARS).map((v) => v ** 0.7)
+    const smoothed = raw.map((v, i) => {
+      const l = raw[i - 1] ?? v
+      const r = raw[i + 1] ?? v
+      return (l + 2 * v + r) / 4
+    })
+    const peak = Math.max(1e-6, ...smoothed)
+    const bars = smoothed.map((v) => v / peak)
+    const padX = 14
+    const slot = (w - padX * 2) / bars.length
+    const barW = Math.max(2, slot * 0.55)
+    const mid = h / 2
+    const reach = h / 2 - 22
+    const accent = readAccent(canvas)
+    // Faint centre line ties the bars together and reads as the baseline.
+    ctx.fillStyle = accent
+    ctx.globalAlpha = 0.14
+    ctx.fillRect(padX, mid - 0.5, w - padX * 2, 1)
+    for (let i = 0; i < bars.length; i++) {
+      const v = bars[i] ?? 0
+      const half = Math.max(barW / 2, v * reach)
+      const x = padX + i * slot + (slot - barW) / 2
+      ctx.globalAlpha = 0.28 + 0.62 * v
+      ctx.beginPath()
+      ctx.roundRect(x, mid - half, barW, half * 2, barW / 2)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // Same open/dest/piece trigger the video preview uses. `queueMicrotask` lets
+  // the <Show> swap land in the DOM (and get laid out) before we measure it.
+  createEffect(
+    on(
+      () => [props.isOpen(), props.openCount(), ui.dest, props.deps.piece()],
+      () => {
+        if (!props.isOpen()) return
+        if (ui.dest === 'audio') queueMicrotask(drawWaveform)
+      },
+    ),
+  )
+
+  const trackCount = (): string => String(props.deps.piece()?.tracks.length ?? 0)
+  const noteCount = (): number =>
+    (props.deps.piece()?.tracks ?? []).reduce((n, track) => n + track.notes.length, 0)
+
+  // ── Caption ──────────────────────────────────────────────────────────────
+  // Line 2 is empty until an export on this device has been timed — the
+  // caption reserves its height in CSS so it never shifts when it appears.
+  const caption = (): { specs: string; time: string } => {
+    const d = dims()
+    const secs = estimateSeconds(readThroughput(), d, ui.fps, props.deps.pieceDuration())
+    return {
+      specs: [`${d.width} × ${d.height}`, t('export.fps.unit', { fps: ui.fps })].join(' · '),
+      time:
+        secs === null
+          ? ''
+          : secs < 50
+            ? t('export.est.soon')
+            : t('export.est.minutes', { min: Math.ceil(secs / 60) }),
+    }
+  }
+
+  const tabs: readonly ExportDest[] = ['video', 'audio', 'midi']
 
   return (
     <Portal mount={props.container}>
@@ -143,178 +344,246 @@ function ExportView(props: ViewProps) {
       >
         {/* biome-ignore-end lint/a11y/useKeyWithClickEvents: — */}
         {/* biome-ignore-end lint/a11y/noStaticElementInteractions: — */}
-        <div class="export-card modal-scroll">
-          <div class="export-phase" classList={{ hidden: props.phase() !== 'settings' }}>
-            <header class="export-header">
-              <div class="export-card-icon" innerHTML={icons.film()} />
-              <div class="export-header-text">
-                <h2 class="export-card-title">{t('export.title')}</h2>
-                <p class="export-card-sub">{t('export.sub')}</p>
+        <div class="export-card modal-scroll" data-phase={props.phase()} data-dest={ui.dest}>
+          <div
+            class="export-phase export-settings"
+            classList={{ hidden: props.phase() !== 'settings' }}
+          >
+            <header class="export-head">
+              <h2 class="export-card-title">{t('export.title')}</h2>
+              <div class="export-tabs" role="tablist">
+                <For each={tabs}>
+                  {(d) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      class="export-tab"
+                      aria-selected={ui.dest === d}
+                      classList={{ 'export-tab--on': ui.dest === d }}
+                      onClick={() => props.set('dest', d)}
+                    >
+                      {t(`export.tab.${d}`)}
+                    </button>
+                  )}
+                </For>
               </div>
+              <button
+                type="button"
+                class="export-close"
+                aria-label={t('export.cancel')}
+                innerHTML={icons.close(14)}
+                onClick={() => props.onDismiss()}
+              />
             </header>
 
-            <section class="export-section">
-              <span class="export-section-label">{t('export.outputLabel')}</span>
-              <div class="fps-group out-group">
-                <button
-                  type="button"
-                  class="fps-btn"
-                  classList={{ 'fps-btn--on': props.output() === 'av' }}
-                  onClick={() => props.setOutput('av')}
-                >
-                  {t('export.output.av')}
-                </button>
-                <button
-                  type="button"
-                  class="fps-btn"
-                  classList={{ 'fps-btn--on': props.output() === 'video-only' }}
-                  onClick={() => props.setOutput('video-only')}
-                >
-                  {t('export.output.video')}
-                </button>
-                <button
-                  type="button"
-                  class="fps-btn"
-                  classList={{ 'fps-btn--on': props.output() === 'audio-only' }}
-                  onClick={() => props.setOutput('audio-only')}
-                >
-                  {t('export.output.audio')}
-                </button>
-                <button
-                  type="button"
-                  class="fps-btn"
-                  classList={{ 'fps-btn--on': props.output() === 'midi' }}
-                  title={t('export.output.midi.tip')}
-                  onClick={() => props.setOutput('midi')}
-                >
-                  {t('export.output.midi')}
-                </button>
-              </div>
-            </section>
-
-            <Show when={props.output() === 'audio-only'}>
-              <section class="export-section">
-                <span class="export-section-label">{t('export.formatLabel')}</span>
-                <div class="fps-group">
-                  <button
-                    type="button"
-                    class="fps-btn"
-                    classList={{ 'fps-btn--on': props.audioFormat() === 'mp3' }}
-                    onClick={() => props.setAudioFormat('mp3')}
-                  >
-                    MP3
-                  </button>
-                  <button
-                    type="button"
-                    class="fps-btn"
-                    classList={{ 'fps-btn--on': props.audioFormat() === 'wav' }}
-                    onClick={() => props.setAudioFormat('wav')}
-                  >
-                    WAV
-                  </button>
+            <div class="export-body">
+              {/* ── Video ── */}
+              <Show when={ui.dest === 'video'}>
+                <div class="export-preview">
+                  <div class="export-stage" data-aspect={ui.format}>
+                    <canvas
+                      ref={stageCanvas}
+                      class="export-stage-canvas"
+                      classList={{ 'export-stage-canvas--ready': previewReady() }}
+                      role="img"
+                      aria-label={caption().specs}
+                    />
+                  </div>
+                  <p class="export-caption">
+                    <span>{caption().specs}</span>
+                    <span class="export-caption-time">{caption().time}</span>
+                  </p>
                 </div>
-              </section>
-            </Show>
 
-            <section class="export-section" classList={{ 'export-section--disabled': noVideo() }}>
-              <span class="export-section-label">{t('export.resolutionLabel')}</span>
-              <div class="res-grid">
-                <For each={buildPresets()}>
-                  {(p) => (
+                <div class="export-rows">
+                  <div class="export-row">
+                    <span class="export-row-label">{t('export.format')}</span>
+                    <Segmented<ExportFormat>
+                      value={() => ui.format}
+                      options={FORMATS}
+                      label={(f) => t(`export.format.${f}`)}
+                      tip={(f) => t(`export.format.${f}.tip`)}
+                      onChange={(f) => props.set('format', f)}
+                    />
+                  </div>
+                  <div class="export-row" classList={{ 'export-row--off': isSocial() }}>
+                    <span class="export-row-label">{t('export.quality')}</span>
+                    <Segmented<ExportQuality>
+                      value={() => ui.quality}
+                      options={QUALITIES}
+                      label={(q) =>
+                        q === 'match'
+                          ? t('export.quality.window')
+                          : q === '2k'
+                            ? '2K'
+                            : q === '4k'
+                              ? '4K'
+                              : q
+                      }
+                      tip={(q) =>
+                        q === 'match'
+                          ? t('export.quality.window.tip')
+                          : q === '4k' && LOW_MEMORY_DEVICE
+                            ? t('export.preset.lowMemory.hint')
+                            : undefined
+                      }
+                      disabled={isSocial}
+                      onChange={(q) => props.set('quality', q)}
+                    />
+                    <Show when={isSocial()}>
+                      <span class="export-row-note">{t('export.quality.social')}</span>
+                    </Show>
+                  </div>
+                  <div class="export-row">
+                    <span class="export-row-label">{t('export.motion')}</span>
+                    <Segmented<ExportFps>
+                      value={() => ui.fps}
+                      options={FPS_OPTIONS}
+                      label={(f) => t('export.fps.unit', { fps: f })}
+                      onChange={(f) => props.set('fps', f)}
+                    />
                     <button
                       type="button"
-                      class="res-card"
-                      classList={{ 'res-card--on': props.resolution() === p.id }}
-                      title={p.hint}
-                      onClick={() => props.setResolution(p.id)}
+                      class="export-toggle"
+                      role="switch"
+                      aria-checked={ui.includeAudio}
+                      classList={{ 'export-toggle--on': ui.includeAudio }}
+                      onClick={() => props.set('includeAudio', !ui.includeAudio)}
                     >
-                      <div class={`res-preview res-preview--${p.aspect}`} aria-hidden="true" />
-                      <div class="res-card-label">{p.label}</div>
-                      <div class="res-card-dim">{p.dim}</div>
+                      <span class="export-toggle-knob" />
+                      {t('export.includeAudio')}
                     </button>
-                  )}
-                </For>
-              </div>
-            </section>
-
-            <section class="export-section" classList={{ 'export-section--disabled': noVideo() }}>
-              <span class="export-section-label">{t('export.fpsLabel')}</span>
-              <div class="fps-group">
-                <For each={FPS_OPTIONS}>
-                  {(fps) => (
-                    <button
-                      type="button"
-                      class="fps-btn"
-                      classList={{ 'fps-btn--on': props.fps() === fps }}
-                      onClick={() => props.setFps(fps)}
-                    >
-                      {t('export.fps.unit', { fps })}
-                    </button>
-                  )}
-                </For>
-              </div>
-            </section>
-
-            <Show when={isSocial()}>
-              <section class="export-section">
-                <span class="export-section-label">{t('export.focusLabel')}</span>
-                <div class="fps-group">
-                  <button
-                    type="button"
-                    class="fps-btn"
-                    classList={{ 'fps-btn--on': props.focus() === 'fit' }}
-                    title={t('export.focus.fit.tip')}
-                    onClick={() => props.setFocus('fit')}
-                  >
-                    {t('export.focus.fit')}
-                  </button>
-                  <button
-                    type="button"
-                    class="fps-btn"
-                    classList={{ 'fps-btn--on': props.focus() === 'all' }}
-                    title={t('export.focus.all.tip')}
-                    onClick={() => props.setFocus('all')}
-                  >
-                    {t('export.focus.all')}
-                  </button>
+                  </div>
+                  <div class="export-social" classList={{ 'export-social--open': isSocial() }}>
+                    <div class="export-social-inner">
+                      <div class="export-row">
+                        <span class="export-row-label">{t('export.framing')}</span>
+                        <Segmented<ExportFocus>
+                          value={() => ui.focus}
+                          options={['fit', 'all'] as const}
+                          label={(f) => t(`export.focus.${f}`)}
+                          tip={(f) => t(`export.focus.${f}.tip`)}
+                          onChange={(f) => props.set('focus', f)}
+                        />
+                      </div>
+                      <div class="export-row">
+                        <span class="export-row-label">{t('export.fall')}</span>
+                        <Segmented<ExportSpeed>
+                          value={() => ui.speed}
+                          options={['compact', 'standard', 'drama'] as const}
+                          label={(s) => t(`export.speed.${s}`)}
+                          tip={(s) => t(`export.speed.${s}.tip`)}
+                          onChange={(s) => props.set('speed', s)}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </section>
+              </Show>
 
-              <section class="export-section">
-                <span class="export-section-label">{t('export.speedLabel')}</span>
-                <div class="fps-group">
-                  <button
-                    type="button"
-                    class="fps-btn"
-                    classList={{ 'fps-btn--on': props.speed() === 'compact' }}
-                    title={t('export.speed.compact.tip')}
-                    onClick={() => props.setSpeed('compact')}
-                  >
-                    {t('export.speed.compact')}
-                  </button>
-                  <button
-                    type="button"
-                    class="fps-btn"
-                    classList={{ 'fps-btn--on': props.speed() === 'standard' }}
-                    title={t('export.speed.standard.tip')}
-                    onClick={() => props.setSpeed('standard')}
-                  >
-                    {t('export.speed.standard')}
-                  </button>
-                  <button
-                    type="button"
-                    class="fps-btn"
-                    classList={{ 'fps-btn--on': props.speed() === 'drama' }}
-                    title={t('export.speed.drama.tip')}
-                    onClick={() => props.setSpeed('drama')}
-                  >
-                    {t('export.speed.drama')}
-                  </button>
+              {/* ── Audio ── */}
+              <Show when={ui.dest === 'audio'}>
+                <div class="export-preview">
+                  <div class="export-stage">
+                    <canvas
+                      ref={(el) => {
+                        waveCanvas = el
+                        queueMicrotask(drawWaveform)
+                      }}
+                      class="export-stage-canvas export-stage-canvas--thumb"
+                      role="img"
+                      aria-label={t('export.tab.audio')}
+                    />
+                  </div>
+                  <p class="export-caption">
+                    <span>
+                      {[
+                        formatDuration(props.deps.pieceDuration()),
+                        ui.audioFormat.toUpperCase(),
+                        AUDIO_SPEC[ui.audioFormat],
+                      ].join(' · ')}
+                    </span>
+                    <span class="export-caption-time" />
+                  </p>
                 </div>
-              </section>
-            </Show>
 
-            <div class="export-actions">
+                <div class="export-rows">
+                  <div class="export-row">
+                    <span class="export-row-label">{t('export.audioFormat')}</span>
+                    <div class="export-choices">
+                      <For each={['mp3', 'wav'] as const}>
+                        {(f) => (
+                          <button
+                            type="button"
+                            class="export-choice"
+                            aria-pressed={ui.audioFormat === f}
+                            classList={{ 'export-choice--on': ui.audioFormat === f }}
+                            onClick={() => props.set('audioFormat', f)}
+                          >
+                            <span class="export-choice-title">{f.toUpperCase()}</span>
+                            <span class="export-choice-hint">{t(`export.audio.${f}.hint`)}</span>
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                  <div class="export-row">
+                    <span class="export-row-label">{t('export.details')}</span>
+                    <Details
+                      rows={[
+                        {
+                          k: t('export.kv.duration'),
+                          v: formatDuration(props.deps.pieceDuration()),
+                        },
+                        { k: t('export.kv.instrument'), v: props.deps.instrumentName() },
+                        { k: t('export.kv.tracks'), v: trackCount() },
+                      ]}
+                    />
+                  </div>
+                </div>
+              </Show>
+
+              {/* ── MIDI ── */}
+              <Show when={ui.dest === 'midi'}>
+                <div class="export-preview">
+                  <div class="export-stage export-stage--file">
+                    <span class="export-file-icon" innerHTML={icons.midi(30)} />
+                    <span class="export-file-name">{`${props.deps.piece()?.name ?? ''}.mid`}</span>
+                  </div>
+                  <p class="export-caption">
+                    <span class="export-caption-line">
+                      <span class="export-caption-name">{props.deps.piece()?.name ?? ''}</span>
+                      <span class="export-caption-sep">·</span>
+                      <span>{formatDuration(props.deps.pieceDuration())}</span>
+                    </span>
+                    <span class="export-caption-time" />
+                  </p>
+                </div>
+
+                <div class="export-rows">
+                  <div class="export-row">
+                    <span class="export-row-label">{t('export.details')}</span>
+                    <Details
+                      rows={[
+                        { k: t('export.kv.file'), v: `${props.deps.piece()?.name ?? ''}.mid` },
+                        {
+                          k: t('export.kv.duration'),
+                          v: formatDuration(props.deps.pieceDuration()),
+                        },
+                        { k: t('export.kv.tracks'), v: trackCount() },
+                        { k: t('export.kv.notes'), v: String(noteCount()) },
+                        {
+                          k: t('export.kv.tempo'),
+                          v: `${Math.round(props.deps.piece()?.bpm ?? 0)} bpm`,
+                        },
+                      ]}
+                    />
+                  </div>
+                </div>
+              </Show>
+            </div>
+
+            <footer class="export-actions">
               <button type="button" class="modal-btn" onClick={() => props.onDismiss()}>
                 {t('export.cancel')}
               </button>
@@ -326,18 +595,18 @@ function ExportView(props: ViewProps) {
                 <span innerHTML={icons.exportArrow()} />
                 <span>{t('export.action')}</span>
               </button>
-            </div>
+            </footer>
           </div>
 
           <div
-            class="export-phase"
+            class="export-phase export-progress"
             classList={{
               hidden: props.phase() !== 'progress',
               indeterminate: props.indeterminate(),
             }}
           >
             <div class="export-spinner"></div>
-            <div class="export-stage">{props.stage()}</div>
+            <div class="export-stage-label">{props.stage()}</div>
             <div class="export-progress-wrap">
               <div
                 class="export-progress-bar"
@@ -355,13 +624,16 @@ function ExportView(props: ViewProps) {
             </button>
           </div>
 
-          <div class="export-phase" classList={{ hidden: props.phase() !== 'error' }}>
+          <div
+            class="export-phase export-progress"
+            classList={{ hidden: props.phase() !== 'error' }}
+          >
             <div class="export-error-icon" aria-hidden="true">
               !
             </div>
             <h2 class="export-card-title">{t('export.error.title')}</h2>
             <p class="export-error-msg">{props.errorMessage()}</p>
-            <div class="export-actions">
+            <div class="export-actions export-actions--center">
               <button type="button" class="modal-btn" onClick={() => props.onDismiss()}>
                 {t('export.error.close')}
               </button>
@@ -390,18 +662,9 @@ export class ExportModal {
   private readonly readIsOpen: () => boolean
   private readonly setPhase: (v: Phase) => void
   private readonly readPhase: () => Phase
-  private readonly setFps: (v: number) => void
-  private readonly readFps: () => number
-  private readonly setResolution: (v: ExportResolution) => void
-  private readonly readResolution: () => ExportResolution
-  private readonly setOutput: (v: ExportOutput) => void
-  private readonly readOutput: () => ExportOutput
-  private readonly setAudioFormat: (v: ExportAudioFormat) => void
-  private readonly readAudioFormat: () => ExportAudioFormat
-  private readonly setFocus: (v: ExportFocus) => void
-  private readonly readFocus: () => ExportFocus
-  private readonly setSpeed: (v: ExportSpeed) => void
-  private readonly readSpeed: () => ExportSpeed
+  private readonly bumpOpenCount: () => void
+  private readonly ui: ExportUiState
+  private readonly setUi: <K extends keyof ExportUiState>(key: K, value: ExportUiState[K]) => void
   private readonly setStage: (v: string) => void
   private readonly setPct: (v: number) => void
   private readonly readPct: () => number
@@ -430,15 +693,20 @@ export class ExportModal {
   private currentStage: ExportStage | null = null
   private stageStartedAt = 0
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, deps: ExportModalDeps) {
     const [isOpen, setIsOpen] = createSignal(false)
     const [phase, setPhase] = createSignal<Phase>('settings')
-    const [fps, setFps] = createSignal(30)
-    const [resolution, setResolution] = createSignal<ExportResolution>(defaultResolution())
-    const [output, setOutput] = createSignal<ExportOutput>('av')
-    const [audioFormat, setAudioFormat] = createSignal<ExportAudioFormat>('mp3')
-    const [focus, setFocus] = createSignal<ExportFocus>('fit')
-    const [speed, setSpeed] = createSignal<ExportSpeed>('drama')
+    const [openCount, setOpenCount] = createSignal(0)
+    const [ui, setUi] = createStore<ExportUiState>({
+      dest: 'video',
+      format: 'landscape',
+      quality: defaultQuality(),
+      fps: 30,
+      includeAudio: true,
+      focus: 'fit',
+      speed: 'drama',
+      audioFormat: 'mp3',
+    })
     const [stage, setStage] = createSignal(t('export.preparing'))
     const [pct, setPct] = createSignal(0)
     const [eta, setEta] = createSignal('')
@@ -450,18 +718,9 @@ export class ExportModal {
     this.readIsOpen = isOpen
     this.setPhase = setPhase
     this.readPhase = phase
-    this.setFps = setFps
-    this.readFps = fps
-    this.setResolution = setResolution
-    this.readResolution = resolution
-    this.setOutput = setOutput
-    this.readOutput = output
-    this.setAudioFormat = setAudioFormat
-    this.readAudioFormat = audioFormat
-    this.setFocus = setFocus
-    this.readFocus = focus
-    this.setSpeed = setSpeed
-    this.readSpeed = speed
+    this.bumpOpenCount = () => setOpenCount((n) => n + 1)
+    this.ui = ui
+    this.setUi = (key, value) => setUi(key, value)
     this.setStage = setStage
     this.setPct = setPct
     this.readPct = pct
@@ -478,26 +737,21 @@ export class ExportModal {
       () => (
         <ExportView
           container={container}
+          deps={deps}
           isOpen={isOpen}
           phase={phase}
-          fps={fps}
-          setFps={(v) => this.setFps(v)}
-          resolution={resolution}
-          setResolution={(v) => {
-            this.setResolution(v)
-            this.applyResolutionDefaults()
+          ui={ui}
+          set={(key, value) => {
+            this.setUi(key, value)
+            // Vertical reads best with the slow "drama" fall; square with
+            // standard. Applied when the format changes, never on every click,
+            // so a deliberate choice sticks.
+            if (key === 'format') {
+              if (value === 'vertical') this.setUi('speed', 'drama')
+              else if (value === 'square') this.setUi('speed', 'standard')
+            }
           }}
-          output={output}
-          setOutput={(v) => {
-            this.setOutput(v)
-            this.applyResolutionDefaults()
-          }}
-          audioFormat={audioFormat}
-          setAudioFormat={(v) => this.setAudioFormat(v)}
-          focus={focus}
-          setFocus={(v) => this.setFocus(v)}
-          speed={speed}
-          setSpeed={(v) => this.setSpeed(v)}
+          openCount={openCount}
           stage={stage}
           pct={pct}
           eta={eta}
@@ -507,8 +761,9 @@ export class ExportModal {
           onDismiss={() => this.close()}
           onStart={() => this.startExport()}
           onRetryLower={() => {
-            this.setResolution('720p')
-            if (this.readFps() > 30) this.setFps(30)
+            this.setUi('format', 'landscape')
+            this.setUi('quality', '720p')
+            if (this.ui.fps > 30) this.setUi('fps', 30)
             this.startExport()
           }}
           onCancelProgress={() => this.onCancel?.()}
@@ -525,6 +780,7 @@ export class ExportModal {
   open(): void {
     this.resetProgressState()
     this.setPhase('settings')
+    this.bumpOpenCount()
     this.setIsOpen(true)
   }
 
@@ -538,10 +794,9 @@ export class ExportModal {
    * attempt was a video export at a higher resolution.
    */
   showFailure(message: string): void {
-    const output = this.readOutput()
-    const isVideo = output === 'av' || output === 'video-only'
+    const isVideo = this.ui.dest === 'video'
     this.setErrorMessage(message)
-    this.setCanRetryLower(isVideo && this.readResolution() !== '720p')
+    this.setCanRetryLower(isVideo && resolutionFor(this.ui.format, this.ui.quality) !== '720p')
     this.setPhase('error')
   }
 
@@ -592,14 +847,7 @@ export class ExportModal {
   }
 
   private startExport(): void {
-    const settings: ExportSettings = {
-      fps: this.readFps(),
-      resolution: this.readResolution(),
-      output: this.readOutput(),
-      audioFormat: this.readAudioFormat(),
-      focus: this.readFocus(),
-      speed: this.readSpeed(),
-    }
+    const settings = toExportSettings(this.ui)
     this.resetProgressState()
     this.progressMode = settings.output === 'midi' ? null : settings.output
     this.setPhase('progress')
@@ -617,19 +865,6 @@ export class ExportModal {
     this.setStage(t('export.preparing'))
     this.setErrorMessage('')
     this.setCanRetryLower(false)
-  }
-
-  // Only auto-applies a per-resolution default speed when the Focus/Speed
-  // rows become visible — matches the pre-port behaviour where user choices
-  // weren't overwritten on every click.
-  private applyResolutionDefaults(): void {
-    const noVideo = this.readOutput() === 'audio-only' || this.readOutput() === 'midi'
-    const isSocial =
-      !noVideo && (this.readResolution() === 'vertical' || this.readResolution() === 'square')
-    if (isSocial) {
-      const desiredSpeed: ExportSpeed = this.readResolution() === 'vertical' ? 'drama' : 'standard'
-      this.setSpeed(desiredSpeed)
-    }
   }
 }
 

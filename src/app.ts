@@ -19,6 +19,7 @@ import {
   pitchSignature,
   resolveExportBitrate,
   resolveExportDims,
+  resolveExportRender,
   speedToPps,
   trimAudioBuffer,
 } from './export/exportMath'
@@ -68,11 +69,12 @@ import { DropZone } from './ui/DropZone'
 // below so their JSX stays out of the initial bundle. The static side keeps
 // the type imports for signatures.
 import type { ExportSettings } from './ui/ExportModal'
+import { THROUGHPUT_KEY, throughputFrom } from './ui/exportSettings'
 import { InstrumentMenu } from './ui/InstrumentMenu'
 import { KeyboardResizer } from './ui/KeyboardResizer'
 import type { SessionAction } from './ui/PostSessionModal'
 import { PEDAL_HIDDEN, type PedalIndicatorState, pedalIndicatorState } from './ui/pedalIndicator'
-import { showError, showSuccess } from './ui/Toast'
+import { showError, showSuccess, showToast } from './ui/Toast'
 import { TrackPanel } from './ui/TrackPanel'
 import { installViewportClassSync } from './ui/utils'
 import { whenIdle } from './whenIdle'
@@ -120,7 +122,35 @@ export class App {
   trackPanel!: TrackPanel
   private exportHandle = lazyHandle(() =>
     import('./ui/ExportModal').then(({ ExportModal }) => {
-      const m = new ExportModal(this.overlay)
+      const m = new ExportModal(this.overlay, {
+        pieceDuration: () => this.store.state.loadedMidi?.duration ?? 0,
+        canvasSize: () => this.renderer.canvasSize,
+        piece: () => this.store.state.loadedMidi,
+        instrumentName: () => t(INSTRUMENTS[this.instrumentIndex]!.nameKey),
+        // One real frame at the chosen size/framing, a quarter into the piece
+        // so there are notes on screen.
+        renderPreview: (settings, maxWidth) => {
+          const midi = this.store.state.loadedMidi
+          if (!midi) return Promise.resolve(null)
+          // Same fixed-logical-stage plan the real export uses, so the
+          // preview's proportions match the file the user gets.
+          const plan = resolveExportRender(settings.resolution, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            resolution: this.renderer.canvasSize.resolution,
+          })
+          const social = settings.resolution === 'vertical' || settings.resolution === 'square'
+          return this.renderer.renderPreview({
+            width: plan.logicalWidth,
+            height: plan.logicalHeight,
+            resolution: plan.resolution,
+            time: midi.duration * 0.25,
+            maxWidth,
+            ...(social && settings.focus === 'fit' ? { pitchRange: fitPitchRange(midi) } : {}),
+            ...(social ? { pixelsPerSecond: speedToPps(settings.speed) } : {}),
+          })
+        },
+      })
       m.onStart = (settings) => void this.startExport(settings)
       m.onCancel = () => this.cancelExport()
       return m
@@ -1077,6 +1107,24 @@ export class App {
     const nav = navigator as Navigator & { deviceMemory?: number }
     const isVideoOutput = settings.output === 'av' || settings.output === 'video-only'
     const targetDims = isVideoOutput ? resolveExportDims(settings.resolution) : null
+    // Fixed LOGICAL stage + a `resolution` multiplier for the pixels. Every
+    // renderer constant (keyboard height, glow, line widths) is in logical px,
+    // so sizing the logical canvas to 4K would shrink the whole layout instead
+    // of sharpening it. Resolved once here so telemetry reports the same pixel
+    // size the encoder will actually see.
+    const renderPlan = isVideoOutput
+      ? resolveExportRender(settings.resolution, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          resolution: this.renderer.canvasSize.resolution,
+        })
+      : null
+    const planPixels = renderPlan
+      ? {
+          width: Math.round(renderPlan.logicalWidth * renderPlan.resolution),
+          height: Math.round(renderPlan.logicalHeight * renderPlan.resolution),
+        }
+      : null
     const exportBase = {
       output: settings.output,
       resolution: settings.resolution,
@@ -1086,8 +1134,8 @@ export class App {
       midi_duration_s: Math.round(midi.duration),
       hardware_concurrency: nav.hardwareConcurrency ?? null,
       device_memory: nav.deviceMemory ?? null,
-      export_w: isVideoOutput ? (targetDims?.width ?? this.renderer.canvasSize.width) : null,
-      export_h: isVideoOutput ? (targetDims?.height ?? this.renderer.canvasSize.height) : null,
+      export_w: targetDims?.width ?? planPixels?.width ?? null,
+      export_h: targetDims?.height ?? planPixels?.height ?? null,
     }
     let exportStage: 'serialize' | 'audio_render' | 'video_encode' = 'serialize'
 
@@ -1205,14 +1253,13 @@ export class App {
     const needsVideo = settings.output !== 'audio-only'
     const needsAudio = settings.output !== 'video-only'
 
-    // Only resize the canvas when we're actually rendering video.
+    // Only resize the canvas when we're actually rendering video (renderPlan is
+    // null otherwise). Always resize — and always restore in the finally —
+    // rather than diffing against the current canvas: a same-pixel-size canvas
+    // can still need a different logical size / resolution pair.
     const originalCanvas = this.renderer.canvasSize
-    const target = needsVideo ? resolveExportDims(settings.resolution) : null
-    const resized =
-      target !== null &&
-      (target.width !== originalCanvas.width || target.height !== originalCanvas.height)
-    if (resized) {
-      this.renderer.resize(target.width, target.height, 1)
+    if (renderPlan) {
+      this.renderer.resize(renderPlan.logicalWidth, renderPlan.logicalHeight, renderPlan.resolution)
     }
 
     // Snapshot viewport state so we can restore after export. Vertical/Square
@@ -1344,7 +1391,28 @@ export class App {
           }),
       })
       exportModal.close()
-      this.showSuccess(`↓ ${t('toast.export.ready', { filename })}`)
+      if (fileHandle && stats.target === 'file') {
+        // A streamed file gets no downloads bubble — offer the open ourselves.
+        const handle = fileHandle
+        showToast(`↓ ${t('toast.export.ready', { filename })}`, 'toast toast--success', 10_000, {
+          label: t('toast.export.open'),
+          onClick: () => void openFileHandle(handle),
+        })
+      } else {
+        this.showSuccess(`↓ ${t('toast.export.ready', { filename })}`)
+      }
+      // Feeds the dialog's "about N min" estimate next time.
+      const throughput = throughputFrom({
+        framesEncoded: stats.framesEncoded,
+        width: this.renderer.canvasSize.width,
+        height: this.renderer.canvasSize.height,
+        videoEncodeMs: stats.videoEncodeMs,
+      })
+      if (throughput !== null) {
+        try {
+          localStorage.setItem(THROUGHPUT_KEY, String(Math.round(throughput)))
+        } catch {}
+      }
       const elapsedMs = Math.round(performance.now() - exportStartedAt)
       track('export_completed', {
         ...exportBase,
@@ -1407,7 +1475,7 @@ export class App {
       this.renderer.canvas.removeEventListener('webglcontextlost', onGlContextLost)
       clearExportInflight()
       this.currentExporter = null
-      if (resized) {
+      if (renderPlan) {
         // Match window dimensions instead of the stale originalCanvas values
         // in case the window was resized while we were exporting.
         this.renderer.resize(window.innerWidth, window.innerHeight, originalCanvas.resolution)
@@ -1945,4 +2013,17 @@ function indexOfId<T extends { id: string }>(list: readonly T[], id: string): nu
 function sanitiseFilename(name: string): string {
   const cleaned = name.replace(/[\\/:*?"<>|]+/g, ' ').trim()
   return cleaned.length > 0 ? cleaned : 'midee'
+}
+
+// Opens a streamed export in a new tab — the nearest thing to the downloads
+// bubble's "open" for a file the browser wrote silently via the save dialog.
+async function openFileHandle(handle: FileSystemFileHandle): Promise<void> {
+  try {
+    const file = await handle.getFile()
+    const url = URL.createObjectURL(file)
+    window.open(url, '_blank', 'noopener')
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (err) {
+    console.warn('Could not open exported file', err)
+  }
 }

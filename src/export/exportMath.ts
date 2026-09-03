@@ -191,3 +191,53 @@ export function resolveExportBitrate(preset: ExportResolution): number {
       return 8_000_000
   }
 }
+
+// Resolution is a SHARPNESS choice, not a layout choice.
+//
+// Every renderer constant (keyboard height, glow distance, line widths,
+// particle sizes) is in logical pixels, so rendering a 4K export at a 3840×2160
+// logical canvas produced a 1080p layout shrunk to a quarter size — the piano
+// looked proportionally much shorter at 4K than at 720p. Instead each format
+// renders at a FIXED logical size and Pixi's `resolution` multiplier scales the
+// backing store up/down to the requested pixel size.
+//
+// Invariant: `Math.round(logical × resolution)` equals `resolveExportDims()` for
+// every preset (Pixi rounds pixel dimensions the same way), so the encoder still
+// sees the exact dimensions the user picked.
+export interface ExportRenderPlan {
+  logicalWidth: number
+  logicalHeight: number
+  resolution: number
+}
+
+const LANDSCAPE_LOGICAL = { width: 1920, height: 1080 }
+
+// `windowSize.resolution` is the live canvas density (devicePixelRatio, capped),
+// so 'match' exports the window exactly as displayed — Retina stays sharp.
+export function resolveExportRender(
+  preset: ExportResolution,
+  windowSize: { width: number; height: number; resolution?: number },
+): ExportRenderPlan {
+  if (preset === 'match') {
+    return {
+      logicalWidth: windowSize.width,
+      logicalHeight: windowSize.height,
+      resolution: windowSize.resolution ?? 1,
+    }
+  }
+  const dims = resolveExportDims(preset)
+  // Unreachable: 'match' is the only preset without dims. Keeps the compiler
+  // honest without a non-null assertion.
+  if (!dims) {
+    return { logicalWidth: windowSize.width, logicalHeight: windowSize.height, resolution: 1 }
+  }
+  if (preset === 'vertical' || preset === 'square') {
+    return { logicalWidth: dims.width, logicalHeight: dims.height, resolution: 1 }
+  }
+  // Landscape presets share one 16:9 logical stage; only the sharpness varies.
+  return {
+    logicalWidth: LANDSCAPE_LOGICAL.width,
+    logicalHeight: LANDSCAPE_LOGICAL.height,
+    resolution: dims.width / LANDSCAPE_LOGICAL.width,
+  }
+}

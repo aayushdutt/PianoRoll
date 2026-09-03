@@ -5303,11 +5303,14 @@ body.canvas-hidden #kbd-resizer {
 }
 
 .export-card {
+  /* Long side of the preview stage; the short side follows the aspect. */
+  --stage: 300px;
   background: var(--surface-hi);
   border: 1px solid var(--border-hi);
   border-radius: var(--r-xl);
-  padding: 28px 30px 24px;
-  width: 420px;
+  padding: 22px 24px 20px;
+  width: 720px;
+  max-width: 100%;
   box-shadow:
     0 32px 80px rgba(0, 0, 0, 0.75),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -5315,7 +5318,14 @@ body.canvas-hidden #kbd-resizer {
   transform: scale(0.94) translateY(8px);
   transition:
     opacity 0.28s var(--ease-out),
-    transform 0.28s var(--ease-out);
+    transform 0.28s var(--ease-out),
+    width 0.28s var(--ease-out);
+}
+/* Every settings tab shares one footprint (see .export-body); only the
+   progress/error phases shrink to a compact card. */
+.export-card[data-phase="progress"],
+.export-card[data-phase="error"] {
+  width: 420px;
 }
 
 #export-modal.open .export-card {
@@ -5340,26 +5350,6 @@ body.canvas-hidden #kbd-resizer {
 }
 
 /* Settings phase */
-.export-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 22px;
-}
-
-.export-header-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.export-card-icon {
-  color: var(--accent);
-  opacity: 0.88;
-  padding: 8px;
-  background: var(--accent-soft);
-  border-radius: var(--r-md);
-  display: inline-flex;
-}
 
 .export-card-title {
   font-size: 17px;
@@ -5367,159 +5357,6 @@ body.canvas-hidden #kbd-resizer {
   letter-spacing: -0.03em;
   color: var(--text);
   margin-bottom: 3px;
-}
-
-.export-card-sub {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
-.export-section {
-  margin-bottom: 18px;
-}
-
-.export-section-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-}
-
-.export-section--disabled {
-  opacity: 0.35;
-  pointer-events: none;
-  filter: saturate(0.2);
-  transition:
-    opacity 0.2s,
-    filter 0.2s;
-}
-
-/* Segmented controls inside the export modal span full width with equal-sized
-   cells, so Output and Frame rate sit at the same visual weight under their
-   shared section-label style. */
-.export-section .fps-group {
-  width: 100%;
-}
-.export-section .fps-btn {
-  flex: 1;
-  padding: 6px 10px;
-}
-
-/* Resolution card grid — 3 columns × 2 rows, last row left-aligned. Each card
-   shows a tiny preview rectangle at the format's actual aspect ratio so the
-   picker reads visually before the dimensions do. */
-.res-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.res-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 8px 10px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    background 0.15s,
-    border-color 0.15s,
-    transform 0.12s var(--ease-spring);
-}
-
-.res-card:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border-hi);
-}
-
-.res-card:active {
-  transform: scale(0.97);
-}
-
-.res-card.res-card--on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.res-card-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: inherit;
-  letter-spacing: -0.01em;
-}
-
-.res-card-dim {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  letter-spacing: 0.02em;
-}
-
-.res-card--on .res-card-dim {
-  color: var(--text);
-  opacity: 0.7;
-}
-
-/* Aspect-ratio preview rectangles. Each is centered in a 44×32 slot and sized
-   proportional to the target format — user scans the shape before reading. */
-.res-preview {
-  width: 100%;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 6px;
-}
-
-.res-preview::before {
-  content: "";
-  display: block;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-  transition:
-    background 0.15s,
-    border-color 0.15s;
-}
-
-.res-card--on .res-preview::before {
-  background: linear-gradient(135deg, var(--accent), rgba(255, 255, 255, 0.06));
-  border-color: var(--accent);
-}
-
-.res-preview--landscape::before {
-  width: 50px;
-  height: 28px;
-}
-.res-preview--vertical::before {
-  width: 16px;
-  height: 28px;
-}
-.res-preview--square::before {
-  width: 28px;
-  height: 28px;
-}
-.res-preview--match::before {
-  width: 42px;
-  height: 28px;
-  border-style: dashed;
-  background: transparent;
-}
-.res-card--on .res-preview--match::before {
-  background: transparent;
 }
 
 /* FPS segmented control */
@@ -5567,6 +5404,506 @@ body.canvas-hidden #kbd-resizer {
 .fps-btn.fps-btn--on:hover {
   background: var(--accent);
   filter: brightness(1.1);
+}
+
+/* ── Export dialog: head, tabs, body ─────────────────────────────────── */
+/* The settings phase is a normal block; only progress/error centre. */
+.export-phase.export-settings {
+  display: block;
+}
+.export-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.export-head .export-card-title {
+  margin: 0;
+}
+.export-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+.export-tab {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.export-tab:hover {
+  color: var(--text);
+}
+.export-tab--on {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+.export-close {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.export-close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+.export-close svg {
+  display: block;
+}
+
+.export-body {
+  display: grid;
+  grid-template-columns: var(--stage) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* Preview: the stage IS the frame — it takes the aspect of the chosen format
+   (16:9 / 9:16 / 1:1) and the canvas fills it edge to edge, so the left column
+   is exactly stage + caption and the card never carries dead space. Audio and
+   MIDI leave `data-aspect` off and get the 16:9 default. */
+/* Stage centred in its column (a 9:16 frame sits mid-column); caption keeps
+   the column's left edge. */
+.export-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.export-preview .export-caption {
+  align-self: stretch;
+}
+.export-stage {
+  --stage-ar: 16 / 9;
+  --stage-w: var(--stage);
+  --stage-h: calc(var(--stage) * 9 / 16);
+  width: var(--stage-w);
+  height: var(--stage-h);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(60% 60% at 50% 40%, rgba(255, 255, 255, 0.035), transparent),
+    rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+}
+.export-stage[data-aspect="vertical"] {
+  --stage-ar: 9 / 16;
+  --stage-w: calc(var(--stage) * 9 / 16);
+  --stage-h: var(--stage);
+}
+.export-stage[data-aspect="square"] {
+  --stage-ar: 1 / 1;
+  --stage-w: var(--stage);
+  --stage-h: var(--stage);
+}
+.export-stage-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--r-md) - 1px);
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.22s var(--ease-out);
+}
+.export-stage-canvas--ready {
+  opacity: 1;
+}
+/* Audio / MIDI thumbnails paint synchronously straight onto the stage
+   background — no black letterbox and no fade-in gate to wait on. */
+.export-stage-canvas--thumb {
+  background: transparent;
+  opacity: 1;
+}
+/* Two lines are always reserved: the time estimate only exists once this
+   device has measured an export, so its arrival must not move the card. */
+.export-caption {
+  margin: 0;
+  width: 100%;
+  min-height: 35px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+.export-caption-time {
+  min-height: 16px;
+  color: var(--text-dim);
+}
+/* MIDI caption line 1: the piece name gives way before the duration does. */
+.export-caption-line {
+  display: flex;
+  min-width: 0;
+}
+.export-caption-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* MIDI tab: the stage is a file tile, not a picture. */
+.export-stage--file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+}
+.export-file-icon {
+  display: inline-flex;
+  color: var(--accent);
+  opacity: 0.9;
+}
+.export-file-name {
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.export-caption-sep {
+  margin: 0 5px;
+  flex-shrink: 0;
+}
+
+/* Settings rows: label above a full-width control. Nothing is pinned — the
+   card is as tall as its taller column — but all three tabs are BUILT to the
+   same 256px so switching tabs never resizes it. The budget, given the
+   explicit line-heights below (label 16, segmented button 18, toggle 18) and
+   the 14px row gap:
+     row          = 16 label + 7 + 38 segmented (18 + 12 pad + 6 pad + 2 border)  = 61
+     Video 16:9   = 61 + 61 + (61 + 7 + 24 toggle) + 3 × 14 gap                   = 256
+                    (the collapsed .export-social is 0 tall but still costs a gap)
+     Audio        = (16 + 7 + 53 choices) + 14 + (16 + 7 + 143 kv×3)              = 256
+     MIDI         =  16 + 7 + 233 kv×5                                            = 256
+     kv block     = rows × 45 + 6 padding + 2 border
+   The left column (stage 168.75 + 10 + 35 caption ≈ 214) always fits inside
+   that. Social formats slide Framing + Fall open on purpose — the card is
+   meant to grow for those. */
+.export-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.export-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: opacity 0.2s;
+}
+.export-row-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.export-row-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.export-row--off .export-seg {
+  opacity: 0.35;
+  filter: saturate(0.2);
+}
+.export-seg {
+  width: 100%;
+}
+/* Explicit line-height: buttons don't inherit the body's, and the row budget
+   above is only reliable if this height is a number we chose. */
+.export-seg .fps-btn {
+  flex: 1;
+  padding: 6px 8px;
+  line-height: 18px;
+}
+.export-seg .fps-btn:disabled {
+  cursor: default;
+}
+
+/* Include-audio switch, sits under the frame-rate control. */
+.export-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.export-toggle:hover,
+.export-toggle--on {
+  color: var(--text);
+}
+.export-toggle-knob {
+  position: relative;
+  width: 26px;
+  height: 15px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 0.18s;
+}
+.export-toggle-knob::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.7;
+  transition:
+    transform 0.18s var(--ease-spring),
+    opacity 0.18s;
+}
+.export-toggle--on .export-toggle-knob {
+  background: var(--accent);
+}
+.export-toggle--on .export-toggle-knob::after {
+  transform: translateX(11px);
+  opacity: 1;
+}
+
+/* Audio format: two pickable cards rather than a segmented control — there's a
+   real trade-off (size vs fidelity) and each option gets a line to say it. */
+.export-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.export-choice {
+  height: 53px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 12px;
+  text-align: left;
+  font-family: var(--font);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+.export-choice:hover {
+  color: var(--text);
+  border-color: var(--border-hi);
+}
+.export-choice--on {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.export-choice-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: -0.01em;
+}
+.export-choice-hint {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-dim);
+}
+.export-choice--on .export-choice-hint {
+  color: var(--text-muted);
+}
+
+/* Details: a compact spec sheet of the piece. 45px rows, so three of them
+   (Audio) and five (MIDI) land on the shared row budget documented above. */
+.export-kv {
+  padding: 3px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+.export-kv-row {
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+}
+.export-kv-row + .export-kv-row {
+  border-top: 1px solid var(--border);
+}
+.export-kv-k {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.export-kv-v {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Framing + Fall slide open for social formats (grid-rows transition keeps
+   the card from popping). */
+.export-social {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.26s var(--ease-out);
+}
+.export-social--open {
+  grid-template-rows: 1fr;
+}
+.export-social-inner {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.export-social--open .export-social-inner {
+  padding-top: 2px;
+}
+
+/* Progress/error phases are centred and content-sized inside the compact card. */
+.export-progress {
+  justify-content: center;
+  padding: 12px 0;
+}
+.export-actions--center {
+  justify-content: center;
+  border-top: none;
+  margin-top: 6px;
+  padding-top: 0;
+}
+
+/* Narrow: single column, preview on top, shorter stage. */
+@media (max-width: 759px) {
+  .export-card {
+    --stage: 180px;
+    width: 460px;
+    padding: 20px 20px 18px;
+  }
+  .export-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  /* Height-led here: a 9:16 stage at full sheet width would be taller than the
+     screen, so the aspect hangs off a capped height instead. */
+  .export-stage {
+    width: auto;
+    max-width: 100%;
+    height: var(--stage);
+    aspect-ratio: var(--stage-ar);
+  }
+  .export-caption {
+    text-align: center;
+  }
+  .export-caption-line {
+    justify-content: center;
+  }
+}
+/* Short screens with width to spare: keep two columns, shrink the stage. */
+@media (min-width: 760px) and (max-height: 620px) {
+  .export-card {
+    --stage: 220px;
+    padding-top: 16px;
+    padding-bottom: 14px;
+  }
+  .export-head {
+    margin-bottom: 12px;
+  }
+}
+/* Phones: bottom sheet. */
+@media (max-width: 640px) {
+  #export-modal {
+    --modal-vpad: 12px;
+    align-items: flex-end;
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+  .export-card,
+  .export-card[data-phase="progress"],
+  .export-card[data-phase="error"] {
+    --stage: 150px;
+    width: 100%;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    border-bottom: none;
+    padding: 14px 18px calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(24px);
+  }
+  .export-card::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto 12px;
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.18);
+  }
+  #export-modal.open .export-card {
+    transform: translateY(0);
+  }
+  .export-tab {
+    padding: 5px 11px;
+  }
+  .export-actions {
+    margin-top: 16px;
+    padding-top: 12px;
+  }
+  .export-actions .modal-btn--accent {
+    flex: 1;
+    justify-content: center;
+  }
 }
 
 /* Modal action buttons */
@@ -5636,7 +5973,7 @@ body.canvas-hidden #kbd-resizer {
   animation: spin 0.65s linear infinite;
 }
 
-.export-stage {
+.export-stage-label {
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
@@ -5718,9 +6055,6 @@ body.canvas-hidden #kbd-resizer {
   letter-spacing: 0.04em;
   min-height: 1em;
 }
-
-/* "Step k of N" above the stage name — orients the user across the
-   multi-stage pipeline so per-stage transitions don't read as restarts. */
 
 .export-eta {
   font-size: 12px;
@@ -6334,6 +6668,25 @@ body.canvas-hidden #kbd-resizer {
   color: #a5f3d0;
 }
 
+.toast--actionable {
+  pointer-events: auto;
+}
+.toast-action {
+  margin-left: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.toast-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .toast::before {
   content: "";
   display: inline-block;
@@ -6574,11 +6927,10 @@ body.canvas-hidden #kbd-resizer {
 
 /* ─── Export modal: narrow viewport fixes.
    — fps-group tabs wrap instead of overflowing
-   — res-card grid auto-fits
    — taller vertical padding on the overlay (see --modal-vpad) so .modal-scroll
-     max-height matches; card still scrolls inside itself on short phones. */
+     max-height matches; card still scrolls inside itself on short phones.
+   The export dialog has its own phone rules (bottom sheet) next to .export-*. */
 @media (max-width: 640px) {
-  #export-modal,
   #post-session-modal {
     --modal-vpad: 32px;
     align-items: flex-start;
@@ -6587,11 +6939,6 @@ body.canvas-hidden #kbd-resizer {
     padding-left: calc(12px + env(safe-area-inset-left, 0px));
     padding-right: calc(12px + env(safe-area-inset-right, 0px));
   }
-  .export-card {
-    width: 100%;
-    max-width: 100%;
-    padding: 18px 16px 16px;
-  }
   .post-session-card {
     width: 100%;
     max-width: 100%;
@@ -6599,14 +6946,6 @@ body.canvas-hidden #kbd-resizer {
   .fps-group {
     flex-wrap: wrap;
     justify-content: center;
-  }
-  .export-section .fps-btn {
-    flex: 0 1 auto;
-    padding: 6px 10px;
-    font-size: 11.5px;
-  }
-  .res-grid {
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   }
 }
 

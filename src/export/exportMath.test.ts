@@ -7,6 +7,7 @@ import {
   pitchSignature,
   resolveExportBitrate,
   resolveExportDims,
+  resolveExportRender,
   speedToPps,
   stageEtaSeconds,
   stageWindow,
@@ -264,6 +265,72 @@ describe('resolveExportDims', () => {
 
   it('returns null for "match" so the caller keeps the current canvas size', () => {
     expect(resolveExportDims('match')).toBeNull()
+  })
+})
+
+// --- resolveExportRender -----------------------------------------------------
+
+describe('resolveExportRender', () => {
+  const win = { width: 1440, height: 900 }
+  const presets = ['720p', '1080p', '2k', '4k', 'vertical', 'square'] as const
+
+  it('renders every landscape preset on the same 1920x1080 logical stage', () => {
+    for (const p of ['720p', '1080p', '2k', '4k'] as const) {
+      const plan = resolveExportRender(p, win)
+      expect(plan.logicalWidth).toBe(1920)
+      expect(plan.logicalHeight).toBe(1080)
+    }
+  })
+
+  it('varies only the resolution multiplier across landscape presets', () => {
+    expect(resolveExportRender('720p', win).resolution).toBeCloseTo(2 / 3, 10)
+    expect(resolveExportRender('1080p', win).resolution).toBe(1)
+    expect(resolveExportRender('2k', win).resolution).toBeCloseTo(4 / 3, 10)
+    expect(resolveExportRender('4k', win).resolution).toBe(2)
+  })
+
+  it('renders social formats at native logical size (resolution 1)', () => {
+    expect(resolveExportRender('vertical', win)).toEqual({
+      logicalWidth: 1080,
+      logicalHeight: 1920,
+      resolution: 1,
+    })
+    expect(resolveExportRender('square', win)).toEqual({
+      logicalWidth: 1080,
+      logicalHeight: 1080,
+      resolution: 1,
+    })
+  })
+
+  it("passes the window through for 'match', keeping its display density", () => {
+    expect(resolveExportRender('match', win)).toEqual({
+      logicalWidth: 1440,
+      logicalHeight: 900,
+      resolution: 1,
+    })
+    expect(resolveExportRender('match', { ...win, resolution: 2 }).resolution).toBe(2)
+  })
+
+  // The load-bearing invariant: Pixi sizes the backing store as
+  // round(logical * resolution), which must land exactly on the dims table the
+  // encoder + telemetry use.
+  it('produces a backing store equal to resolveExportDims for every preset', () => {
+    for (const p of presets) {
+      const dims = resolveExportDims(p)
+      expect(dims).not.toBeNull()
+      const plan = resolveExportRender(p, win)
+      expect(Math.round(plan.logicalWidth * plan.resolution)).toBe(dims?.width)
+      expect(Math.round(plan.logicalHeight * plan.resolution)).toBe(dims?.height)
+    }
+  })
+
+  it('keeps the logical stage aspect ratio equal to the output aspect ratio', () => {
+    for (const p of presets) {
+      const dims = resolveExportDims(p)
+      if (!dims) throw new Error(`no dims for ${p}`)
+      const plan = resolveExportRender(p, win)
+      expect(plan.logicalWidth / plan.logicalHeight).toBeCloseTo(dims.width / dims.height, 6)
+    }
   })
 })
 
