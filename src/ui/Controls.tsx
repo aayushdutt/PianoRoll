@@ -27,10 +27,9 @@ import {
 } from './ControlsView'
 import { DragCoachmark } from './DragCoachmark'
 import { isLearnCoachmarkSeen, LearnCoachmark } from './LearnCoachmark'
+import { PEDAL_HIDDEN, type PedalIndicatorState } from './pedalIndicator'
 
 const SKIP_SECONDS = 10
-
-import { PEDAL_HIDDEN, type PedalIndicatorState } from './pedalIndicator'
 
 export { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN } from './ControlsView'
 

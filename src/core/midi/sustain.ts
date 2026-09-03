@@ -56,15 +56,25 @@ export function buildPedalIntervals(
   return intervals
 }
 
-// Pedal is down at `t` when some interval covers it. Intervals are sorted and
-// non-overlapping by construction, so a linear scan from a moving cursor would
-// work too; note counts here are small enough that clarity wins.
-function pedalEndAt(intervals: readonly PedalInterval[], t: number): number | null {
-  for (const iv of intervals) {
-    if (iv.start > t) break
-    if (t < iv.end) return iv.end
+// Index of the interval covering `t`, or -1. Intervals are ascending and
+// disjoint by construction, so binary search. Shared by the parse-time pass
+// (once per note) and the per-tick indicator lookup.
+function intervalIndexAt(intervals: readonly PedalInterval[], t: number): number {
+  let lo = 0
+  let hi = intervals.length - 1
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1
+    const iv = intervals[mid]!
+    if (t < iv.start) hi = mid - 1
+    else if (t >= iv.end) lo = mid + 1
+    else return mid
   }
-  return null
+  return -1
+}
+
+function pedalEndAt(intervals: readonly PedalInterval[], t: number): number | null {
+  const i = intervalIndexAt(intervals, t)
+  return i === -1 ? null : intervals[i]!.end
 }
 
 // Per-track note lists in, per-track note lists out (same order, same lengths).
@@ -116,11 +126,7 @@ export function applySustain(
       const pedalEnd = pedalEndAt(intervals, notatedEnd)
       if (pedalEnd !== null) {
         const capped = Math.min(pedalEnd, notatedEnd + MAX_SUSTAIN_EXTENSION)
-        if (capped > notatedEnd) {
-          releases[ref.t]![ref.i] = capped
-          ringing.set(note.pitch, ref)
-          continue
-        }
+        if (capped > notatedEnd) releases[ref.t]![ref.i] = capped
       }
       ringing.set(note.pitch, ref)
     }
@@ -156,17 +162,7 @@ export function mergePedalIntervals(lists: Iterable<readonly PedalInterval[]>): 
   return out
 }
 
-// Pedal down at `t`? Binary search over the merged list — this runs on every
-// clock tick while a piece plays.
+// Pedal down at `t`? Runs on every clock tick while a piece plays.
 export function pedalDownAt(intervals: readonly PedalInterval[], t: number): boolean {
-  let lo = 0
-  let hi = intervals.length - 1
-  while (lo <= hi) {
-    const mid = (lo + hi) >>> 1
-    const iv = intervals[mid]!
-    if (t < iv.start) hi = mid - 1
-    else if (t >= iv.end) lo = mid + 1
-    else return true
-  }
-  return false
+  return intervalIndexAt(intervals, t) !== -1
 }

@@ -14,6 +14,8 @@
 //   Nothing here is for them.
 // - The walker is a plain beat-by-beat loop from each meter anchor. It is
 //   not meant to run per frame: BeatGrid walks the piece once per file.
+// - Only the walker (and `tempoAt`, for callers that need a bpm at a time)
+//   is exported. Per-time meter / beat-length lookups were removed unused.
 
 import type { MeterEntry, TempoEntry } from './types'
 
@@ -51,34 +53,15 @@ export function tempoAt(src: TempoMapSource, time: number): number {
   return bpm > 0 ? bpm : NOMINAL_BPM
 }
 
-// The meter in force at `time`. Bar counting restarts from the meter's own
-// `time` (floored at 0 for a map that starts late).
-export function meterAt(src: TempoMapSource, time: number): MeterEntry {
-  const meters = src.timeSignatures
-  if (meters.length === 0) return NOMINAL_METER
-  return meters[indexAt(meters, time)]!
-}
-
 function beatSeconds(bpm: number, denominator: number): number {
   const den = denominator > 0 ? denominator : NOMINAL_METER.denominator
   return Math.max(MIN_BEAT_SECONDS, (4 / den) * (60 / bpm))
 }
 
-// Length of one beat (in the meter's own beat unit) at `time`.
-export function secondsPerBeatAt(src: TempoMapSource, time: number): number {
-  return beatSeconds(tempoAt(src, time), meterAt(src, time).denominator)
-}
-
-// Length of the bar starting at `time`, assuming constant tempo across it.
-// Exact for the common case (tempo changes land on bar lines); the walker
-// integrates beat-by-beat when they don't.
-export function secondsPerBarAt(src: TempoMapSource, time: number): number {
-  const meter = meterAt(src, time)
-  const numerator = meter.numerator > 0 ? meter.numerator : NOMINAL_METER.numerator
-  return numerator * beatSeconds(tempoAt(src, time), meter.denominator)
-}
-
-// Return `false` to stop the walk early.
+// Return `false` to stop the walk early; a visitor that never stops needs no
+// return at all, hence `void` rather than `undefined` (callers would otherwise
+// have to write `return undefined`).
+// biome-ignore lint/suspicious/noConfusingVoidType: see above
 export type BeatVisitor = (time: number, isBar: boolean) => boolean | void
 
 // Safety net: a pathological map can't hang the caller.
@@ -116,25 +99,4 @@ export function forEachBeatLine(
       t += beatSeconds(tempoAt(src, t), meter.denominator)
     }
   }
-}
-
-export interface BeatLine {
-  time: number
-  isBar: boolean
-}
-
-export function beatLinesBetween(src: TempoMapSource, from: number, to: number): BeatLine[] {
-  const out: BeatLine[] = []
-  forEachBeatLine(src, from, to, (time, isBar) => {
-    out.push({ time, isBar })
-  })
-  return out
-}
-
-export function barBoundariesBetween(src: TempoMapSource, from: number, to: number): number[] {
-  const out: number[] = []
-  forEachBeatLine(src, from, to, (time, isBar) => {
-    if (isBar) out.push(time)
-  })
-  return out
 }

@@ -1,15 +1,21 @@
 import { Midi } from '@tonejs/midi'
 import { describe, expect, it } from 'vitest'
 import { parseMidiFile } from './parser'
-import {
-  barBoundariesBetween,
-  beatLinesBetween,
-  meterAt,
-  secondsPerBarAt,
-  secondsPerBeatAt,
-  type TempoMapSource,
-  tempoAt,
-} from './tempoMap'
+import { forEachBeatLine, type TempoMapSource, tempoAt } from './tempoMap'
+
+// Collectors over the walker, so expectations read as plain arrays.
+function beatLinesBetween(src: TempoMapSource, from: number, to: number) {
+  const out: { time: number; isBar: boolean }[] = []
+  forEachBeatLine(src, from, to, (time, isBar) => {
+    out.push({ time, isBar })
+  })
+  return out
+}
+function barBoundariesBetween(src: TempoMapSource, from: number, to: number): number[] {
+  return beatLinesBetween(src, from, to)
+    .filter((l) => l.isBar)
+    .map((l) => l.time)
+}
 
 // ── Fixture ───────────────────────────────────────────────────────────────
 
@@ -88,7 +94,7 @@ describe('parser tempo/meter maps', () => {
 
 // ── Lookups ───────────────────────────────────────────────────────────────
 
-describe('tempoAt / meterAt', () => {
+describe('tempoAt', () => {
   it('holds the previous value until the next event', () => {
     expect(tempoAt(changed, 0)).toBe(120)
     expect(tempoAt(changed, 3.999)).toBe(120)
@@ -99,34 +105,10 @@ describe('tempoAt / meterAt', () => {
   it('extends the first entry back before its own timestamp', () => {
     const late: TempoMapSource = { tempos: [{ time: 5, bpm: 90 }], timeSignatures: [] }
     expect(tempoAt(late, 0)).toBe(90)
-    expect(meterAt(late, 0)).toEqual({ time: 0, numerator: 4, denominator: 4 })
   })
 
-  it('falls back to 120 / 4-4 on empty maps', () => {
-    const empty: TempoMapSource = { tempos: [], timeSignatures: [] }
-    expect(tempoAt(empty, 12)).toBe(120)
-    expect(meterAt(empty, 12).numerator).toBe(4)
-    expect(secondsPerBarAt(empty, 12)).toBe(2)
-  })
-})
-
-describe('secondsPerBeatAt / secondsPerBarAt', () => {
-  it('is correct either side of the changes', () => {
-    expect(secondsPerBeatAt(changed, 0)).toBeCloseTo(0.5, 9)
-    expect(secondsPerBarAt(changed, 0)).toBeCloseTo(2, 9)
-    expect(secondsPerBeatAt(changed, 4)).toBeCloseTo(1, 9)
-    // 3/4 at 60 bpm → three 1 s beats.
-    expect(secondsPerBarAt(changed, 4)).toBeCloseTo(3, 9)
-  })
-
-  it('counts the meter denominator as the beat unit', () => {
-    const sixEight: TempoMapSource = {
-      tempos: [{ time: 0, bpm: 120 }],
-      timeSignatures: [{ time: 0, numerator: 6, denominator: 8 }],
-    }
-    // Quarter = 0.5 s, so an eighth is 0.25 s and a 6/8 bar is 1.5 s.
-    expect(secondsPerBeatAt(sixEight, 0)).toBeCloseTo(0.25, 9)
-    expect(secondsPerBarAt(sixEight, 0)).toBeCloseTo(1.5, 9)
+  it('falls back to 120 on an empty map', () => {
+    expect(tempoAt({ tempos: [], timeSignatures: [] }, 12)).toBe(120)
   })
 })
 
@@ -148,6 +130,27 @@ describe('beatLinesBetween', () => {
     // The pre-window skip-ahead must not shift the grid off the anchor.
     const times = beatLinesBetween(flat, 10.2, 11.2).map((l) => Number(l.time.toFixed(6)))
     expect(times).toEqual([10.5, 11])
+  })
+
+  it('falls back to 120 / 4-4 on empty maps and extends a late first meter back', () => {
+    const empty: TempoMapSource = { tempos: [], timeSignatures: [] }
+    expect(barBoundariesBetween(empty, 0, 4)).toEqual([0, 2, 4])
+    const late: TempoMapSource = {
+      tempos: [{ time: 0, bpm: 120 }],
+      timeSignatures: [{ time: 5, numerator: 3, denominator: 4 }],
+    }
+    expect(barBoundariesBetween(late, 0, 3)).toEqual([0, 1.5, 3])
+  })
+
+  it('counts the meter denominator as the beat unit', () => {
+    const sixEight: TempoMapSource = {
+      tempos: [{ time: 0, bpm: 120 }],
+      timeSignatures: [{ time: 0, numerator: 6, denominator: 8 }],
+    }
+    // Quarter = 0.5 s, so an eighth is 0.25 s and a 6/8 bar is 1.5 s.
+    const lines = beatLinesBetween(sixEight, 0, 1.5)
+    expect(lines.map((l) => l.time)).toEqual([0, 0.25, 0.5, 0.75, 1, 1.25, 1.5])
+    expect(lines.filter((l) => l.isBar).map((l) => l.time)).toEqual([0, 1.5])
   })
 
   it('emits nothing before time 0', () => {

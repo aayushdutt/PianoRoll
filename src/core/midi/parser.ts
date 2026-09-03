@@ -43,7 +43,7 @@ export class EmptyMidiError extends Error {
 export interface MidiParseStats {
   outOfRangeNotes: number // notes outside A0–C8: audible, but nothing to draw them on
   hasSustainPedal: boolean // any CC64 event, on any track
-  tempoEvents: number // >1 means the file has a tempo map we currently flatten
+  tempoEvents: number // >1 means the file carries a tempo map (the beat grid follows it)
 }
 
 export async function parseMidiFile(source: File | ArrayBuffer, name?: string): Promise<MidiFile> {
