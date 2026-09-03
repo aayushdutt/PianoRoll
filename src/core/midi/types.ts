@@ -27,6 +27,11 @@ export interface MidiFile {
   bpm: number
   timeSignature: [number, number]
   tracks: MidiTrack[]
+  // Absolute start time (seconds) of every musical measure/barline, derived
+  // from the full tempo + time-signature maps and any detected anacrusis. Index
+  // 0 is always 0. Optional because synthetic MidiFiles (live recordings, tests)
+  // don't carry real barline info — consumers fall back to a constant-length grid.
+  measureStarts?: number[]
 }
 
 // Pitch constants

@@ -160,6 +160,10 @@ export class App {
   private chordLastRunMs = 0
   private chordLastSig = ''
   private chordOverlayOn = false
+  // Chord-degree note coloring: colors falling/live notes by their chord
+  // degree relative to the current key instead of the per-track color.
+  private chordColoringOn = chordColoringStore.load()
+  private keyFifths = keyFifthsStore.load()
 
   private themeIndex = indexOfId(THEMES, themeStore.load())
   private instrumentIndex = indexOfId(INSTRUMENTS, instrumentStore.load())
@@ -498,13 +502,18 @@ export class App {
         onSelectLocale: (code) => {
           void setLocale(code).then(() => window.location.reload())
         },
+        onToggleChordColoring: () => this.toggleChordColoring(),
+        onSelectKey: (fifths) => this.setKeySignature(fifths),
       },
     )
     this.customizeMenu.setChord(this.chordOverlayOn)
+    this.customizeMenu.setChordColoring(this.chordColoringOn)
+    this.customizeMenu.setKeySignature(this.keyFifths)
 
     this.applyTheme(THEMES[this.themeIndex]!)
     this.applyInstrument()
     this.applyParticleStyle()
+    this.applyChordColoring()
 
     // Idle-time warmups. None of these affect first paint — they trade
     // background bandwidth for "feels instant" on first-click flows. All
@@ -1632,6 +1641,30 @@ export class App {
     this.chordOverlay.setVisible(this.chordOverlayOn && allowedHere)
   }
 
+  // ── Chord-degree note coloring ──────────────────────────────────────────
+  private toggleChordColoring(): void {
+    this.chordColoringOn = !this.chordColoringOn
+    this.applyChordColoring()
+    this.customizeMenu?.setChordColoring(this.chordColoringOn)
+    chordColoringStore.save(this.chordColoringOn)
+    track('chord_coloring_toggled', { on: this.chordColoringOn })
+  }
+
+  private setKeySignature(fifths: number): void {
+    if (!Number.isInteger(fifths) || fifths < -7 || fifths > 7) return
+    if (fifths === this.keyFifths) return
+    this.keyFifths = fifths
+    this.renderer.setKeySignature(fifths)
+    this.customizeMenu?.setKeySignature(fifths)
+    keyFifthsStore.save(fifths)
+    track('key_signature_changed', { fifths })
+  }
+
+  private applyChordColoring(): void {
+    this.renderer.setChordColoring(this.chordColoringOn)
+    this.renderer.setKeySignature(this.keyFifths)
+  }
+
   // Builds the active-pitch set from the right sources for the current mode,
   // detects a chord, and pushes it to the overlay. Gated on the overlay being
   // *visible* — not just the saved preference — because in play mode (where
@@ -1815,6 +1848,11 @@ const metronomeBpmStore = numberPersisted('midee.metronomeBpm', 120, 40, 240)
 // boolean store treats "no preference" as the fallback (true), and only
 // an explicit "false" turns it off.
 const chordOverlayStore = booleanPersisted('midee.chordOverlay', true)
+// Chord-degree note coloring is opt-in — the per-track palette is the default
+// look, and coloring by degree is an analytical overlay a user turns on.
+const chordColoringStore = booleanPersisted('midee.chordColoring', false)
+// Key signature as circle-of-fifths position (-7..+7), default C major (0).
+const keyFifthsStore = numberPersisted('midee.keyFifths', 0, -7, 7)
 
 // Persisted id → list index. Stores only return roster ids, so -1 is unreachable.
 function indexOfId<T extends { id: string }>(list: readonly T[], id: string): number {

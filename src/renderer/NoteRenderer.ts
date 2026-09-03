@@ -1,6 +1,11 @@
 import { Container, Graphics } from 'pixi.js'
 import { GlowFilter } from 'pixi-filters'
 import type { MidiTrack } from '../core/midi/types'
+import {
+  type MeasureColoring,
+  measureNoteColor,
+  measureRootColorAt,
+} from '../core/music/measureColoring'
 import { getTrackColor, type Theme } from './theme'
 import { type Viewport, visibleNoteRange } from './viewport'
 
@@ -17,6 +22,12 @@ export class NoteRenderer {
   private glowContainer: Container
   private glowGraphics: Graphics
   private glowFilter: GlowFilter
+
+  // When enabled, each note is colored by the fixed chord root of the measure
+  // it belongs to (see core/music/measureColoring) instead of its track color.
+  // `measureColoring` is precomputed once per file/key by PianoRollRenderer.
+  private chordColoring = false
+  private measureColoring: MeasureColoring | null = null
 
   constructor(private theme: Theme) {
     this.container = new Container()
@@ -72,6 +83,7 @@ export class NoteRenderer {
     visibleTrackIds: Set<string>,
     practiceFocusTrackIds: ReadonlySet<string> | null,
   ): void {
+    const coloring = this.chordColoring ? this.measureColoring : null
     const { noteRadius } = this.theme
     const nowLineY = viewport.nowLineY
     this.glowGraphics.clear()
@@ -92,16 +104,18 @@ export class NoteRenderer {
 
       if (!visibleTrackIds.has(track.id)) continue
 
-      const noteColor = getTrackColor(track, this.theme)
+      const trackColor = getTrackColor(track, this.theme)
       const practiceInactive =
         practiceFocusTrackIds !== null && !practiceFocusTrackIds.has(track.id)
-      const colorR = (noteColor >> 16) & 0xff
-      const colorG = (noteColor >> 8) & 0xff
-      const colorB = noteColor & 0xff
 
       const [lo, hi] = visibleNoteRange(track.notes, visStart, visEnd)
       for (let ni = lo; ni < hi; ni++) {
         const note = track.notes[ni]!
+
+        // Chord-degree coloring is per-note but *fixed*: it depends only on the
+        // pitch and the note's measure (via its onset time), so it never shifts
+        // as the playhead moves. The plain track color is per-track.
+        const noteColor = coloring ? measureNoteColor(note.pitch, note.time, coloring) : trackColor
 
         const x = viewport.pitchToX(note.pitch)
         const w = Math.max(viewport.pitchWidth(note.pitch) - 1, 2)
@@ -118,6 +132,12 @@ export class NoteRenderer {
 
         g.roundRect(x, y, w, h, noteRadius)
         g.fill({ color: noteColor, alpha })
+        // Outline each note in its measure's chord-root color. Skipped for
+        // very short notes where a 1px border would swallow the fill.
+        if (coloring && h > 3) {
+          const edgeColor = measureRootColorAt(note.time, coloring)
+          g.stroke({ color: edgeColor, width: 3, alpha: Math.min(1, alpha + 0.25) })
+        }
 
         if (
           !practiceInactive &&
@@ -126,9 +146,9 @@ export class NoteRenderer {
         ) {
           this.glowGraphics.roundRect(x, y, w, h, noteRadius)
           this.glowGraphics.fill({ color: noteColor, alpha: 0.9 })
-          sumR += colorR
-          sumG += colorG
-          sumB += colorB
+          sumR += (noteColor >> 16) & 0xff
+          sumG += (noteColor >> 8) & 0xff
+          sumB += noteColor & 0xff
           activeCount++
         }
       }
@@ -150,6 +170,14 @@ export class NoteRenderer {
     this.theme = theme
     this.glowFilter.distance = theme.noteGlowDistance
     this.glowFilter.outerStrength = theme.noteGlowStrength
+  }
+
+  setChordColoring(enabled: boolean): void {
+    this.chordColoring = enabled
+  }
+
+  setMeasureColoring(coloring: MeasureColoring | null): void {
+    this.measureColoring = coloring
   }
 
   clear(): void {

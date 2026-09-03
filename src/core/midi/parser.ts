@@ -1,3 +1,4 @@
+import { computeMeasureStarts } from './measures'
 import { type MidiFile, type MidiNote, type MidiTrack, TRACK_COLOR_SLOTS } from './types'
 
 // `@tonejs/midi` is ~25 KB gz and only used inside this module + MidiEncoding.
@@ -66,5 +67,8 @@ export async function parseMidiFile(source: File | ArrayBuffer, name?: string): 
     bpm,
     timeSignature: [num, den] as [number, number],
     tracks,
+    // Real barlines from the full tempo/meter maps (+ anacrusis) so chord
+    // coloring aligns to actual measures instead of a fixed-length grid.
+    measureStarts: computeMeasureStarts(midi),
   }
 }
