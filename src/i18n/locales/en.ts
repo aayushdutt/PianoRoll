@@ -226,6 +226,7 @@ export const en = {
   // ── Keyboard reference card (live mode) ────────────────────
   'keyHint.play': 'Play',
   'keyHint.octave': 'Octave',
+  'keyHint.shortcut.sustain': 'Sustain',
   'keyHint.shortcuts': 'Shortcuts',
   'keyHint.shortcut.record': 'Record',
   'keyHint.shortcut.loop': 'Loop',

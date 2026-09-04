@@ -194,6 +194,7 @@ const zhCN: Messages = {
 
   'keyHint.play': '弹奏',
   'keyHint.octave': '八度',
+  'keyHint.shortcut.sustain': '延音',
   'keyHint.shortcuts': '快捷键',
   'keyHint.shortcut.record': '录制',
   'keyHint.shortcut.loop': '循环',

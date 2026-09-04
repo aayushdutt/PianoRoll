@@ -31,23 +31,38 @@ describe('ComputerKeyboardInput', () => {
     expect(input.noteOn.value?.pitch).toBe(60) // C4 at the default octave
   })
 
-  describe('software sustain pedal (currently unbound)', () => {
-    // Space was the damper until Space became the transport key everywhere.
-    // Shift cannot take over: every live command letter (R L U C M P) is also a
-    // note key, which is why commands sit behind Shift in the first place.
-    // Parked rather than rebound — hardware MIDI pedals are a separate source
-    // and keep working.
-    it('is not engaged by Shift', () => {
+  describe('software sustain pedal', () => {
+    it('is Space, held down and released', () => {
+      press('Space')
+      expect(input.pedal.value).toBe(true)
+      press('Space', { repeat: true })
+      expect(input.pedal.value).toBe(true)
+      release('Space')
+      expect(input.pedal.value).toBe(false)
+    })
+
+    it('is not engaged by Shift — that is the command modifier', () => {
       press('ShiftLeft')
       expect(input.pedal.value).toBe(false)
       press('ShiftRight')
       expect(input.pedal.value).toBe(false)
     })
 
-    it('is not engaged by Space', () => {
+    it('leaves Space alone where it has a transport job', () => {
+      // Play mode: Space is play/pause. The predicate gates the press only;
+      // a release always lifts the damper so a mode switch can't strand it.
+      const gated = new ComputerKeyboardInput(clock, () => false)
+      input.disable()
+      gated.enable()
       press('Space')
-      expect(input.pedal.value).toBe(false)
-      release('Space')
+      expect(gated.pedal.value).toBe(false)
+      gated.disable()
+    })
+
+    it('lifts on disable so a mode switch never strands the damper', () => {
+      press('Space')
+      expect(input.pedal.value).toBe(true)
+      input.disable()
       expect(input.pedal.value).toBe(false)
     })
   })

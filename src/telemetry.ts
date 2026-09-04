@@ -327,10 +327,8 @@ type EventMap = {
   instrument_changed: { from: string | undefined; to: string; method: 'cycle' | 'menu' }
   // Live commands, split by how they were invoked. The Shift+letter shortcuts
   // and the HUD buttons call the same handlers, so nothing previously recorded
-  // which one people actually use — and that is the question that decides
-  // whether the Shift command layer is worth keeping (it currently blocks
-  // Shift from being the sustain pedal, since every command letter is also a
-  // note key).
+  // which one people actually use — the question that decides whether the
+  // Shift command layer is worth keeping.
   live_action: {
     action: 'record' | 'loop_toggle' | 'loop_undo' | 'loop_clear' | 'metronome'
     method: 'shortcut' | 'button'

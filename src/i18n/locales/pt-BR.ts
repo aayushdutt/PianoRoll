@@ -143,6 +143,7 @@ const ptBR: Messages = {
   // ── Keyboard reference ─────────────────────────────────────
   'keyHint.play': 'Tocar',
   'keyHint.octave': 'Oitava',
+  'keyHint.shortcut.sustain': 'Sustain',
   'keyHint.shortcuts': 'Atalhos',
   'keyHint.shortcut.record': 'Gravar',
   'keyHint.shortcut.loop': 'Loop',

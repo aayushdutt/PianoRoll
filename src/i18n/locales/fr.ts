@@ -146,6 +146,7 @@ const fr: Messages = {
   // ── Keyboard reference ─────────────────────────────────────
   'keyHint.play': 'Jouer',
   'keyHint.octave': 'Octave',
+  'keyHint.shortcut.sustain': 'Sustain',
   'keyHint.shortcuts': 'Raccourcis',
   'keyHint.shortcut.record': 'Enreg.',
   'keyHint.shortcut.loop': 'Boucle',

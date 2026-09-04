@@ -254,7 +254,12 @@ export class App {
     this.renderer.setLoopNoteStore(this.loopNotes)
 
     this.midiInput = new MidiInputManager(this.clock)
-    this.keyboardInput = new ComputerKeyboardInput(this.clock)
+    // Space is the sustain pedal only in Live; Play and Learn own it as the
+    // transport / exercise key.
+    this.keyboardInput = new ComputerKeyboardInput(
+      this.clock,
+      () => this.store.state.mode === 'live',
+    )
 
     this.liveLooper = new LiveLooper(
       this.clock,

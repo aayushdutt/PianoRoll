@@ -754,6 +754,10 @@ export function KeyHintView(props: KeyHintProps) {
           <span class="kh-label">{t('keyHint.shortcuts')}</span>
           <div class="kh-shortcuts">
             <span class="kh-combo">
+              <kbd>Space</kbd>
+              <span>{t('keyHint.shortcut.sustain')}</span>
+            </span>
+            <span class="kh-combo">
               <kbd>Tab</kbd>
               <span>{t('keyHint.shortcut.record')}</span>
             </span>

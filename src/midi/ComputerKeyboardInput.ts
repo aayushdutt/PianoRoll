@@ -53,27 +53,21 @@ export class ComputerKeyboardInput {
   readonly noteOn = createEventSignal<MidiNoteEvent | null>(null)
   readonly noteOff = createEventSignal<MidiNoteEvent | null>(null)
   readonly octave = createEventSignal<number>(DEFAULT_OCTAVE)
-  // Software sustain pedal — currently UNBOUND, see below. Kept as a signal so
-  // the App wiring (and the MIDI-device pedal merged with it in
-  // LivePerformanceBus) is untouched: players with hardware pedals are
-  // unaffected by this.
-  //
-  // Space used to be the damper, but Space is now the transport key in every
-  // mode. The obvious replacement, Shift, cannot work: every command letter in
-  // live mode (R L U C M P) is ALSO a note key, which is exactly why commands
-  // live behind Shift — so Shift is structurally the command modifier and
-  // cannot simultaneously be a pedal you hold while playing. Cmd/Ctrl/Alt are
-  // owned by the browser un-preventably (Cmd+W, Ctrl+R). Parked until usage
-  // data says whether the Shift command layer is worth keeping; if it is not,
-  // Shift becomes the pedal, and if it is, the pedal moves to right-Shift with
-  // the command layer on left-Shift.
+  // Software sustain pedal: hold Space. Only where Space has no transport job
+  // (`pedalKeyActive`, Live mode) — in Play it is play/pause and Learn's
+  // exercises use it too. Shift can't be the pedal: every Live command letter
+  // (R L U C M P) is also a note key, so Shift is the command modifier.
+  // Merged with a MIDI-device pedal in LivePerformanceBus.
   readonly pedal = createEventSignal<boolean>(false)
 
   private active = false
   private held = new Map<string, number>() // code → pitch (for correct release after octave change)
   private pedalHeld = false
 
-  constructor(private readonly clock: MasterClock) {}
+  constructor(
+    private readonly clock: MasterClock,
+    private readonly pedalKeyActive: () => boolean = () => true,
+  ) {}
 
   enable(): void {
     if (this.active) return
@@ -125,6 +119,14 @@ export class ComputerKeyboardInput {
       this.shiftOctaveUp()
       return
     }
+    if (e.code === 'Space' && this.pedalKeyActive()) {
+      e.preventDefault()
+      if (!this.pedalHeld) {
+        this.pedalHeld = true
+        this.pedal.set(true)
+      }
+      return
+    }
 
     const offset = NOTE_MAP[e.code]
     if (offset === undefined) return
@@ -141,6 +143,13 @@ export class ComputerKeyboardInput {
   }
 
   private onKeyUp = (e: KeyboardEvent): void => {
+    // Released regardless of the mode predicate, so a mode switch mid-hold
+    // can't leave the damper down.
+    if (e.code === 'Space' && this.pedalHeld) {
+      this.pedalHeld = false
+      this.pedal.set(false)
+      return
+    }
     const pitch = this.held.get(e.code)
     if (pitch === undefined) return
     this.held.delete(e.code)

@@ -143,6 +143,7 @@ const es: Messages = {
   // ── Keyboard reference ─────────────────────────────────────
   'keyHint.play': 'Tocar',
   'keyHint.octave': 'Octava',
+  'keyHint.shortcut.sustain': 'Sustain',
   'keyHint.shortcuts': 'Atajos',
   'keyHint.shortcut.record': 'Grabar',
   'keyHint.shortcut.loop': 'Bucle',

@@ -202,6 +202,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
 
   'keyHint.play': 'Graj',
   'keyHint.octave': 'Oktawa',
+  'keyHint.shortcut.sustain': 'Sustain',
   'keyHint.shortcuts': 'Skróty',
   'keyHint.shortcut.record': 'Nagrywaj',
   'keyHint.shortcut.loop': 'Pętla',
