@@ -5,7 +5,7 @@ import './styles/main.css'
 // fonts.googleapis.com + fonts.gstatic.com, this saves the cross-origin
 // DNS+TLS chain Lighthouse measures as ~360 ms render-blocking on first
 // load. The bundled `latin-` subsets cover the Latin-script locales we ship;
-// `zh-CN` falls back to system CJK fonts via CSS.
+// `zh-CN` and `ja` fall back to system CJK fonts via CSS.
 import '@fontsource/inter/latin-400.css'
 import '@fontsource/inter/latin-500.css'
 import '@fontsource/inter/latin-600.css'

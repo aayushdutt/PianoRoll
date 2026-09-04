@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { watch } from '../store/watch'
 import { formatNumber, locale, resolveLocale, setLocale, t, tn } from './index'
 import { en } from './locales/en'
+import ja from './locales/ja'
 import pl from './locales/pl'
 import zhCN from './locales/zh-CN'
 
@@ -142,6 +143,23 @@ describe('zh-CN locale', () => {
     await setLocale('zh-CN')
     expect(tn('tracks.notes', 1, { channel: 3 })).toBe(
       zhCN['tracks.notes.other'].replace('{channel}', '3').replace('{count}', '1'),
+    )
+  })
+})
+
+describe('ja locale', () => {
+  it('dynamically loads the chunk and serves translated strings', async () => {
+    await setLocale('ja')
+    expect(locale.value).toBe('ja')
+    expect(t('home.cta.openMidi')).toBe(ja['home.cta.openMidi'])
+    expect(t('home.cta.openMidi')).not.toBe(en['home.cta.openMidi'])
+  })
+
+  it('uses the .other plural form for every count (Japanese has no singular)', async () => {
+    // Intl.PluralRules('ja') only ever returns "other" — same shape as zh-CN.
+    await setLocale('ja')
+    expect(tn('tracks.notes', 1, { channel: 3 })).toBe(
+      ja['tracks.notes.other'].replace('{channel}', '3').replace('{count}', '1'),
     )
   })
 })
