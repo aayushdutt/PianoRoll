@@ -24,6 +24,8 @@ It is built for the skill that falling-note visualizers do not fully teach: read
 
 The exercise starts simple and keeps the feedback immediate: correct notes count as hits, wrong notes count as misses, and weak notes can be practiced again.
 
+{{cta:Try the sight-reading trainer|Free, in your browser, works with any MIDI keyboard.}}
+
 ## Why sight reading needs a different trainer
 
 Falling notes are great for visual imitation. Staff reading is different. You need to connect a note on the staff to a piano key without waiting for the note to fall onto the keyboard.

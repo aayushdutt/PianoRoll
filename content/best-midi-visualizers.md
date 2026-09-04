@@ -24,6 +24,8 @@ This guide compares the common options honestly so you can pick the right tool i
 | Use a simple classic web piano roll | MIDIano |
 | Edit or compose MIDI | A DAW or MIDI editor |
 
+{{cta:Try the browser option|midee is the free, no-install pick on this list. Drop in a MIDI file and judge it yourself.}}
+
 ## What to look for in a MIDI visualizer
 
 Before comparing tools, decide what matters:

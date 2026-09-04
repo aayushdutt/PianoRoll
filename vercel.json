@@ -1,0 +1,14 @@
+{
+  "redirects": [
+    {
+      "source": "/no-upload-midi-visualizer",
+      "destination": "/midi-visualizer/",
+      "permanent": true
+    },
+    {
+      "source": "/no-upload-midi-visualizer/",
+      "destination": "/midi-visualizer/",
+      "permanent": true
+    }
+  ]
+}

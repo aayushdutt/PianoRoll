@@ -1,9 +1,9 @@
 ---
-title: midee vs Synthesia: honest comparison
-description: Compare Synthesia and midee for MIDI playback, falling notes, wait-mode practice, live MIDI, looping, sight reading, and MP4 export.
+title: Synthesia vs midee: Free Browser Alternative Compared (2026)
+description: Synthesia costs money and needs an install. midee is free and runs in the browser. Compare falling notes, wait-mode practice, live MIDI, looping, and MP4 export.
 path: /vs/synthesia/
 type: page
-modified: 2026-05-07
+modified: 2026-09-05
 ---
 
 # midee vs Synthesia: honest comparison
@@ -23,7 +23,7 @@ This page is a genuine comparison, not a hatchet job - Synthesia is the right ch
 | --- | --- | --- |
 | Platform | Windows, macOS, iOS, Android | Any browser (Chrome, Safari, Firefox) |
 | Cost | Free built-in songs; paid desktop unlock for custom MIDIs | **Free, forever** |
-| Open source | No | Yes, MIT license |
+| Open source | No | Yes |
 | Install required | Yes | No - just visit the URL |
 | Primary focus | Learning to play the piano | Browser MIDI playback, live play, learning, looping, and export |
 | Falling-notes display | Yes | Yes |
@@ -36,6 +36,8 @@ This page is a genuine comparison, not a hatchet job - Synthesia is the right ch
 | Themes / visual styles | A few built-in | Five themes + cycleable particle styles |
 | Watermark on output | N/A (no export) | No watermark, ever |
 | Your MIDI files leave your device? | No | No |
+
+{{cta:Try midee free|No install, no account. See whether it covers what you use Synthesia for.}}
 
 ## Where Synthesia wins
 
@@ -56,7 +58,7 @@ midee didn't start as a Synthesia clone - it started because there was no browse
 - **Built-in MP4 export.** This is the thing Synthesia doesn't do. Hit record inside midee and you get a frame-accurate 1080p MP4 with audio baked in. 720p, 1080p, vertical for TikTok and Reels, square, or native resolution. Rendered locally in your browser via WebCodecs - no server, no upload.
 - **Beautiful out of the box.** Five themes (Dark, Midnight, Neon, Sunset, Ocean), sampled piano plus multiple synth and acoustic voices, and a rotating roster of particle styles. Your picks persist across reloads.
 - **Learn mode.** Drop a MIDI into play-along practice, turn on wait mode, slow it down, focus hands, loop hard sections, and track accuracy. Learn also includes sight reading and interval training.
-- **Free and open source.** MIT-licensed. No paywall, no unlock code for custom MIDIs. The [source code is on GitHub](https://github.com/aayushdutt/midee) and PRs are welcome.
+- **Free and open source.** No paywall, no unlock code for custom MIDIs. The [source code is on GitHub](https://github.com/aayushdutt/midee) and PRs are welcome.
 - **Live mode + loop station.** Plug in a MIDI keyboard (Web MIDI) or use your laptop keyboard. Loop a phrase bar-snapped to the metronome. Record a session and export to `.mid` or straight to video.
 - **Fully client-side.** Your MIDI file and the rendered video never leave your browser. There's no server to store, mine, or leak them.
 
@@ -83,7 +85,7 @@ The two tools don't cancel each other out - plenty of piano learners use Synthes
 ## Common questions
 
 **Is midee really free, or free-with-upsell?**
-Really free. MIT licensed. There's no paid tier, no custom-song unlock, no export watermark. No account required.
+Really free. There's no paid tier, no custom-song unlock, no export watermark. No account required.
 
 **Can I use the MIDI files I bought for Synthesia?**
 Yes. midee reads any standard `.mid` or `.midi` file. Drag it into the browser window.

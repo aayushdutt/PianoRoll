@@ -27,7 +27,9 @@ If you found sightread.dev, you are probably looking for a browser-based way to 
 | Session recording / MIDI save | Not the main focus | Yes |
 | MIDI file playback | Not the main focus | Yes |
 | MP4 piano-roll export | No | Yes |
-| Open source | Public open-source codebase | Yes, MIT |
+| Open source | Public open-source codebase | Yes |
+
+{{cta:Try midee's Learn mode|Free, in your browser. Wait-mode practice and sight reading with your own MIDI files.}}
 
 ## Where sightread.dev fits
 

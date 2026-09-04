@@ -24,6 +24,8 @@ This is the most Synthesia-like part of midee: falling notes, live input, practi
 
 The goal is simple: the music waits for you, so you can practice the right notes before worrying about full-speed timing.
 
+{{cta:Start practising|Drop in any MIDI file, connect a keyboard, turn on wait mode. Free, no account.}}
+
 ## What wait mode does
 
 Wait mode pauses at each target chord. midee listens for your input and only moves forward when the expected notes are played.

@@ -21,7 +21,7 @@ SeeMusic is one of the best-known MIDI visualizers among music educators and ser
 | --- | --- | --- |
 | Platform | Windows, macOS (native) | Any modern browser |
 | Cost | Paid tiers / paid export features | **Free, forever** |
-| Open source | No | Yes, MIT license |
+| Open source | No | Yes |
 | Install required | Yes, ~500 MB | No |
 | MP4 export | Yes (watermarked on free tier) | **Yes, never watermarked** |
 | Vertical aspect (TikTok / Reels) | Paid tier | **Free** |
@@ -31,6 +31,8 @@ SeeMusic is one of the best-known MIDI visualizers among music educators and ser
 | Visual themes | Yes, extensive | Yes, five themes + particle styles |
 | Runs on Linux / Chromebook | No | Yes |
 | Your files leave your device? | Depends on tier | No - fully client-side |
+
+{{cta:Try the free browser option|No download, no licence. Drop in a MIDI file and export an MP4 without a watermark.}}
 
 ## Where SeeMusic wins
 
@@ -48,7 +50,7 @@ If you're a teacher making polished demonstration videos daily or a full-time mu
 midee is the browser-first, design-forward, open-source option for everyone who doesn't need the full SeeMusic kit.
 
 - **No install, no license key.** Open [midee.app](/), drag in a `.mid`, and you're rendering. Works on Chromebooks, locked-down work laptops, Linux - anywhere SeeMusic doesn't run.
-- **No watermark, ever.** midee's MP4 export is clean on the free tier because there *is* no paid tier. MIT-licensed.
+- **No watermark, ever.** midee's MP4 export is clean on the free tier because there *is* no paid tier.
 - **Fully client-side.** Your MIDI file and the rendered video never leave your browser.
 - **Vertical export out of the box.** TikTok/Reels 9:16, square 1:1, 1080p, 720p, or native aspect ratio - all free, all built-in.
 - **Loop station + live play.** Jam with a MIDI controller, loop a phrase bar-snapped to the metronome, layer takes, record sessions. This is the one category where midee does something SeeMusic doesn't.
@@ -79,7 +81,7 @@ For most use cases, yes. midee renders at 60fps with baked-in audio, frame-accur
 Only on first load. Once the app is cached, MIDI playback and video export work offline.
 
 **Will midee eventually charge?**
-No plans to. The project is MIT-licensed, indie, and built because existing options demanded money, uploads, or installs. If features land that need server costs (hosted galleries, collaborative features), those will be opt-in and priced separately, and the core visualizer + export will stay free.
+No plans to. The project is open source, indie, and built because existing options demanded money, uploads, or installs. If features land that need server costs (hosted galleries, collaborative features), those will be opt-in and priced separately, and the core visualizer + export will stay free.
 
 **Can I install midee as a desktop app?**
 Yes - modern browsers let you "Install" a web app from the URL bar. It runs in its own window, pinnable in the dock. midee ships a web manifest so this works cleanly.

@@ -1,9 +1,9 @@
 ---
-title: Free Synthesia alternative in your browser
-description: A free browser-based Synthesia alternative for playing MIDI files, practicing with wait mode, live MIDI controller play, looping, recording, and MP4 export.
+title: Free Synthesia Alternative: Piano Practice in Your Browser (2026)
+description: A free Synthesia alternative with no install. Play MIDI files with falling notes, practice with wait mode, plug in a MIDI keyboard, loop sections, and export MP4.
 path: /synthesia-alternative/
 type: page
-modified: 2026-05-07
+modified: 2026-09-05
 ---
 
 # Free Synthesia alternative in your browser
@@ -40,7 +40,9 @@ midee is strongest when you want the browser version of that idea: instant, visu
 | Loop station | No | Yes |
 | Session recording to MIDI | No | Yes |
 | MP4 export | No built-in export | Yes, built in |
-| Open source | No | Yes, MIT |
+| Open source | No | Yes |
+
+{{cta:Try the free alternative|No install, no account. Drop in a MIDI file and start practising in your browser.}}
 
 ## The hero difference: live mode
 

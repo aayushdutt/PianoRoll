@@ -25,6 +25,8 @@ It is designed for the moment before a DAW: when you want to catch a musical ide
 
 The workflow is intentionally close to a one-button hardware looper: arm, play, loop, overdub, repeat.
 
+{{cta:Open the loop station|Free, in your browser. Record a loop from your MIDI keyboard in under a minute.}}
+
 ## What makes it different from a normal MIDI recorder?
 
 A normal recorder captures a linear take. A loop station turns the first phrase into a repeating canvas. That makes it better for:

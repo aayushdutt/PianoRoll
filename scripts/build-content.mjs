@@ -78,7 +78,7 @@ function buildJsonLd({ data, html }) {
     headline: data.title,
     description: data.description,
     url: `${SITE}${data.path}`,
-    image: `${SITE}/og.png`,
+    image: data.ogImage || `${SITE}/og.png`,
     author: { '@type': 'Person', name: 'Aayush Dutt' },
     publisher: {
       '@type': 'Organization',
@@ -173,6 +173,80 @@ function appHref(path, position) {
   return `/?${params.toString()}`
 }
 
+// Mid-article CTA shortcode. Authors drop `{{cta}}` on its own line, or
+// `{{cta:Button label|Supporting sentence}}` to override the copy. Placed
+// after the how-to steps so readers with intent don't have to scroll to
+// the end-of-page card. Quieter styling than `.page-cta` (see content.css).
+// utm_content=cta_mid so PostHog can compare it against cta_end.
+function midCta(path, args) {
+  // `args` is captured from marked's output, so it is already HTML-escaped
+  // (apostrophes arrive as &#39;). Don't escape again.
+  const [label, blurb] = (args || '').split('|').map((s) => s.trim())
+  const text = blurb || 'Free, no upload, no account. Drop in a MIDI and go.'
+  const button = label || 'Open midee'
+  return `<aside class="page-cta page-cta--mid">
+  <p>${text}</p>
+  <a class="cta-button" href="${appHref(path, 'cta_mid')}">${button} →</a>
+</aside>`
+}
+
+// Display order for guide links (blog index "more guides" + the footer nav
+// on every page). Pages not listed here sort last, alphabetically by path.
+const GUIDE_ORDER = [
+  '/online-midi-player/',
+  '/midi-visualizer/',
+  '/midi-converter/',
+  '/midi-to-mp4/',
+  '/midi-to-mp3/',
+  '/midi-to-wav/',
+  '/piano-roll-video-maker/',
+  '/synthesia-alternative/',
+  '/play-along-piano/',
+  '/sight-reading-trainer/',
+  '/live-midi-keyboard/',
+  '/midi-loop-station/',
+  '/best-midi-visualizers/',
+  '/vs/synthesia/',
+  '/vs/seemusic/',
+  '/vs/midi2vidi/',
+  '/vs/sightread-dev/',
+]
+const guideRank = new Map(GUIDE_ORDER.map((path, idx) => [path, idx]))
+const byGuideOrder = (a, b) =>
+  (guideRank.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (guideRank.get(b.path) ?? Number.MAX_SAFE_INTEGER) ||
+  a.path.localeCompare(b.path)
+
+// Set in the main flow before any render() call.
+let allPages = []
+
+// Sitewide footer nav linking every guide, comparison, and post. Exists so
+// each content page has ~20 internal inbound links instead of 2–3; Search
+// Console showed most pages "discovered, not crawled" with the sparse graph.
+// The current page is rendered as plain text so it doesn't self-link.
+// Short form of a page title for nav labels and OG banners: explicit
+// `navTitle` frontmatter, else the SEO title with its subtitle and year
+// stripped ("MIDI to MP3: Free… (2026)" → "MIDI to MP3").
+const shortTitle = (p) =>
+  p.navTitle || p.title.split(/:| [-–—] /)[0].replace(/\s*\(\d{4}\)\s*$/, '').trim()
+
+// /vs/synthesia/ → vs-synthesia; used for dist/og/<slug>.png.
+const ogSlug = (path) => path.replace(/^\/+|\/+$/g, '').replace(/\//g, '-')
+const ogImageFor = (path) => `${SITE}/og/${ogSlug(path)}.png`
+
+function guidesFooter(currentPath) {
+  const label = shortTitle
+  const item = (p) =>
+    p.path === currentPath
+      ? `<li><span aria-current="page">${escapeHtml(label(p))}</span></li>`
+      : `<li><a href="${p.path}">${escapeHtml(label(p))}</a></li>`
+  const group = (heading, pages) =>
+    pages.length === 0 ? '' : `<div><h2>${heading}</h2><ul>${pages.map(item).join('')}</ul></div>`
+  const guides = allPages.filter((p) => p.type === 'page' && !p.path.startsWith('/vs/')).sort(byGuideOrder)
+  const compare = allPages.filter((p) => p.type === 'page' && p.path.startsWith('/vs/')).sort(byGuideOrder)
+  const posts = allPages.filter((p) => p.type === 'post').sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  return `<nav class="footer-guides" aria-label="More from midee">${group('Guides', guides)}${group('Comparisons', compare)}${group('Blog', posts)}</nav>`
+}
+
 function render(mdPath) {
   const raw = readFileSync(mdPath, 'utf8')
   const { data, content } = parseFrontmatter(raw)
@@ -186,8 +260,10 @@ function render(mdPath) {
   // attach UTMs in every post. Scoped to <a …> so future markdown features
   // that emit other href="/" values (e.g. canonical <link>) aren't caught.
   // utm_content=inline distinguishes these from brand/nav/cta_end positions.
+  data.ogImage = ogImageFor(data.path)
   const html = marked.parse(content)
     .replace(/<a href="\/"/g, `<a href="${appHref(data.path, 'inline')}"`)
+    .replace(/<p>\{\{cta(?::([^}]*))?\}\}<\/p>/g, (_, args) => midCta(data.path, args))
   const jsonLd = buildJsonLd({ data, html })
   const breadcrumbJsonLd = buildBreadcrumbJsonLd({ data })
   const ogType = data.type === 'post' ? 'article' : 'website'
@@ -205,6 +281,8 @@ function render(mdPath) {
     .replaceAll('{{appHrefBrand}}', appHref(data.path, 'brand'))
     .replaceAll('{{appHrefNav}}',   appHref(data.path, 'nav'))
     .replaceAll('{{appHrefCta}}',   appHref(data.path, 'cta_end'))
+    .replaceAll('{{guides}}', guidesFooter(data.path))
+    .replaceAll('{{ogImage}}', data.ogImage)
     .replaceAll('{{posthogSnippet}}', posthogSnippet)
     .replaceAll('{{fontPreload}}', fontPreload)
     .replaceAll('{{fontFaces}}', fontFaces)
@@ -229,30 +307,9 @@ function writeBlogIndex(results) {
     return `<li><a href="${p.path}">${escapeHtml(p.title)}</a><br/><span class="post-meta-inline">${pretty}</span><p>${escapeHtml(p.description)}</p></li>`
   }).join('\n')
 
-  const guideOrder = [
-    '/online-midi-player/',
-    '/midi-visualizer/',
-    '/midi-to-mp4/',
-    '/piano-roll-video-maker/',
-    '/synthesia-alternative/',
-    '/play-along-piano/',
-    '/sight-reading-trainer/',
-    '/live-midi-keyboard/',
-    '/midi-loop-station/',
-    '/best-midi-visualizers/',
-    '/no-upload-midi-visualizer/',
-    '/vs/synthesia/',
-    '/vs/seemusic/',
-    '/vs/sightread-dev/',
-  ]
-
-  const guideRank = new Map(guideOrder.map((path, idx) => [path, idx]))
   const guideLinks = results
     .filter(p => p.type === 'page')
-    .sort((a, b) =>
-      (guideRank.get(a.path) ?? Number.MAX_SAFE_INTEGER) -
-      (guideRank.get(b.path) ?? Number.MAX_SAFE_INTEGER)
-    )
+    .sort(byGuideOrder)
     .map(p => [p.path, p.title])
 
   const guidesHtml = guideLinks
@@ -292,6 +349,8 @@ function writeBlogIndex(results) {
     .replaceAll('{{breadcrumbJsonLd}}', breadcrumb)
     .replaceAll('{{meta}}', '')
     .replaceAll('{{content}}', body)
+    .replaceAll('{{guides}}', guidesFooter(indexData.path))
+    .replaceAll('{{ogImage}}', `${SITE}/og.png`)
     .replaceAll('{{appHrefBrand}}', appHref(indexData.path, 'brand'))
     .replaceAll('{{appHrefNav}}',   appHref(indexData.path, 'nav'))
     .replaceAll('{{appHrefCta}}',   appHref(indexData.path, 'cta_end'))
@@ -347,6 +406,10 @@ ${items}
 
 // MAIN
 const files = walkMd(contentDir)
+// Pre-parse every page's frontmatter so each rendered page can carry the
+// sitewide guides footer (see guidesFooter). Two passes over small files is
+// cheaper than threading a dependency order through render().
+allPages = files.map((f) => parseFrontmatter(readFileSync(f, 'utf8')).data)
 const results = []
 for (const f of files) {
   const result = render(f)
@@ -355,4 +418,18 @@ for (const f of files) {
 }
 const posts = writeBlogIndex(results)
 writeRssFeed(posts)
+// Manifest for build-og.mjs (runs next in postbuild): one banner per page.
+writeFileSync(
+  resolve(distDir, 'og-pages.json'),
+  JSON.stringify(
+    results.map((p) => ({
+      slug: ogSlug(p.path),
+      label: p.type === 'post' ? 'Blog' : p.path.startsWith('/vs/') ? 'Comparison' : 'Guide',
+      title: p.ogTitle || shortTitle(p),
+      description: p.ogDescription || p.description,
+    })),
+    null,
+    2,
+  ),
+)
 console.log(`[build-content] ${results.length} pages + blog index + rss`)

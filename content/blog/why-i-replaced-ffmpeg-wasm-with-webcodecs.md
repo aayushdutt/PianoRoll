@@ -134,6 +134,8 @@ const blob = new Blob([target.buffer!], { type: 'video/mp4' })
 
 That's the whole export - ~40 lines. The ffmpeg-based version was closer to 200.
 
+{{cta:See the export in action|Drop a MIDI into midee and export an MP4 from your browser. Free, no upload.}}
+
 ## Sharp edges I ran into
 
 ### VideoFrame lifetime

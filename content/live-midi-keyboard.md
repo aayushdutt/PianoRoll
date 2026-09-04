@@ -23,6 +23,8 @@ You do not need a DAW just to jam, sketch a phrase, or make something beautiful 
 
 No MIDI controller nearby? Your computer keyboard and mouse can play notes too.
 
+{{cta:Play your keyboard in the browser|Plug in, open midee, switch to Live. No install, no account.}}
+
 ## What live mode is for
 
 Live mode is the performance side of midee. Instead of loading a MIDI file first, you play the notes yourself and midee visualizes them as they happen.

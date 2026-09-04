@@ -20,6 +20,8 @@ Everything I know about using a MIDI keyboard with a browser-based music app in 
 
 If that works on the first try, you're done. The rest of this post is for when it doesn't, or when you want to understand what's actually happening.
 
+{{cta:Try it with your keyboard|Plug in a MIDI keyboard, open midee, switch to Live. Nothing to install.}}
+
 ## What "Web MIDI" actually means
 
 Web MIDI is a standard API - [MDN: Web MIDI API](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API) - that lets a webpage request access to connected MIDI devices through the browser. The code looks roughly like this:

@@ -22,6 +22,8 @@ It is built for the small, common moment: you found a MIDI file, downloaded an a
 
 No upload is required. The MIDI file is parsed and played locally in the browser.
 
+{{cta:Play a MIDI file|Free, no account. Drop in a .mid and press play.}}
+
 ## Why use an online MIDI player?
 
 MIDI is not audio. A `.mid` file is a compact set of note events, timing, tracks, velocities, and instrument hints. That makes it useful for music software, but awkward for casual listening. Some systems play it with dated built-in sounds. Some do not preview it at all.
@@ -95,7 +97,7 @@ Yes on desktop, as long as the tab stays open. Mobile browsers may pause backgro
 It plays audio and shows notes. You can listen while watching the piano-roll visualization.
 
 **Can I export what I am hearing?**
-Yes. Use the export control to create an MP4 piano-roll video with audio. For details, see [MIDI to MP4](/midi-to-mp4/).
+Yes. Use the export control to create an MP4 piano-roll video with audio, or an audio-only [MP3](/midi-to-mp3/) or [WAV](/midi-to-wav/). For details, see [MIDI to MP4](/midi-to-mp4/) or the [MIDI converter](/midi-converter/) overview.
 
 **Can I play a MIDI keyboard too?**
 Yes. midee supports live play through Web MIDI controllers and a computer keyboard. See the [browser MIDI keyboard guide](/blog/playing-your-midi-keyboard-in-the-browser/).

@@ -24,6 +24,8 @@ If you have ever seen a video where piano notes fall toward a keyboard in sync w
 
 For the file-format details, see [MIDI to MP4](/midi-to-mp4/).
 
+{{cta:Make a piano roll video|Free, no watermark, rendered in your browser. Drop in a .mid and click Export.}}
+
 ## What makes a good piano-roll video?
 
 A good piano-roll video is easy to read, pleasant to watch, and synced tightly enough that the notes feel attached to the sound. You do not need a huge editing workflow. You need the basics done well:

@@ -208,6 +208,36 @@ a:hover { text-decoration: underline; }
   margin: 0 0 1.25rem;
 }
 
+/* Mid-article variant: a quieter row, left-aligned, sized like body copy
+   so it reads as a nudge rather than a second footer. */
+.page-cta--mid {
+  margin: 2.5rem 0;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+.page-cta--mid p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.page-cta--mid .cta-button {
+  flex-shrink: 0;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  box-shadow: none;
+}
+@media (max-width: 560px) {
+  .page-cta--mid {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 .cta-button {
   display: inline-block;
   background: var(--accent);
@@ -222,6 +252,43 @@ a:hover { text-decoration: underline; }
   text-decoration: none;
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(249, 115, 22, 0.28);
+}
+
+/* Sitewide guide links, injected by scripts/build-content.mjs → guidesFooter. */
+.footer-guides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem 2rem;
+  text-align: left;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+.footer-guides h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 0 0.6rem;
+}
+.footer-guides ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.footer-guides li {
+  margin: 0 0 0.35rem;
+  line-height: 1.4;
+}
+.footer-guides a {
+  color: var(--text-soft);
+}
+.footer-guides a:hover {
+  color: var(--accent);
+}
+.footer-guides [aria-current] {
+  color: var(--text-dim);
 }
 
 .page-footer {
