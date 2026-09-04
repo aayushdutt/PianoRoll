@@ -17,12 +17,20 @@ import '@fontsource/jetbrains-mono/latin-500.css'
 import '@fontsource/jetbrains-mono/latin-600.css'
 import { render } from 'solid-js/web'
 import { AppRoot } from './AppRoot'
+import { justReloadedForStaleChunk, reloadForStaleChunk } from './core/staleChunk'
 import { createApp } from './createApp'
 import { env } from './env'
 import { currentLocaleNativeName, initI18n, shouldShowLocaleHint, t } from './i18n'
 import { AppCtx } from './store/AppCtx'
 import { loadPostHog, registerAnalyticsContext } from './telemetry'
+import { showToast } from './ui/Toast'
 import { whenIdle } from './whenIdle'
+
+// Vite fires this when a dynamic import's chunk (or its preloaded deps) fails
+// to fetch — typically a tab that outlived a deploy. See core/staleChunk.ts.
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForStaleChunk(event.payload)) event.preventDefault()
+})
 
 // Both analytics SDKs are loaded on idle so they don't sit in the initial
 // bundle. PostHog alone is ~70 KB gz with autocapture / session_recording /
@@ -70,6 +78,7 @@ async function boot(): Promise<void> {
   // Subtle one-time onboarding for users whose browser language was
   // auto-detected to a non-English locale.
   if (shouldShowLocaleHint()) showLocaleHint()
+  if (justReloadedForStaleChunk()) showToast(t('toast.updated'), 'toast toast--success', 2500)
 
   // Bench runner is a build-time opt-in. `npm run bench` sets
   // VITE_ENABLE_BENCH=1; public prod builds don't, so Vite constant-folds the

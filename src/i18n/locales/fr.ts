@@ -475,6 +475,7 @@ const fr: Messages = {
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty':
     'Rien d’enregistré - jouez quelques notes pendant que Record est activé.',
+  'toast.updated': 'Mis à jour vers la dernière version',
 
   'onboarding.localeDetected': 'Affichage en {language} · changez dans Apparence',
 }

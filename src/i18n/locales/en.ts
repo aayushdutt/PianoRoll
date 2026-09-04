@@ -501,6 +501,7 @@ export const en = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nothing recorded - play a few notes while Record is on.',
+  'toast.updated': 'Updated to the latest version',
 
   // ── Onboarding ─────────────────────────────────────────────
   // Shown once on first visit if a non-English locale was auto-detected,

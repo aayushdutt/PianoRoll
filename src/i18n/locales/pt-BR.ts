@@ -469,6 +469,7 @@ const ptBR: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nada gravado - toque algumas notas com o Gravar ativo.',
+  'toast.updated': 'Atualizado para a versão mais recente',
 
   'onboarding.localeDetected': 'Mostrando em {language} · troque em Aparência',
 }

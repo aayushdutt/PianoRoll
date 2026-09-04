@@ -462,6 +462,7 @@ const pl: Messages & Record<PolishPluralKey, string> = {
   'toast.session.saved': 'midee-session.mid · {seconds} s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nic nie nagrano - zagraj kilka nut przy włączonym nagrywaniu.',
+  'toast.updated': 'Zaktualizowano do najnowszej wersji',
 
   'onboarding.localeDetected': 'Język interfejsu: {language} · zmień w sekcji Wygląd',
 }

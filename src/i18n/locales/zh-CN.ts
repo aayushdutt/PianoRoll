@@ -441,6 +441,7 @@ const zhCN: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': '还没有录到内容，请在录制开启时弹几个音符。',
+  'toast.updated': '已更新到最新版本',
 
   'onboarding.localeDetected': '当前显示为 {language} · 可在“外观”中切换',
 }

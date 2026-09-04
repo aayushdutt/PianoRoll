@@ -1,3 +1,5 @@
+import { reloadForStaleChunk } from './staleChunk'
+
 export interface LazyHandle<T> {
   /** Returns the cached value, or triggers the loader on first call. Memoised and
    *  race-safe: concurrent calls attach to the same Promise. A rejection clears
@@ -30,6 +32,9 @@ export function lazyHandle<T>(loader: () => Promise<T>): LazyHandle<T> {
             // the current in-flight promise (concurrent get() calls all share
             // the same rejection — no hazard of partial retry).
             loadPromise = null
+            // A retry can't help when the chunk no longer exists on the
+            // server (tab outlived a deploy) — reload to pick up the new build.
+            reloadForStaleChunk(err)
             throw err
           })
       }

@@ -449,6 +449,7 @@ const ja: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': '何も録音されていません。録音をオンにして音を弾いてみてください。',
+  'toast.updated': '最新バージョンに更新しました',
 
   'onboarding.localeDetected': '{language} で表示中 · 「外観」で変更できます',
 }

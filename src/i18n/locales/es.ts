@@ -470,6 +470,7 @@ const es: Messages = {
   'toast.session.saved': 'midee-session.mid · {seconds}s',
   'toast.loop.saved': 'midee-loop.mid',
   'toast.recording.empty': 'Nada grabado - toca algunas notas mientras Grabar está activo.',
+  'toast.updated': 'Actualizado a la última versión',
 
   'onboarding.localeDetected': 'Mostrando en {language} · cambia en Apariencia',
 }

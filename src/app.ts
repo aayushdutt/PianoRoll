@@ -559,12 +559,16 @@ export class App {
     //   • LearnController (only when Learn is enabled) → first Learn entry
     whenIdle(() => this.synth.preloadDefault())
     whenIdle(() => void import('@tonejs/midi'))
+    // Chunk-only prefetch: failures are harmless (the click path goes through
+    // lazyHandle, which retries or reloads a stale tab), so swallow them
+    // rather than surfacing unhandled rejections.
+    const prefetch = (p: Promise<unknown>) => p.catch(() => {})
     whenIdle(() => {
-      void import('./ui/ExportModal')
-      void import('./ui/PostSessionModal')
-      void import('./ui/MidiPickerModal')
+      prefetch(import('./ui/ExportModal'))
+      prefetch(import('./ui/PostSessionModal'))
+      prefetch(import('./ui/MidiPickerModal'))
     })
-    whenIdle(() => void this.ensureLearnController())
+    whenIdle(() => prefetch(import('./modes/LearnController')))
 
     this.controls.updateMidiStatus(this.midiInput.status.value, '')
     this.dropzone.updateMidiStatus(this.midiInput.status.value, '')
