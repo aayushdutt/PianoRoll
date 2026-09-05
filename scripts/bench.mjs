@@ -40,7 +40,7 @@ const FIXTURE_INDEPENDENT = new Set(['idle'])
 // See docs/AUDIO_GLITCH_HARNESS_2026-09-05.md.
 const AUDIO_SUITES = new Set(['headroom', 'voiceload'])
 const AUDIO_METRICS = {
-  headroom: ['peakDb', 'clipPct', 'clipRunMaxMs', 'firstClipNotes', 'rmsDb', 'crestDb'],
+  headroom: ['peakDb', 'clipPct', 'aboveKneePct', 'firstClipNotes', 'rmsDb', 'lufsM'],
   voiceload: ['driftMs', 'firstDriftNote'],
 }
 // voiceload drives the live synth by hand (no MIDI); its fixture is nominal.

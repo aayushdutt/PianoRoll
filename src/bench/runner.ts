@@ -854,17 +854,18 @@ function heapMB(): number {
 const HEADROOM_VOLUME = 0.8
 
 async function loadAudioFixture(id: string): Promise<MidiFile> {
-  const { applyBarSustain, buildSyntheticFixture, isAudioFixtureId } = await import(
+  const { applyBarSustain, buildSyntheticFixture, isAudioFixtureId, truncateMidi } = await import(
     './audioFixtures'
   )
   if (!isAudioFixtureId(id)) throw new Error(`unknown audio fixture: ${id}`)
-  if (id !== 'pedal-piece') return buildSyntheticFixture(id)
+  if (id !== 'pedal-piece' && id !== 'piece-20') return buildSyntheticFixture(id)
   // Real piece + bar-length sustain: the playback-with-pedal case. Fetched
   // directly rather than via loadFixture — no play-mode side effects needed.
   const base = BENCH_FIXTURES[0]!
   const res = await fetch(base.url)
   if (!res.ok) throw new Error(`fixture fetch failed: ${base.url} → ${res.status}`)
-  return applyBarSustain(await parseMidiFile(await res.arrayBuffer(), base.id))
+  const piece = applyBarSustain(await parseMidiFile(await res.arrayBuffer(), base.id))
+  return id === 'piece-20' ? truncateMidi(piece, 20) : piece
 }
 
 function requestedInstruments(): InstrumentId[] {
@@ -883,7 +884,7 @@ async function suiteHeadroom(ctx: AppCtxValue, fixtureId: string): Promise<Recor
   // Sample decode happens on the online context; make sure it's running.
   ctx.primeInteractiveAudio()
   const { renderAudioOffline } = await import('../audio/OfflineAudioRenderer')
-  const { analyseBuffer } = await import('./audioAnalysis')
+  const { analyseBuffer, measureLoudness } = await import('./audioAnalysis')
   const { notesSoundingAt } = await import('./audioFixtures')
 
   // `&protection=off` measures raw instrument levels (for setting trims);
@@ -908,8 +909,15 @@ async function suiteHeadroom(ctx: AppCtxValue, fixtureId: string): Promise<Recor
     out[`${id}_clipRunMaxMs`] = m.clipRunMaxMs
     out[`${id}_rmsDb`] = m.rmsDb
     out[`${id}_crestDb`] = m.crestDb
+    out[`${id}_aboveKneePct`] = m.aboveKneePct
     // Notes sounding at the first clipped sample; 0 = never clipped.
     out[`${id}_firstClipNotes`] = m.firstClipS < 0 ? 0 : notesSoundingAt(midi, m.firstClipS)
+    // Perceived loudness (K-weighted). `lufsM` is what to balance on.
+    const channels: Float32Array[] = []
+    for (let c = 0; c < buffer.numberOfChannels; c++) channels.push(buffer.getChannelData(c))
+    const l = measureLoudness(channels, buffer.sampleRate)
+    out[`${id}_lufsI`] = l.integratedLufs
+    out[`${id}_lufsM`] = l.maxMomentaryLufs
   }
   return out
 }

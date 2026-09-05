@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyseChannels } from './audioAnalysis'
+import { analyseChannels, measureLoudness } from './audioAnalysis'
 
 const SR = 1000 // 1 kHz keeps frame↔ms arithmetic trivial
 
@@ -62,5 +62,45 @@ describe('analyseChannels', () => {
     expect(m.peakDb).toBe(-120)
     expect(m.rmsDb).toBe(-120)
     expect(m.clipPct).toBe(0)
+  })
+})
+
+describe('measureLoudness (BS.1770 K-weighted)', () => {
+  const sr = 48_000
+  const tone = (hz: number, amp: number, secs: number): Float32Array => {
+    const out = new Float32Array(Math.round(sr * secs))
+    for (let i = 0; i < out.length; i++) out[i] = amp * Math.sin((2 * Math.PI * hz * i) / sr)
+    return out
+  }
+
+  it('reads a 1 kHz sine at -20 dBFS as about -23.7 LUFS (single channel)', () => {
+    // K-weighting is ~0 dB at 1 kHz; mean square of a sine at 0.1 is 0.005 →
+    // -0.691 + 10·log10(0.005) = -23.7. Standard's reference behaviour.
+    const l = measureLoudness([tone(1000, 0.1, 3)], sr)
+    expect(l.integratedLufs).toBeCloseTo(-23.7, 0)
+    expect(l.maxMomentaryLufs).toBeCloseTo(-23.7, 0)
+  })
+
+  it('tracks gain: +6 dB in → +6 LU out', () => {
+    const a = measureLoudness([tone(1000, 0.1, 3)], sr).integratedLufs
+    const b = measureLoudness([tone(1000, 0.2, 3)], sr).integratedLufs
+    expect(b - a).toBeCloseTo(6.02, 1)
+  })
+
+  it('weights high frequencies up and sub-bass down, as the ear does', () => {
+    const mid = measureLoudness([tone(1000, 0.1, 3)], sr).integratedLufs
+    const high = measureLoudness([tone(6000, 0.1, 3)], sr).integratedLufs
+    const low = measureLoudness([tone(30, 0.1, 3)], sr).integratedLufs
+    expect(high).toBeGreaterThan(mid + 2)
+    expect(low).toBeLessThan(mid - 6)
+  })
+
+  it('momentary max captures a short burst that integrated loudness gates out', () => {
+    const x = new Float32Array(sr * 4)
+    x.set(tone(1000, 0.5, 0.5), sr) // half-second burst in four seconds of silence
+    const l = measureLoudness([x], sr)
+    expect(l.maxMomentaryLufs).toBeGreaterThan(-12)
+    // Integrated is gated to the loud blocks only, so it stays near the burst level too.
+    expect(l.integratedLufs).toBeGreaterThan(-15)
   })
 })
