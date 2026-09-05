@@ -33,6 +33,18 @@ const PORT = 4477
 const DEFAULT_SUITES = ['frame', 'attribution', 'live', 'idle']
 // Suites where the fixture doesn't matter — run once on the densest fixture.
 const FIXTURE_INDEPENDENT = new Set(['idle'])
+// Suites that run on the in-page synthetic audio fixtures (`?bench=list`
+// publishes them as __BENCH_AUDIO_FIXTURES) instead of MIDI files, and whose
+// metrics are per-instrument rows rather than per-fixture columns. They're
+// deterministic (offline render), so they run once unless --runs is explicit.
+// See docs/AUDIO_GLITCH_HARNESS_2026-09-05.md.
+const AUDIO_SUITES = new Set(['headroom', 'voiceload'])
+const AUDIO_METRICS = {
+  headroom: ['peakDb', 'clipPct', 'clipRunMaxMs', 'firstClipNotes', 'rmsDb', 'crestDb'],
+  voiceload: ['driftMs', 'firstDriftNote'],
+}
+// voiceload drives the live synth by hand (no MIDI); its fixture is nominal.
+const SUITE_FIXED_FIXTURE = { voiceload: 'stack-185' }
 // Regression gates. `pct` metrics fail at >+10% vs baseline; `pctInverse`
 // metrics fail at <-10% (higher-is-better, e.g. encode throughput); `abs`
 // metrics fail above the absolute limit with no baseline needed.
@@ -53,10 +65,17 @@ const HELP = `midee perf harness - see docs/BENCH_HARNESS_V2_2026-07-02.md
 usage: npm run bench [-- <flags>]        build + run
        npm run bench:run [-- <flags>]    run against existing dist/
 
-  --suite a,b,c     suites: frame, attribution, live, idle, pacing, export
-                    (default: frame,attribution,live,idle)
+  --suite a,b,c     suites: frame, attribution, live, idle, pacing, export,
+                    audiorender, headroom  (default: frame,attribution,live,idle)
                     export = the real seek→render→VideoFrame→encode loop
+                    headroom = offline pre-clip peak per instrument on held
+                    clusters (synthetic fixtures: cluster-ff, cluster-mf,
+                    stack-185, pedal-piece)
   --fixture x,y     fixture ids (default: all - sparse → dense)
+  --instruments a,b audio suites only: instrument ids (default: all 13;
+                    'piano' downloads samples from an external CDN)
+  --protection off  headroom only: bypass the master bus's soft-clip ceiling
+                    to read raw instrument levels (for setting trims)
   --quick           smoke mode: frame+idle, sparsest+densest fixture, 1 run
   --runs N          repeats per suite, best median wins (default 2)
 
@@ -80,6 +99,7 @@ function parseArgs(argv) {
     suites: DEFAULT_SUITES,
     suitesExplicit: false,
     fixtures: null, // null = all from page
+    instruments: null, // null = all (audio suites)
     cpu: 1,
     noGpu: false,
     dpr: null,
@@ -101,6 +121,12 @@ function parseArgs(argv) {
       args.suites = next().split(',')
       args.suitesExplicit = true
     } else if (a === '--fixture') args.fixtures = next().split(',')
+    else if (a === '--instruments') args.instruments = next().split(',')
+    else if (a === '--protection') {
+      const v = next()
+      if (v !== 'on' && v !== 'off') die(`--protection expects on|off, got ${v}`)
+      args.protectionOff = v === 'off'
+    }
     else if (a === '--cpu') args.cpu = Number(next())
     else if (a === '--no-gpu') args.noGpu = true
     else if (a === '--dpr') args.dpr = Number(next())
@@ -245,12 +271,18 @@ async function runInPage(browser, args, query) {
     }
     const value = await handle.jsonValue()
     if (value?.__err) throw new Error(`bench failed: ${value.__err}`)
+    if (query === 'bench=list') {
+      // The page publishes both lists before __BENCH_FIXTURES appears.
+      const audio = await page.evaluate(() => window.__BENCH_AUDIO_FIXTURES ?? [])
+      return { midi: value, audio }
+    }
     return value
   } finally {
     await context.close()
   }
 }
 
+// → { midi: string[], audio: string[] }
 async function discoverFixtures(browser, args) {
   return runInPage(browser, args, 'bench=list')
 }
@@ -259,9 +291,15 @@ async function discoverFixtures(browser, args) {
 // the standard noise-floor convention. Non-frame metrics come from that same
 // winning run so the result stays internally consistent.
 async function runSuite(browser, args, suite, fixture) {
+  const audio = AUDIO_SUITES.has(suite)
+  // Offline audio suites are deterministic — repeats only cost time.
+  const runs = audio && !args.runsExplicit ? 1 : args.runs
+  let query = `bench=${suite}&fixture=${fixture}`
+  if (audio && args.instruments) query += `&instruments=${args.instruments.join(',')}`
+  if (audio && args.protectionOff) query += '&protection=off'
   let best = null
-  for (let i = 0; i < args.runs; i++) {
-    const result = await runInPage(browser, args, `bench=${suite}&fixture=${fixture}`)
+  for (let i = 0; i < runs; i++) {
+    const result = await runInPage(browser, args, query)
     const score = result.metrics.medianFrameMs ?? 0
     if (!best || score < (best.metrics.medianFrameMs ?? 0)) best = result
   }
@@ -404,6 +442,13 @@ function printReport(results, baseline, env, args) {
 
   let anyUnbaselined = false
   for (const [suite, rows] of bySuite) {
+    if (AUDIO_SUITES.has(suite)) {
+      for (const r of rows) {
+        if (!baseline.entries[r.key]) anyUnbaselined = true
+        printAudioTable(suite, r)
+      }
+      continue
+    }
     const cols = SUITE_COLUMNS[suite] ?? Object.keys(rows[0].result.metrics)
     const header = ['fixture', ...cols.map((c) => COLUMN_LABELS[c] ?? c)]
     const table = [header]
@@ -436,6 +481,40 @@ function printReport(results, baseline, env, args) {
   }
 }
 
+// Audio suites: one table per fixture, instruments as rows. Metric keys are
+// `<instrument>_<metric>`; `peakDb > 0` is flagged — that's audible clipping
+// in the online path.
+function printAudioTable(suite, r) {
+  const { metrics } = r.result
+  const cols = AUDIO_METRICS[suite]
+  const instruments = [...new Set(Object.keys(metrics).filter((k) => k.includes('_')).map((k) => k.split('_')[0]))]
+  const header = ['instrument', ...cols]
+  const table = [header]
+  for (const inst of instruments) {
+    table.push([
+      inst,
+      ...cols.map((m) => {
+        const v = metrics[`${inst}_${m}`]
+        if (v === undefined) return '-'
+        const flag = (m === 'peakDb' && v > 0) || (m === 'firstDriftNote' && v > 0)
+        return flag ? `${v} ✗` : String(v)
+      }),
+    ])
+  }
+  const widths = header.map((_, i) => Math.max(...table.map((row) => row[i].length)))
+  const note =
+    metrics.durationS !== undefined
+      ? `${metrics.durationS}s held, protection ${metrics.protectionOn ? 'on' : 'OFF'}`
+      : `${metrics.notes} notes, ${metrics.stepMs} ms apart`
+  console.log(`\n■ ${suite} / ${r.fixture}  (${note})`)
+  for (let ri = 0; ri < table.length; ri++) {
+    const line = table[ri]
+      .map((cell, i) => (i === 0 ? cell.padEnd(widths[i]) : cell.padStart(widths[i])))
+      .join('   ')
+    console.log(`  ${ri === 0 ? dim(line) : line}`)
+  }
+}
+
 function dim(s) {
   return process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s
 }
@@ -456,14 +535,29 @@ async function main() {
 
   try {
     browser = await launch(args)
-    const allFixtures = await discoverFixtures(browser, args)
+    const { midi: allFixtures, audio: audioFixtures } = await discoverFixtures(browser, args)
     let fixtures = args.fixtures ?? allFixtures
     if (args.quick && !args.fixtures) {
       // Smoke mode: cheapest early warning — the sparse floor + dense ceiling.
       fixtures = [allFixtures[0], allFixtures[allFixtures.length - 1]]
     }
+    const known = [...allFixtures, ...audioFixtures]
     for (const f of fixtures) {
-      if (!allFixtures.includes(f)) die(`unknown fixture ${f} - page offers: ${allFixtures.join(', ')}`)
+      if (!known.includes(f)) die(`unknown fixture ${f} - page offers: ${known.join(', ')}`)
+    }
+    // Audio suites take the synthetic list by default; an explicit --fixture
+    // is filtered to whichever list applies to the suite at hand.
+    const fixturesFor = (suite) => {
+      if (AUDIO_SUITES.has(suite)) {
+        if (SUITE_FIXED_FIXTURE[suite]) return [SUITE_FIXED_FIXTURE[suite]]
+        const list = args.fixtures ? args.fixtures.filter((f) => audioFixtures.includes(f)) : audioFixtures
+        if (!list.length) die(`${suite} needs an audio fixture: ${audioFixtures.join(', ')}`)
+        return list
+      }
+      if (FIXTURE_INDEPENDENT.has(suite)) return [fixtures[fixtures.length - 1]]
+      const list = fixtures.filter((f) => allFixtures.includes(f))
+      if (!list.length) die(`${suite} needs a MIDI fixture: ${allFixtures.join(', ')}`)
+      return list
     }
     const env = envKey(args)
     const baseline = loadBaseline()
@@ -473,10 +567,7 @@ async function main() {
     }
 
     for (const suite of args.suites) {
-      const suiteFixtures = FIXTURE_INDEPENDENT.has(suite)
-        ? [fixtures[fixtures.length - 1]]
-        : fixtures
-      for (const fixture of suiteFixtures) {
+      for (const fixture of fixturesFor(suite)) {
         const t0 = Date.now()
         const result = await runSuite(browser, args, suite, fixture)
         const key = baselineKey(env, suite, fixture)

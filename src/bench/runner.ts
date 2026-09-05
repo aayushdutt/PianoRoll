@@ -14,6 +14,7 @@
 //     ~0.1 ms without cross-origin isolation, so single sub-ms frames are
 //     mostly timer noise. A batch gives 0.01 ms/frame resolution.
 
+import { INSTRUMENTS, type InstrumentId } from '../audio/instruments'
 import { parseMidiFile } from '../core/midi/parser'
 import type { MidiFile } from '../core/midi/types'
 import type { AppCtxValue } from '../store/AppCtx'
@@ -51,6 +52,8 @@ export type BenchSuite =
   | 'export'
   | 'exportlab'
   | 'audiorender'
+  | 'headroom'
+  | 'voiceload'
 
 export interface BenchEnv {
   ua: string
@@ -839,6 +842,151 @@ function heapMB(): number {
   return mem ? mem.usedJSHeapSize / (1024 * 1024) : 0
 }
 
+// ── headroom: pre-clip peak per instrument on held clusters ───────────────
+// Renders synthetic held-note fixtures (src/bench/audioFixtures.ts) offline
+// through the real instrument chain and measures how far the summed signal
+// exceeds full scale. Offline buffers are unclamped, so `peakDb > 0` is
+// exactly the overshoot the online path hard-clips into crunch. Deterministic
+// — no timing, no frame pacing — so the driver runs it once.
+// See docs/AUDIO_GLITCH_HARNESS_2026-09-05.md.
+
+// Store default (src/store/state.ts) — the level a fresh install plays at.
+const HEADROOM_VOLUME = 0.8
+
+async function loadAudioFixture(id: string): Promise<MidiFile> {
+  const { applyBarSustain, buildSyntheticFixture, isAudioFixtureId } = await import(
+    './audioFixtures'
+  )
+  if (!isAudioFixtureId(id)) throw new Error(`unknown audio fixture: ${id}`)
+  if (id !== 'pedal-piece') return buildSyntheticFixture(id)
+  // Real piece + bar-length sustain: the playback-with-pedal case. Fetched
+  // directly rather than via loadFixture — no play-mode side effects needed.
+  const base = BENCH_FIXTURES[0]!
+  const res = await fetch(base.url)
+  if (!res.ok) throw new Error(`fixture fetch failed: ${base.url} → ${res.status}`)
+  return applyBarSustain(await parseMidiFile(await res.arrayBuffer(), base.id))
+}
+
+function requestedInstruments(): InstrumentId[] {
+  const all = INSTRUMENTS.map((i) => i.id)
+  const param = new URLSearchParams(window.location.search).get('instruments')
+  if (!param) return all
+  const ids = param.split(',').filter(Boolean)
+  for (const id of ids) {
+    if (!all.includes(id as InstrumentId)) throw new Error(`unknown instrument: ${id}`)
+  }
+  return ids as InstrumentId[]
+}
+
+async function suiteHeadroom(ctx: AppCtxValue, fixtureId: string): Promise<Record<string, number>> {
+  const midi = await loadAudioFixture(fixtureId)
+  // Sample decode happens on the online context; make sure it's running.
+  ctx.primeInteractiveAudio()
+  const { renderAudioOffline } = await import('../audio/OfflineAudioRenderer')
+  const { analyseBuffer } = await import('./audioAnalysis')
+  const { notesSoundingAt } = await import('./audioFixtures')
+
+  // `&protection=off` measures raw instrument levels (for setting trims);
+  // default is the shipped path, soft-clip ceiling included.
+  const raw = new URLSearchParams(window.location.search).get('protection') === 'off'
+  const out: Record<string, number> = {
+    durationS: round(midi.duration),
+    protectionOn: raw ? 0 : 1,
+  }
+  for (const id of requestedInstruments()) {
+    progress(`headroom:${id}`)
+    const buffer = await renderAudioOffline({
+      midi,
+      instrumentId: id,
+      volume: HEADROOM_VOLUME,
+      busRouting: raw ? 'raw' : 'protected',
+    })
+    // RMS over the held region only; the 1.5 s render tail would dilute it.
+    const m = analyseBuffer(buffer, { from: 0, to: midi.duration })
+    out[`${id}_peakDb`] = m.peakDb
+    out[`${id}_clipPct`] = m.clipPct
+    out[`${id}_clipRunMaxMs`] = m.clipRunMaxMs
+    out[`${id}_rmsDb`] = m.rmsDb
+    out[`${id}_crestDb`] = m.crestDb
+    // Notes sounding at the first clipped sample; 0 = never clipped.
+    out[`${id}_firstClipNotes`] = m.firstClipS < 0 ? 0 : notesSoundingAt(midi, m.firstClipS)
+  }
+  return out
+}
+
+// ── voiceload: live voice pile-up on the online context ───────────────────
+// Reproduces Wyatt's method on the REAL live path (`SynthEngine.liveNoteOn`,
+// online AudioContext): one full-velocity note per beat at 185 BPM, all held,
+// then a 3 s steady state. Underrun proxy: Chrome advances
+// `AudioContext.currentTime` only as quanta are rendered, so when the audio
+// thread falls behind, context time lags wall time. `driftMs` is that lag;
+// `firstDriftNote` is the note count at which it first exceeds
+// DRIFT_THRESHOLD_MS — directly comparable to Wyatt's per-instrument table.
+// (`AudioContext.renderCapacity` is not exposed by the bundled Chromium,
+// even behind Blink flags — checked 2026-09-05.)
+//
+// Caveats, both stated in docs/AUDIO_GLITCH_HARNESS_2026-09-05.md: headless
+// output goes to a fake sink (still realtime-paced), and CDP CPU throttling
+// slows the main thread more reliably than the audio render thread. Numbers
+// are indicative and relative, not a CI gate.
+
+const VOICELOAD_PITCHES = [48, 52, 55, 59, 62, 64, 67, 71, 72, 76, 79, 83, 84, 88, 91, 95]
+// One render quantum at 44.1 kHz is ~2.9 ms; ordinary jitter stays well
+// under 10 ms. Anything past this is the audio thread genuinely behind.
+const DRIFT_THRESHOLD_MS = 10
+const VOICELOAD_HOLD_MS = 3000
+const VOICELOAD_TAIL_MS = 2500
+
+async function suiteVoiceload(
+  ctx: AppCtxValue,
+  _fixtureId: string,
+): Promise<Record<string, number>> {
+  const { getContext } = await import('tone')
+  const { STACK_BPM } = await import('./audioFixtures')
+  const stepMs = (60 / STACK_BPM) * 1000
+  const synth = ctx.services.synth
+  ctx.primeInteractiveAudio()
+  const native = getContext().rawContext as AudioContext
+
+  const out: Record<string, number> = { notes: VOICELOAD_PITCHES.length, stepMs: round(stepMs) }
+  for (const id of requestedInstruments()) {
+    progress(`voiceload:${id}:load`)
+    await synth.setInstrument(id)
+    synth.primeLiveInput()
+    await sleep(500)
+
+    const wall0 = performance.now()
+    const ctx0 = native.currentTime
+    const drift = (): number => performance.now() - wall0 - (native.currentTime - ctx0) * 1000
+    let driftMax = 0
+    let firstDriftNote = 0
+    const sample = (noteCount: number): void => {
+      const d = drift()
+      if (d > driftMax) driftMax = d
+      if (!firstDriftNote && d > DRIFT_THRESHOLD_MS) firstDriftNote = noteCount
+    }
+
+    for (let i = 0; i < VOICELOAD_PITCHES.length; i++) {
+      progress(`voiceload:${id}:note${i + 1}`)
+      synth.liveNoteOn(VOICELOAD_PITCHES[i]!, 1)
+      await sleep(stepMs)
+      sample(i + 1)
+    }
+    // Steady state with the full stack held — sample a few times so a late
+    // drift still registers against the full count.
+    for (let t = 0; t < VOICELOAD_HOLD_MS; t += 250) {
+      await sleep(250)
+      sample(VOICELOAD_PITCHES.length)
+    }
+    synth.liveReleaseAll()
+    await sleep(VOICELOAD_TAIL_MS)
+
+    out[`${id}_driftMs`] = round(driftMax)
+    out[`${id}_firstDriftNote`] = firstDriftNote
+  }
+  return out
+}
+
 // ── entry point (called from main.tsx behind VITE_ENABLE_BENCH) ───────────
 
 const SUITES: Record<
@@ -853,6 +1001,8 @@ const SUITES: Record<
   export: suiteExport,
   exportlab: suiteExportLab,
   audiorender: suiteAudioRender,
+  headroom: suiteHeadroom,
+  voiceload: suiteVoiceload,
 }
 
 export async function maybeRunBench(ctx: AppCtxValue): Promise<void> {
@@ -861,6 +1011,10 @@ export async function maybeRunBench(ctx: AppCtxValue): Promise<void> {
   if (!suiteParam) return
 
   if (suiteParam === 'list') {
+    const { AUDIO_FIXTURE_IDS } = await import('./audioFixtures')
+    // Audio ids first: the driver waits on __BENCH_FIXTURES, so both must be
+    // in place by the time it appears.
+    window.__BENCH_AUDIO_FIXTURES = [...AUDIO_FIXTURE_IDS]
     window.__BENCH_FIXTURES = BENCH_FIXTURES.map((f) => f.id)
     return
   }
