@@ -112,6 +112,13 @@ vi.mock('tone', () => {
   }
 })
 
+// The master bus owns the volume node; SynthEngine only forwards the slider.
+vi.mock('./masterBus', () => ({
+  setMasterVolume: (v: number) => {
+    holder.destinationVolume.value = v
+  },
+}))
+
 // Fake instrument runtime that records every trigger. createInstrument is async
 // and resolves immediately so `ensureInstrument` settles on the first
 // microtask flush.
@@ -514,7 +521,7 @@ describe('SynthEngine — setSpeed / setVolume', () => {
     expect(holder.transport.bpm.value).toBe(60) // 120 * 0.5
   })
 
-  it('setVolume routes through gainToDb onto the destination', async () => {
+  it('setVolume forwards the slider value to the master bus', async () => {
     const midi = makeMidi([track('a', [note(60, 0)])], 120)
     const engine = await loadedEngine(midi)
 

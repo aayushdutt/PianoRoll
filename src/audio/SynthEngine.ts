@@ -1,12 +1,4 @@
-import {
-  gainToDb,
-  getContext,
-  getDestination,
-  getTransport,
-  immediate,
-  Part,
-  start as toneStart,
-} from 'tone'
+import { getContext, getTransport, immediate, Part, start as toneStart } from 'tone'
 import { audibleDuration, type MidiFile } from '../core/midi/types'
 import { createEventSignal } from '../store/eventSignal'
 import type { AudioEngine } from './AudioEngine'
@@ -16,6 +8,7 @@ import {
   type InstrumentRuntime,
   midiToNoteName,
 } from './instruments'
+import { setMasterVolume } from './masterBus'
 
 export type { InstrumentId, InstrumentInfo } from './instruments'
 export { INSTRUMENTS } from './instruments'
@@ -237,7 +230,7 @@ export class SynthEngine implements AudioEngine {
   }
 
   setVolume(v: number): void {
-    getDestination().volume.value = gainToDb(v)
+    setMasterVolume(v)
   }
 
   setSpeed(s: number): void {

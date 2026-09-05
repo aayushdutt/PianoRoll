@@ -8,17 +8,15 @@
 // API pauses the render at a specified render-time point and yields back to
 // the main thread; we report progress, then `resume()` to continue.
 
-import {
-  gainToDb,
-  getContext,
-  getDestination,
-  getTransport,
-  OfflineContext,
-  Part,
-  setContext,
-} from 'tone'
+import { getContext, getTransport, OfflineContext, Part, setContext } from 'tone'
 import type { MidiFile } from '../core/midi/types'
 import { createInstrument, type InstrumentId, preloadSampleBuffers } from './instruments'
+import {
+  getMasterBusRouting,
+  type MasterBusRouting,
+  setMasterBusRouting,
+  setMasterVolume,
+} from './masterBus'
 import { buildOfflineEvents, type OfflineNoteEvent } from './offlineEvents'
 
 export { buildOfflineEvents, type OfflineNoteEvent } from './offlineEvents'
@@ -38,6 +36,9 @@ export interface OfflineRenderOptions {
   // `true` means `onProgress` will be called; `false` = no suspend API (older
   // runtimes) — the UI should stay indeterminate for this stage.
   onRenderAudioProgressMode?: (determinate: boolean) => void
+  // Bench only: 'raw' renders without the master bus's soft-clip ceiling so
+  // instrument levels can be measured. Product code never sets it.
+  busRouting?: MasterBusRouting
 }
 
 // 44.1 kHz matches AAC output in the muxer — rendering at 48 kHz cost ~9% more
@@ -84,13 +85,17 @@ export async function renderAudioOffline(opts: OfflineRenderOptions): Promise<Au
   const rawContext = new OfflineAudioContext(2, Math.ceil(renderDuration * sampleRate), sampleRate)
   const offline = new OfflineContext(rawContext)
   const prevContext = getContext()
+  const prevRouting = getMasterBusRouting()
   setContext(offline)
 
   try {
     opts.onRenderAudioProgressMode?.(typeof rawContext.suspend === 'function')
 
     const inst = await createInstrument(instrumentId)
-    getDestination().volume.value = gainToDb(volume)
+    // Bus is per context — this builds the offline one (volume + ceiling),
+    // so exports go through exactly the playback output path.
+    setMasterVolume(volume)
+    if (opts.busRouting) setMasterBusRouting(opts.busRouting)
 
     const transport = getTransport()
     transport.bpm.value = midi.bpm
@@ -135,6 +140,9 @@ export async function renderAudioOffline(opts: OfflineRenderOptions): Promise<Au
     if (!raw) throw new Error('Offline audio render produced no buffer')
     return raw
   } finally {
+    // Routing is module-global; a bench render must not leak 'raw' into the
+    // live bus.
+    setMasterBusRouting(prevRouting)
     setContext(prevContext)
   }
 }

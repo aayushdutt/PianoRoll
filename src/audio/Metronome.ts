@@ -1,5 +1,6 @@
 import { getContext, Synth, start as toneStart } from 'tone'
 import { createEventSignal } from '../store/eventSignal'
+import { getMasterBus } from './masterBus'
 
 // Simple click-track metronome. Look-ahead scheduling keeps timing tight
 // (< ~5ms jitter) regardless of page repaints or garbage collection.
@@ -69,7 +70,7 @@ export class Metronome {
     this.synth = new Synth({
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 },
-    }).toDestination()
+    }).connect(getMasterBus())
     this.synth.volume.value = -12
   }
 
