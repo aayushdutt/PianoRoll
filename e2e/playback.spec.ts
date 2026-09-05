@@ -68,6 +68,38 @@ async function clickPlay(page: Page): Promise<void> {
   await btn.click()
 }
 
+/** `data-playing` mirrors the store's playing state (ControlsView.tsx). */
+async function isPlaying(page: Page): Promise<boolean> {
+  return (await page.locator('#hud-play').getAttribute('data-playing')) === 'true'
+}
+
+/** Drive the scrubber exactly as a drag-release does (Controls.tsx → clock.seek). */
+async function seekTo(scrubber: Locator, target: number): Promise<void> {
+  await scrubber.evaluate((el, t) => {
+    const input = el as HTMLInputElement
+    input.value = String(t)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  }, target)
+}
+
+/**
+ * The app auto-plays 250 ms after a file loads when audio is allowed
+ * (App.autoplayAfterLoad). This spec drives play/pause itself, so it must
+ * start from a known PAUSED state at t≈0: wait past the autoplay window,
+ * pause if it kicked in, and rewind. Without this the first "play" click
+ * toggled an already-playing piece to pause (playhead froze at ~0.3 s).
+ */
+async function settlePausedAtStart(page: Page, scrubber: Locator): Promise<void> {
+  await page.waitForTimeout(400)
+  if (await isPlaying(page)) {
+    await clickPlay(page)
+    await expect.poll(() => isPlaying(page), { timeout: 3_000 }).toBe(false)
+  }
+  await seekTo(scrubber, 0)
+  await expect.poll(() => playhead(scrubber), { timeout: 3_000 }).toBeLessThan(0.2)
+}
+
 test.describe('Golden-path playback', () => {
   test('play advances the playhead, pause stops it, seek repositions and resumes', async ({
     page,
@@ -83,8 +115,8 @@ test.describe('Golden-path playback', () => {
       })
       .toBeGreaterThan(FIXTURE_DURATION_S * 0.5)
 
-    // Start at (approximately) zero before playing.
-    expect(await playhead(scrubber)).toBeLessThan(0.2)
+    // Known state: paused at (approximately) zero before we press play.
+    await settlePausedAtStart(page, scrubber)
 
     // ── 1. PLAY → playhead advances at ~real-time ──────────────────────────────
     await clickPlay(page)
@@ -136,12 +168,7 @@ test.describe('Golden-path playback', () => {
     // Seek to a known position well inside the clip. Driving the scrubber's
     // `change` event is exactly what a user drag-release does (Controls.tsx → clock.seek).
     const SEEK_TARGET = 1.0
-    await scrubber.evaluate((el, target) => {
-      const input = el as HTMLInputElement
-      input.value = String(target)
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      input.dispatchEvent(new Event('change', { bubbles: true }))
-    }, SEEK_TARGET)
+    await seekTo(scrubber, SEEK_TARGET)
 
     // While paused, the clock subscription won't overwrite the scrubber, so its value
     // should equal the sought target (the seek path also calls clock.seek(target)).

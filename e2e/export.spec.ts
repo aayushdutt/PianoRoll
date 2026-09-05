@@ -116,9 +116,12 @@ test.describe('MP4 export (flagship, full WebCodecs path)', () => {
   }) => {
     await loadFixtureAndOpenExport(page)
 
-    // Output "Audio only", then pick the WAV format (default is MP3).
-    await page.locator('#export-modal .fps-btn', { hasText: 'Audio only' }).click()
-    await page.locator('#export-modal .fps-btn', { hasText: 'WAV' }).click()
+    // "Audio" destination tab, then the WAV format choice (default is MP3).
+    // Selectors verified against src/ui/ExportModal.tsx: tabs are
+    // `.export-tab` (role=tab, label from i18n `export.tab.audio` = "Audio"),
+    // formats are `.export-choice` with an upper-cased title span.
+    await page.locator('#export-modal .export-tab', { hasText: 'Audio' }).click()
+    await page.locator('#export-modal .export-choice', { hasText: 'WAV' }).click()
 
     const { bytes, suggestedFilename } = await runExportAndCapture(page)
 
@@ -153,9 +156,9 @@ test.describe('MP4 export (flagship, full WebCodecs path)', () => {
   test('audio-only MP3 export is a valid MP3 (frame sync header)', async ({ page }) => {
     await loadFixtureAndOpenExport(page)
 
-    // Output "Audio only"; MP3 is the default format, but click it to be explicit.
-    await page.locator('#export-modal .fps-btn', { hasText: 'Audio only' }).click()
-    await page.locator('#export-modal .fps-btn', { hasText: 'MP3' }).click()
+    // "Audio" destination tab; MP3 is the default format, but click it to be explicit.
+    await page.locator('#export-modal .export-tab', { hasText: 'Audio' }).click()
+    await page.locator('#export-modal .export-choice', { hasText: 'MP3' }).click()
 
     const { bytes, suggestedFilename } = await runExportAndCapture(page)
 

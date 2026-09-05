@@ -401,6 +401,7 @@ export function HudView(props: HudProps) {
             id="hud-play"
             aria-label={t('hud.aria.play')}
             data-tip={t('hud.play')}
+            data-playing={props.playing() ? 'true' : 'false'}
             onClick={() => props.onPlay()}
             innerHTML={props.playing() ? icons.pause() : icons.play()}
           />
